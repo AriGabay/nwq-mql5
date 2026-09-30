@@ -1,7 +1,8 @@
 """EA input extraction and MT5 tester .set files (UTF-16LE with BOM)."""
 import dataclasses
-import pathlib
 import re
+
+from .textio import read_text, write_utf16
 
 INPUT_RE = re.compile(r"^\s*input\s+(\w+)\s+(\w+)\s*=\s*([^;]+);\s*(?://\s*(.*))?$", re.M)
 ENUM_RE = re.compile(r"enum\s+(\w+)\s*\{(.*?)\};", re.S)
@@ -86,16 +87,13 @@ def _fmt(v) -> str:
 
 
 def write_set(path, lines: list, header: str = "") -> None:
-    path = pathlib.Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
     text = "".join(f"; {h}\r\n" for h in header.splitlines() if h) + "\r\n".join(lines) + "\r\n"
-    path.write_bytes(b"\xff\xfe" + text.encode("utf-16-le"))
+    write_utf16(path, text)
 
 
 def read_set(path) -> dict:
     """name -> value (first field) from a .set file (UTF-16 or UTF-8)."""
-    data = pathlib.Path(path).read_bytes()
-    text = data.decode("utf-16") if data[:2] in (b"\xff\xfe", b"\xfe\xff") else data.decode("utf-8-sig")
+    text = read_text(path, fallback="utf-8-sig")
     out = {}
     for line in text.splitlines():
         line = line.strip()

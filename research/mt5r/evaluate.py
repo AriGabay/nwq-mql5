@@ -35,9 +35,7 @@ def stitch(runs: list) -> dict:
 
 def daily_pnl(days: pd.DataFrame) -> pd.Series:
     """Equity change per day (close-to-close; first day vs its opening equity), indexed by date."""
-    prev = days["eq_close"].shift(1)
-    prev.iloc[0] = days["eq_open"].iloc[0]
-    return pd.Series((days["eq_close"] - prev).values, index=days["date"])
+    return pd.Series((days["eq_close"] - metrics.previous_equity(days)).values, index=days["date"])
 
 
 def aligned_pnl(a_days, b_days) -> tuple:

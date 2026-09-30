@@ -1,6 +1,5 @@
 import pathlib
 
-import pandas as pd
 
 from mt5r import journal, reports
 

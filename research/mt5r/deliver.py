@@ -8,13 +8,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-from . import evaluate, montecarlo  # noqa: E402
+from . import evaluate  # noqa: E402
+from .pipeline import DEFAULTS, PARAMS  # noqa: E402,F401
+from .textio import read_text  # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 BLUE, ORANGE, AQUA = "#2a78d6", "#eb6834", "#1baf7a"   # validated categorical slots 1-3 (light surface)
 INK, MUTED, SURFACE = "#1f1f1e", "#6b6a64", "#fcfcfb"
-PARAMS = ["PivL", "PivR", "SweepToSetupBars", "VolumeMultiplier", "ConfirmationBars"]
-DEFAULTS = {"PivL": 3, "PivR": 3, "SweepToSetupBars": 12, "VolumeMultiplier": 2.0, "ConfirmationBars": 6}
 
 
 def load() -> dict:
@@ -51,8 +51,9 @@ def _style(ax):
 def charts(d: dict, out: pathlib.Path) -> list:
     out.mkdir(parents=True, exist_ok=True)
     made = []
-    proc = evaluate.stitch([evaluate.load_run(f["oos"]["procedure"]["run_id"]) for f in d["folds"]])
-    base = evaluate.stitch([evaluate.load_run(f["oos"]["baseline"]["run_id"]) for f in d["folds"]])
+    curated = REPO / "results" / "wfo"
+    proc = evaluate.stitch([evaluate.load_run(f["oos"]["procedure"]["run_id"], curated) for f in d["folds"]])
+    base = evaluate.stitch([evaluate.load_run(f["oos"]["baseline"]["run_id"], curated) for f in d["folds"]])
 
     fig, ax = plt.subplots(figsize=(9.5, 3.6), facecolor=SURFACE)
     _style(ax)
@@ -93,10 +94,8 @@ def charts(d: dict, out: pathlib.Path) -> list:
     plt.close(fig)
     made.append("oos_by_fold.png")
 
-    if len(proc["days"]) > 5:
-        S = d["prereg"]["stats"]
-        mc = montecarlo.block_bootstrap_paths(proc["days"], horizon=S["mc_horizon_days"], n_paths=S["mc_paths"],
-                                              mean_block=S["mean_block_days"], seed=S["seed"], initial=proc["initial"])
+    mc = d["acc"]["acceptance"]["f_loss_limits"]["value"]["monte_carlo"]
+    if mc:
         fig, ax = plt.subplots(figsize=(6, 3), facecolor=SURFACE)
         _style(ax)
         keys = sorted(k for k in mc if k.startswith("final_return_p"))
@@ -122,6 +121,5 @@ def should_write_recommended(acc_json: dict) -> bool:
 
 def set_file_lines(path) -> list:
     """[TesterInputs] lines taken verbatim from a .set file (comments dropped)."""
-    data = pathlib.Path(path).read_bytes()
-    text = data.decode("utf-16") if data[:2] in (b"\xff\xfe", b"\xfe\xff") else data.decode("utf-8-sig")
+    text = read_text(path, fallback="utf-8-sig")
     return [l.strip() for l in text.splitlines() if l.strip() and not l.strip().startswith(";")]

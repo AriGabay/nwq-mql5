@@ -88,12 +88,17 @@ def summary(trades_df, days_df=None, initial=10000.0, bar_minutes=15) -> dict:
     return out
 
 
+def previous_equity(days_df) -> pd.Series:
+    """Equity the day's change is measured from: previous close, first day's opening equity."""
+    prev = days_df["eq_close"].shift(1)
+    prev.iloc[0] = days_df["eq_open"].iloc[0]
+    return prev
+
+
 def daily_returns(days_df) -> pd.Series:
     """Close-to-close equity returns; the first day is measured from its eq_open."""
     d = days_df.sort_values("date")
-    prev = d["eq_close"].shift(1)
-    prev.iloc[0] = d["eq_open"].iloc[0]
-    r = d["eq_close"] / prev - 1
+    r = d["eq_close"] / previous_equity(d) - 1
     r.index = pd.Index(d["date"], name="date")
     return r
 

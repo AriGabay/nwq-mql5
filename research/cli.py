@@ -1,6 +1,6 @@
 """Pipeline entry point: python research/cli.py <step>
 
-Steps: wfo (U6 folds + final selection), robustness (U8), deliver (U9).
+Steps: wfo (U6 folds + final selection), freeze (candidate .set files), robustness (U8), deliver (U9).
 Every step reads research/preregistration.json and refuses to run when it has uncommitted changes.
 """
 import argparse
@@ -11,29 +11,35 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
-from mt5r import curate, env, explog, pipeline, reports, wfo  # noqa: E402
+from mt5r import curate, deliver, env, evaluate, explog, limits, metrics, montecarlo, pipeline, reports, runner, setfile, wfo  # noqa: E402
+from mt5r import ini as inimod  # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 P = pipeline.PREREG
 AXES = P["grid"]
-PARAMS = list(AXES)
-DEFAULTS = {"PivL": 3, "PivR": 3, "SweepToSetupBars": 12, "VolumeMultiplier": 2.0, "ConfirmationBars": 6}
+PARAMS = pipeline.PARAMS
+DEFAULTS = pipeline.DEFAULTS
+FINAL = REPO / "results" / "final_selection" / "selection.json"
+DELIV = REPO / "deliverables"
+
+
+def _uncommitted(path: str) -> bool:
+    r = subprocess.run(["git", "status", "--porcelain", path], cwd=REPO, capture_output=True, text=True)
+    return bool(r.stdout.strip())
 
 
 def prereg_committed() -> None:
-    r = subprocess.run(["git", "status", "--porcelain", "research/preregistration.json"], cwd=REPO,
-                       capture_output=True, text=True)
-    if r.stdout.strip():
+    if _uncommitted("research/preregistration.json"):
         raise SystemExit("preregistration.json has uncommitted changes; refusing to run")
 
 
 def grid_for_window(cfg, tag: str, start: str, end: str):
     """Four complete optimizations (one per VolumeMultiplier) merged into the 576-row grid."""
     ranges = {k: tuple(v) for k, v in P["grid_ranges"].items()}
-    parts, frames = [], []
+    parts = []
     for vm in AXES["VolumeMultiplier"]:
         run_id = f"{tag}_vm{str(vm).replace('.', '')}"
-        res, df = pipeline.run_optimization(cfg, run_id, "research", P["period"], start, end,
+        _, df = pipeline.run_optimization(cfg, run_id, "research", P["period"], start, end,
                                             {"VolumeMultiplier": vm}, ranges, role="train", purpose=f"{tag} grid")
         if df is None:
             raise SystemExit(f"optimization {run_id} failed")
@@ -48,7 +54,7 @@ def grid_for_window(cfg, tag: str, start: str, end: str):
 
 
 def baseline_trades(cfg, tag: str, start: str, end: str) -> int:
-    res, rep = pipeline.run_single(cfg, f"{tag}_baseline_train", "research", P["period"], start, end,
+    _, rep = pipeline.run_single(cfg, f"{tag}_baseline_train", "research", P["period"], start, end,
                                    role="train_baseline_count", purpose=f"{tag} baseline trade count (T only)")
     return reports.summary(rep)["trades"]
 
@@ -84,7 +90,7 @@ def cmd_wfo(args) -> None:
         rec = {"fold": k, "selection": info, "test": fold["test"], "deposits": dict(deposits), "oos": {}}
         for who, params in (("procedure", info["params"]), ("baseline", {})):
             run_id = f"f{k}_oos_{who}"
-            res, rep = pipeline.run_single(cfg, run_id, "research", P["period"], *fold["test"],
+            _, rep = pipeline.run_single(cfg, run_id, "research", P["period"], *fold["test"],
                                            deposit=deposits[who], overrides=params, role=f"oos_{who}",
                                            purpose=f"fold {k} OOS {who}")
             s = reports.summary(rep)
@@ -97,16 +103,11 @@ def cmd_wfo(args) -> None:
         folds_out.write_text(json.dumps(done, indent=1))
         print(f"fold {k}: {info['status']} {info['params']} | OOS procedure {rec['oos']['procedure']['net_profit']:.2f}"
               f" baseline {rec['oos']['baseline']['net_profit']:.2f}", flush=True)
-    final = REPO / "results" / "final_selection" / "selection.json"
-    if not final.exists():
+    if not FINAL.exists():
         info = select_on(cfg, "final", *P["final_train"])
-        final.parent.mkdir(parents=True, exist_ok=True)
-        final.write_text(json.dumps(info, indent=1))
+        FINAL.parent.mkdir(parents=True, exist_ok=True)
+        FINAL.write_text(json.dumps(info, indent=1))
         print(f"final candidate: {info['status']} {info['params']}", flush=True)
-
-
-FINAL = REPO / "results" / "final_selection" / "selection.json"
-DELIV = REPO / "deliverables"
 
 
 def tested_values(params: dict) -> dict:
@@ -118,7 +119,6 @@ def tested_values(params: dict) -> dict:
 
 def cmd_freeze(args) -> None:
     """Write the frozen candidate and the original/baseline .set files (before any check-period run)."""
-    from mt5r import setfile
     sel = json.loads(FINAL.read_text())
     DELIV.mkdir(exist_ok=True)
     orig_specs = setfile.parse_inputs((REPO / "original" / "new_test_v1.03.mq5").read_text())
@@ -134,7 +134,6 @@ def cmd_freeze(args) -> None:
 
 def _chain(cfg, tag, months, params, kind="research", period=None, deposit=None, execution_mode=0, role=""):
     """Run consecutive months with deposit chaining; returns list of evaluate.load_run dicts."""
-    from mt5r import evaluate
     period = period or P["period"]
     dep = deposit or P["deposit"]
     out = []
@@ -152,16 +151,12 @@ def _chain(cfg, tag, months, params, kind="research", period=None, deposit=None,
 def cmd_robustness(args) -> None:
     import numpy as np
     import pandas as pd
-    from mt5r import evaluate, montecarlo, metrics
     prereg_committed()
-    r = subprocess.run(["git", "status", "--porcelain", "deliverables/new_test_candidate.set"], cwd=REPO,
-                       capture_output=True, text=True)
-    if r.stdout.strip() or not (DELIV / "new_test_candidate.set").exists():
+    if _uncommitted("deliverables/new_test_candidate.set") or not (DELIV / "new_test_candidate.set").exists():
         raise SystemExit("candidate is not frozen and committed; run `freeze` and commit first")
     cfg = env.load_config()
     folds = json.loads((REPO / "results" / "wfo" / "folds.json").read_text())
     cand = json.loads(FINAL.read_text())["params"]
-    out_dir = REPO / "results" / "robustness"
     months = [tuple(f["test"]) for f in P["folds"]]
 
     proc = evaluate.stitch([evaluate.load_run(f["oos"]["procedure"]["run_id"]) for f in folds])
@@ -222,9 +217,8 @@ def cmd_robustness(args) -> None:
             pipeline.run_single(cfg, run_id, "research", P["period"], start, end, overrides=params,
                                 role="check_period", purpose=f"R13/R14 {label}")
             x = evaluate.load_run(run_id)
-            ev = metrics.trade_events(x["trades"])
-            from mt5r import limits
-            checks[f"{label}_{who}"] = {**x["summary"], "events": len(ev),
+            check_events = metrics.trade_events(x["trades"])
+            checks[f"{label}_{who}"] = {**x["summary"], "events": len(check_events),
                                         "breach": limits.first_breach(x["days"], initial=x["deposit"])}
             curate.curate(run_id, "check_period")
     indep = "NOT independent" not in (REPO / "results" / "independence_check.md").read_text()
@@ -260,7 +254,6 @@ def cmd_robustness(args) -> None:
 
 def cmd_deliver(args) -> None:
     """R29 validation runs of the exported .set files (development window only), tables and charts."""
-    from mt5r import deliver, ini as inimod, runner as runmod, setfile
     cfg = env.load_config()
     d = deliver.load()
     checks = {}
@@ -270,7 +263,7 @@ def cmd_deliver(args) -> None:
         start, end = P["folds"][0]["test"][0], P["folds"][-1]["test"][1]
         text = inimod.render(expert="new_test.ex5", symbol=P["symbol"], period=P["period"], from_date=start,
                              to_date_inclusive=end, deposit=P["deposit"], report=f"reports\\{run_id}", set_lines=lines)
-        res = runmod.run(cfg, run_id, text, "new_test.ex5", meta={"role": "set_validation", "set": name})
+        res = runner.run(cfg, run_id, text, "new_test.ex5", meta={"role": "set_validation", "set": name})
         rep = reports.parse_html(res.report)
         expected = setfile.read_set(DELIV / name)
         mism = pipeline.check_inputs_loaded(rep, expected)

@@ -53,3 +53,19 @@ def test_run_refuses_while_live_terminal_runs(monkeypatch, tmp_path):
                      wine_dir=tmp_path, server="S", symbol="X")
     with pytest.raises(RuntimeError, match="live MT5 terminal is running"):
         runner.run(cfg, "x", "", "e.ex5")
+
+
+def test_run_refuses_unsafe_isolated_config(monkeypatch, tmp_path):
+    import pytest
+    from mt5r import env
+    monkeypatch.setattr(runner, "live_terminal_running", lambda: False)
+    monkeypatch.setattr(runner, "isolated_processes", lambda: [])
+    monkeypatch.setattr(runner, "_free_gb", lambda p: 100.0)
+    launched = []
+    monkeypatch.setattr(runner.subprocess, "Popen", lambda *a, **k: launched.append(a))
+    cfg = env.Config(live_mt5_dir=tmp_path, live_prefix=tmp_path / "l", isolated_prefix=tmp_path / "i",
+                     wine_dir=tmp_path, server="S", symbol="X")
+    env.write_utf16(cfg.mt5_dir / "config" / "common.ini", "[Experts]\r\nAllowLiveTrading=1\r\nEnabled=1\r\n")
+    with pytest.raises(RuntimeError, match="not trade-safe"):
+        runner.run(cfg, "x", "", "e.ex5")
+    assert launched == []

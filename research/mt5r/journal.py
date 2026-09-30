@@ -2,13 +2,14 @@
 import pathlib
 import re
 
+from .textio import read_text
+
 REDACT_ACCT = re.compile(r"(?<![\d.])\d{7,8}(?![\d.])")
 REDACT_IP = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
 
 
 def read(path) -> str:
-    data = pathlib.Path(path).read_bytes()
-    return data.decode("utf-16", "replace") if data[:2] in (b"\xff\xfe", b"\xfe\xff") else data.decode("utf-8", "replace")
+    return read_text(path, errors="replace", utf16_errors="replace")
 
 
 def redact(line: str) -> str:

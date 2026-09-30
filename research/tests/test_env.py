@@ -1,4 +1,3 @@
-import pathlib
 
 import pytest
 
@@ -72,5 +71,35 @@ def test_disable_mcp_turns_servers_off(tmp_path):
     _touch(cfg.mt5_dir, "config/assistant.ini",
            "[MCP.MetaTrader]\r\nEnable=1\r\nEndpoint=http://127.0.0.1:22346/mcp\r\nApiKey=abc\r\n")
     env.disable_mcp(cfg)
-    text = env._read_text(cfg.mt5_dir / "config" / "assistant.ini")
+    from mt5r import textio
+    text = textio.read_text(cfg.mt5_dir / "config" / "assistant.ini")
     assert "Enable=1" not in text and "ApiKey=abc" not in text and "[MCP.MetaEditor]\r\nEnable=0" in text
+
+
+def _safe_copy(cfg):
+    _touch(cfg.mt5_dir, "config/common.ini", env.common_ini(cfg))
+    _touch(cfg.mt5_dir, "config/assistant.ini", "[MCP.MetaEditor]\r\nEnable=0\r\n[MCP.MetaTrader]\r\nEnable=0\r\n")
+
+
+def test_trade_safety_passes_for_generated_config(tmp_path):
+    cfg = _cfg(tmp_path)
+    _safe_copy(cfg)
+    env.assert_trade_safety(cfg)
+
+
+@pytest.mark.parametrize("common, assistant, msg", [
+    ("[Common]\r\n[Experts]\r\nAllowLiveTrading=1\r\nEnabled=0\r\n", None, "AllowLiveTrading=0"),
+    ("[Common]\r\n[Experts]\r\nAllowLiveTrading=0\r\nEnabled=1\r\n", None, "Enabled=0"),
+    ("[Common]\r\nPassword=x\r\n[Experts]\r\nAllowLiveTrading=0\r\nEnabled=0\r\n", None, "stores a password"),
+    ("[Common]\r\n", None, "AllowLiveTrading=0"),
+    (None, "[MCP.MetaTrader]\r\nEnable=1\r\n", "Enable=0"),
+])
+def test_trade_safety_refuses_unsafe_config(tmp_path, common, assistant, msg):
+    cfg = _cfg(tmp_path)
+    _safe_copy(cfg)
+    if common:
+        _touch(cfg.mt5_dir, "config/common.ini", common)
+    if assistant:
+        _touch(cfg.mt5_dir, "config/assistant.ini", assistant)
+    with pytest.raises(RuntimeError, match=msg):
+        env.assert_trade_safety(cfg)

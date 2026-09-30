@@ -14,11 +14,12 @@ import subprocess
 import time
 
 from . import env as envmod
-from . import explog
+from . import textio
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 RUNS = REPO / "runs"
 ISO_EXE_MARKER = "C:\\mt5r\\"
+LIVE_EXE_MARKER = "C:\\Program Files\\MetaTrader 5\\terminal64.exe"
 MIN_FREE_GB = 5.0
 
 
@@ -31,20 +32,19 @@ class RunResult:
     seconds: float = 0.0
 
 
+def _ps_lines() -> list:
+    return subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True).stdout.splitlines()
+
+
 def isolated_processes() -> list:
     """Processes whose command line runs an executable from the isolated install (C:\\mt5r\\)."""
-    out = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True).stdout
-    return [l.strip() for l in out.splitlines() if ISO_EXE_MARKER in l]
-
-
-LIVE_EXE_MARKER = "C:\\Program Files\\MetaTrader 5\\terminal64.exe"
+    return [l.strip() for l in _ps_lines() if ISO_EXE_MARKER in l]
 
 
 def live_terminal_running() -> bool:
-    """True when the user's live terminal runs. On 2026-09-30 an isolated run coincided with the live
-    terminal stopping ("system shutdown"), so research runs only while the live terminal is closed."""
-    out = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True).stdout
-    return any(LIVE_EXE_MARKER in l for l in out.splitlines())
+    """True when the user's live terminal runs. Research runs only while it is closed: an isolated run
+    under MetaTrader 5.app's Wine coincided with the live terminal stopping ("system shutdown")."""
+    return any(LIVE_EXE_MARKER in l for l in _ps_lines())
 
 
 def shutdown_prefix(cfg: envmod.Config) -> None:
@@ -62,7 +62,7 @@ def _free_gb(path: pathlib.Path) -> float:
 
 
 def _sha(path: pathlib.Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else None
+    return textio.sha256(path) if path.exists() else None
 
 
 def run(cfg: envmod.Config, run_id: str, ini_text: str, expert_ex5: str, timeout: int = 7200,
@@ -75,6 +75,7 @@ def run(cfg: envmod.Config, run_id: str, ini_text: str, expert_ex5: str, timeout
     busy = isolated_processes()
     if busy:
         raise RuntimeError(f"isolated terminal already running: {busy}")
+    envmod.assert_trade_safety(cfg)
     run_dir = RUNS / run_id
     if run_dir.exists():
         shutil.rmtree(run_dir)
@@ -119,11 +120,12 @@ def _collect(cfg, run_id, run_dir, t0):
         shutil.copy2(f, run_dir / f.name)
         if f.suffix in (".htm", ".html", ".xml") and ".forward" not in f.name and report is None:
             report = run_dir / f.name
-    for f in cfg.mt5_dir.rglob(f"rl_*_{run_id}.csv"):
-        shutil.copy2(f, run_dir / f.name)
+    for pattern in (f"Tester/Agent-*/MQL5/Files/rl_*_{run_id}.csv", f"MQL5/Files/rl_*_{run_id}.csv"):
+        for f in cfg.mt5_dir.glob(pattern):
+            shutil.copy2(f, run_dir / f.name)
     logs = run_dir / "logs"
     logs.mkdir()
-    for f in list(cfg.mt5_dir.glob("logs/*.log")) + list(cfg.mt5_dir.glob("Tester/**/logs/*.log")):
+    for f in list(cfg.mt5_dir.glob("logs/*.log")) + list(cfg.mt5_dir.glob("Tester/logs/*.log")) + list(cfg.mt5_dir.glob("Tester/Agent-*/logs/*.log")):
         if f.stat().st_mtime >= t0 - 5:
             rel = f.relative_to(cfg.mt5_dir).as_posix().replace("/", "__")
             shutil.copy2(f, logs / rel)

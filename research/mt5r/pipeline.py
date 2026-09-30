@@ -2,7 +2,6 @@
 import json
 import pathlib
 
-from . import env as envmod
 from . import explog, ini, reports, runner, setfile
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -14,6 +13,10 @@ BUILDS = {
     "v104": ("new_test.ex5", REPO / "mql5" / "Experts" / "new_test.mq5", False),
     "research": ("new_test_research.ex5", REPO / "mql5" / "Experts" / "new_test.mq5", True),
 }
+
+
+PARAMS = list(PREREG["grid"])
+DEFAULTS = {"PivL": 3, "PivR": 3, "SweepToSetupBars": 12, "VolumeMultiplier": 2.0, "ConfirmationBars": 6}
 
 
 def specs(kind: str) -> list:
@@ -34,13 +37,7 @@ def run_single(cfg, run_id: str, kind: str, period: str, start: str, end: str, d
                overrides: dict = None, execution_mode: int = 0, role: str = "", purpose: str = "",
                timeout: int = 7200):
     """One single test; returns (RunResult, parsed report or None)."""
-    tf = ini.PERIODS[period] if period != "H1" else 16385
-    vals = base_values(kind, tf)
-    vals.update(overrides or {})
-    if kind == "research":
-        vals["ResearchRunTag"] = run_id
-    lines = setfile.render_lines(specs(kind), vals)
-    ex5 = BUILDS[kind][0]
+    vals, lines, ex5 = _prepare(run_id, kind, period, overrides)
     text = ini.render(expert=ex5, symbol=PREREG["symbol"], period=period, from_date=start, to_date_inclusive=end,
                       deposit=deposit, report=f"reports\\{run_id}", set_lines=lines, execution_mode=execution_mode)
     res = runner.run(cfg, run_id, text, ex5, timeout=timeout, meta={"kind": kind, "role": role, "values": vals})
@@ -54,6 +51,15 @@ def run_single(cfg, run_id: str, kind: str, period: str, start: str, end: str, d
                       "build": rep["header"].get("Build"), "history_quality": rep["header"].get("History Quality")})
     explog.append(entry)
     return res, rep
+
+
+def _prepare(run_id: str, kind: str, period: str, overrides: dict = None, ranges: dict = None):
+    """Input values, [TesterInputs] lines and ex5 name for one run."""
+    vals = base_values(kind, ini.PERIODS[period])
+    vals.update(overrides or {})
+    if kind == "research":
+        vals["ResearchRunTag"] = run_id
+    return vals, setfile.render_lines(specs(kind), vals, ranges), BUILDS[kind][0]
 
 
 def check_inputs_loaded(rep: dict, expected: dict) -> list:
@@ -80,13 +86,7 @@ def run_optimization(cfg, run_id: str, kind: str, period: str, start: str, end: 
                      ranges: dict, deposit: float = 10000.0, role: str = "", purpose: str = "",
                      timeout: int = 14400):
     """Complete (Optimization=1) run; returns (RunResult, passes DataFrame or None)."""
-    tf = ini.PERIODS[period]
-    vals = base_values(kind, tf)
-    vals.update(fixed)
-    if kind == "research":
-        vals["ResearchRunTag"] = run_id
-    lines = setfile.render_lines(specs(kind), vals, ranges)
-    ex5 = BUILDS[kind][0]
+    vals, lines, ex5 = _prepare(run_id, kind, period, fixed, ranges)
     text = ini.render(expert=ex5, symbol=PREREG["symbol"], period=period, from_date=start, to_date_inclusive=end,
                       deposit=deposit, report=f"reports\\{run_id}", set_lines=lines, optimization=1)
     res = runner.run(cfg, run_id, text, ex5, timeout=timeout,

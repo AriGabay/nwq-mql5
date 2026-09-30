@@ -5,12 +5,13 @@
 - research CSVs written by the research build (rl_days_*, rl_deals_*, rl_frames_*)
 """
 import html
-import io
 import pathlib
 import re
 import xml.etree.ElementTree as ET
 
 import pandas as pd
+
+from .textio import read_text
 
 ROW_RE = re.compile(r"<tr[^>]*>(.*?)</tr>", re.S | re.I)
 CELL_RE = re.compile(r"<t[dh][^>]*>(.*?)</t[dh]>", re.S | re.I)
@@ -18,8 +19,7 @@ TAG_RE = re.compile(r"<[^>]+>")
 
 
 def _read(path) -> str:
-    data = pathlib.Path(path).read_bytes()
-    return data.decode("utf-16") if data[:2] in (b"\xff\xfe", b"\xfe\xff") else data.decode("utf-8", "replace")
+    return read_text(path, errors="replace")
 
 
 def _cells(row_html: str) -> list:
@@ -84,10 +84,6 @@ def _deals(rows) -> pd.DataFrame:
     return df
 
 
-def metric(report: dict, key: str) -> float:
-    return _num(report["metrics"][key])
-
-
 def summary(report: dict) -> dict:
     """Headline numbers from a parsed single-test report."""
     m = report["metrics"]
@@ -101,7 +97,6 @@ def summary(report: dict) -> dict:
         "equity_dd_pct": _num(eq_dd.split("(")[1]) if "(" in eq_dd else float("nan"),
         "balance_dd_pct": _num(m.get("Balance Drawdown Maximal", "0 (0%)").split("(")[1])
         if "(" in m.get("Balance Drawdown Maximal", "") else float("nan"),
-        "final_balance": float("nan"),
     }
 
 

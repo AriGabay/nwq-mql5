@@ -4,7 +4,6 @@ The live MT5 data directory is read-only input: only the allowlisted files below
 """
 import dataclasses
 import fnmatch
-import hashlib
 import json
 import os
 import pathlib
@@ -13,6 +12,8 @@ import shutil
 import subprocess
 
 import yaml
+
+from .textio import read_text, sha256, write_utf16  # noqa: F401  (write_utf16 re-exported)
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 
@@ -113,20 +114,13 @@ def check_allowlist(cfg: Config, root: pathlib.Path = None) -> list:
             bad.append(rel)
             continue
         if rel.endswith(".ini"):
-            text = _read_text(path).lower()
+            text = read_text(path, errors="replace").lower()
             for line in (l.strip() for l in text.splitlines()):
                 if any(line.startswith(k) for k in CREDENTIAL_KEYS):
                     bad.append(rel + " (credential key)")
                 elif line.startswith("login=") and line != f"login={cfg.login}".lower():
                     bad.append(rel + " (unapproved login)")
     return bad
-
-
-def _read_text(path: pathlib.Path) -> str:
-    data = path.read_bytes()
-    if data[:2] in (b"\xff\xfe", b"\xfe\xff"):
-        return data.decode("utf-16")
-    return data.decode("utf-8", errors="replace")
 
 
 def common_ini(cfg: Config) -> str:
@@ -145,21 +139,46 @@ def common_ini(cfg: Config) -> str:
     )
 
 
+def _ini_sections(text: str) -> dict:
+    sections, current = {}, None
+    for line in (l.strip() for l in text.splitlines()):
+        if line.startswith("[") and line.endswith("]"):
+            current = sections.setdefault(line[1:-1], {})
+        elif current is not None and "=" in line:
+            k, v = line.split("=", 1)
+            current[k.strip().lower()] = v.strip()
+    return sections
+
+
+def assert_trade_safety(cfg: Config) -> None:
+    """Refuse to launch unless the isolated copy cannot trade: algo trading off, built-in MCP off, no stored password."""
+    config = cfg.mt5_dir / "config"
+    common = _ini_sections(read_text(config / "common.ini", errors="replace"))
+    experts = common.get("Experts", {})
+    problems = []
+    if experts.get("allowlivetrading") != "0" or experts.get("enabled") != "0":
+        problems.append("common.ini [Experts] must have AllowLiveTrading=0 and Enabled=0")
+    if any(k in sec for sec in common.values() for k in ("password", "certpassword", "proxypassword")):
+        problems.append("common.ini stores a password")
+    assistant = config / "assistant.ini"
+    if assistant.exists():
+        for name, sec in _ini_sections(read_text(assistant, errors="replace")).items():
+            if name.startswith("MCP.") and sec.get("enable") != "0":
+                problems.append(f"assistant.ini [{name}] must have Enable=0")
+    if problems:
+        raise RuntimeError("isolated copy is not trade-safe: " + "; ".join(problems))
+
+
 def disable_mcp(cfg: Config) -> None:
     """Turn off the terminal's built-in MCP servers (they expose trade tools) in the isolated copy."""
     path = cfg.mt5_dir / "config" / "assistant.ini"
-    text = _read_text(path) if path.exists() else ""
+    text = read_text(path, errors="replace") if path.exists() else ""
     text = re.sub(r"(\[MCP\.[^\]]+\]\r?\n)Enable=1", r"\1Enable=0", text)
     text = re.sub(r"ApiKey=[^\r\n]*", "ApiKey=", text)
     for section in ("MCP.MetaEditor", "MCP.MetaTrader"):
         if f"[{section}]" not in text:
             text += f"[{section}]\r\nEnable=0\r\n"
     write_utf16(path, text)
-
-
-def write_utf16(path: pathlib.Path, text: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(b"\xff\xfe" + text.encode("utf-16-le"))
 
 
 def build(cfg: Config) -> dict:
@@ -179,18 +198,11 @@ def build(cfg: Config) -> dict:
     bad = check_allowlist(cfg)
     if bad:
         raise RuntimeError(f"allowlist violation in isolated copy: {bad[:10]}")
-    manifest = {"files": {rel: _sha(cfg.mt5_dir / rel) for rel in files if rel.endswith(".exe")},
+    manifest = {"files": {rel: sha256(cfg.mt5_dir / rel) for rel in files if rel.endswith(".exe")},
                 "n_files": len(files)}
     (cfg.isolated_prefix.parent / "env_manifest.json").write_text(json.dumps(manifest, indent=1))
     return manifest
 
-
-def _sha(path: pathlib.Path) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1 << 20), b""):
-            h.update(chunk)
-    return h.hexdigest()
 
 
 def install_sources(cfg: Config) -> None:
