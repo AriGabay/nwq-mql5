@@ -403,6 +403,9 @@ def _check_row(r, sid, B, prm, tol, used, ob_count, add):
         add("reason_unknown", f"reason={reason!r}")
         return
     rank = _stage_rank(reason)
+    if reason == "run_end_pending":         # the run ended at whatever pre-fill stage the setup had reached
+        rank = (4 if not _missing(r.get("order_ticket")) else 3 if not _missing(r.get("cfvg_c3_time"))
+                else 2 if not _missing(r.get("touch_time")) else 1)
     need = {2: ["touch_time"], 3: ["touch_time", "cfvg_c1_time", "cfvg_c3_time", "entry", "sl", "tp"],
             4: ["order_ticket", "place_time_msc"], 5: ["order_ticket", "place_time_msc", "fill_time_msc",
                                                          "fill_price", "position_id"]}
@@ -419,7 +422,7 @@ def _check_row(r, sid, B, prm, tol, used, ob_count, add):
     if kind != "incomplete":
         if reason in EARLY_REASONS and kind != reason:
             add("reason_inconsistent", f"row {reason}, bars give {kind}")
-        if reason not in EARLY_REASONS and kind != "confirmed":
+        if reason not in EARLY_REASONS and kind != "confirmed" and not (reason == "run_end_pending" and rank < 3):
             add("reason_inconsistent", f"row {reason} needs a confirmation, bars give {kind}")
 
     if cc3 is None or rank is None or rank < 4:

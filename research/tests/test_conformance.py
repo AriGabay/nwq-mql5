@@ -206,3 +206,19 @@ def test_expired_unfilled_and_retest_flag_follow_the_bars(setups, bars):
     assert cf.check(row, bars, P, {**PARAMS, "OrderExpiryBars": 2}) == []
     # The order window is still open at the end of the logged bars: expired_unfilled is inconsistent there.
     assert "reason_inconsistent" in rules(cf.check(row, bars, P, {**PARAMS, "OrderExpiryBars": 40}))
+
+
+def test_run_end_pending_before_confirmation_passes(setups, bars):
+    # The run ends at bar 9 while the long OB is touched (bar 7) but no confirmation FVG has completed yet:
+    # run_end_pending covers any pre-fill stage, so no confirmation or order fields are required.
+    cut = bars[bars.time <= t(9)].reset_index(drop=True)
+    later = {k: float("nan") for k in ("cfvg_c1_time", "cfvg_c3_time", "cfvg_low", "cfvg_high", "entry", "sl", "tp",
+                                       "volume", "place_time_msc", "order_ticket", "fill_time_msc", "fill_price",
+                                       "position_id", "exit_time_msc", "exit_price", "exit_kind")}
+    row = long_only(setups, reason="run_end_pending", retest_seen_no_fill=0, **later)
+    assert cf.check(row, cut, P, PARAMS) == []
+    # A run_end_pending row that already carries an order still needs its placement fields.
+    row2 = long_only(setups, reason="run_end_pending", place_time_msc=float("nan"),
+                     **{k: float("nan") for k in ("fill_time_msc", "fill_price", "position_id", "exit_time_msc",
+                                                  "exit_price", "exit_kind")})
+    assert "reason_fields" in rules(cf.check(row2, bars[bars.time <= t(13)].reset_index(drop=True), P, PARAMS))
