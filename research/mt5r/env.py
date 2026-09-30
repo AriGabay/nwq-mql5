@@ -205,10 +205,14 @@ def build(cfg: Config) -> dict:
 
 
 
-def install_sources(cfg: Config) -> None:
-    """Copy the repo EA sources into the isolated copy's MQL5/Experts."""
+EA_SOURCES = ["ob_fvg_retest.mq5", "ob_fvg_retest_research.mq5"]
+
+
+def install_sources(cfg: Config) -> list:
+    """Copy the repo EA sources into the isolated copy's MQL5/Experts (never the live directory)."""
+    assert_isolated(cfg)
     dst = cfg.mt5_dir / "MQL5" / "Experts"
     dst.mkdir(parents=True, exist_ok=True)
-    for name in ["new_test.mq5", "new_test_research.mq5"]:
+    for name in EA_SOURCES:
         shutil.copy2(REPO / "mql5" / "Experts" / name, dst / name)
-    shutil.copy2(REPO / "original" / "new_test_v1.03.mq5", dst / "new_test_v103.mq5")
+    return [dst / n for n in EA_SOURCES]

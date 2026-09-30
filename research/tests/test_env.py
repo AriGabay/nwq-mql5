@@ -103,3 +103,26 @@ def test_trade_safety_refuses_unsafe_config(tmp_path, common, assistant, msg):
         _touch(cfg.mt5_dir, "config/assistant.ini", assistant)
     with pytest.raises(RuntimeError, match=msg):
         env.assert_trade_safety(cfg)
+
+
+def test_install_sources_copies_both_builds_into_isolated_copy(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    repo = tmp_path / "repo"
+    for name, text in (("ob_fvg_retest.mq5", "// strategy"), ("ob_fvg_retest_research.mq5", "#define RESEARCH_LOG")):
+        p = repo / "mql5" / "Experts" / name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text)
+    monkeypatch.setattr(env, "REPO", repo)
+    env.install_sources(cfg)
+    dst = cfg.isolated_prefix / "drive_c" / "mt5r" / "MQL5" / "Experts"
+    assert sorted(p.name for p in dst.iterdir()) == ["ob_fvg_retest.mq5", "ob_fvg_retest_research.mq5"]
+    assert (dst / "ob_fvg_retest_research.mq5").read_text() == "#define RESEARCH_LOG"
+    assert not (cfg.live_mt5_dir / "MQL5").exists()
+
+
+def test_install_sources_refuses_overlapping_prefix(tmp_path, monkeypatch):
+    cfg = _cfg(tmp_path)
+    cfg.isolated_prefix = cfg.live_prefix / "nested"
+    monkeypatch.setattr(env, "REPO", tmp_path / "repo")
+    with pytest.raises(RuntimeError, match="overlaps"):
+        env.install_sources(cfg)

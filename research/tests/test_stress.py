@@ -41,3 +41,23 @@ def test_apply_commission_scale():
     out = stress.apply(t, zero, commission_scale=1.5)
     assert list(out["profit_net_stressed"]) == pytest.approx([100 - 6.0, -50 - 24.0 - 1.0])
     assert "profit_net_stressed" not in t.columns
+
+
+def test_stop_exit_slippage_10_points_on_three_sl_exits_of_one_lot():
+    t = pd.DataFrame({"volume": [1.0, 1.0, 1.0, 1.0, 1.0],
+                      "exit_kind": ["sl", "tp", "sl", "sl", "tp"],
+                      "profit": [-100.0, 200.0, -100.0, -100.0, 200.0],
+                      "commission": [0.0] * 5, "swap": [0.0] * 5})
+    cost = stress.stop_slippage_cost(t, contract_size=100.0, points=10, point=0.01)
+    assert list(cost) == pytest.approx([10.0, 0.0, 10.0, 10.0, 0.0])
+    out = stress.apply(t, cost)
+    assert out["profit_net_stressed"].sum() == pytest.approx(100.0 - 30.0)
+    # TP exits unchanged
+    tp = out["exit_kind"] == "tp"
+    assert list(out.loc[tp, "profit_net_stressed"]) == [200.0, 200.0]
+
+
+def test_stop_slippage_scales_with_volume_and_ignores_open_trades():
+    t = pd.DataFrame({"volume": [0.25, 2.0, 0.5], "exit_kind": ["sl", "sl", ""]})
+    cost = stress.stop_slippage_cost(t, contract_size=100.0, points=10, point=0.01)
+    assert list(cost) == pytest.approx([2.5, 20.0, 0.0])

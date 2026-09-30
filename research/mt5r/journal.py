@@ -1,10 +1,12 @@
-"""Tester journal facts (R11): real-tick coverage, generated-tick substitution, warm-up, EA init line."""
+"""Tester journal facts (R26): real-tick coverage, generated-tick substitution, warm-up, EA init and Funnel lines."""
 import pathlib
 import re
 
 from .textio import read_text
 
 REDACT_ACCT = re.compile(r"(?<![\d.])\d{7,8}(?![\d.])")
+FUNNEL_RE = re.compile(r"Funnel:((?:[ \t]+\w+=-?\d+)+)")   # EA OnDeinit line (interface contract)
+FUNNEL_KV = re.compile(r"(\w+)=(-?\d+)")
 REDACT_IP = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
 
 
@@ -40,15 +42,9 @@ def facts(text: str) -> dict:
     m = re.search(r"final balance ([\d.]+)", text)
     if m:
         out["final_balance"] = float(m.group(1))
-    m = re.search(r"rejected by volume: (\d+)", text)
-    if m:
-        out["funnel"]["rejected_by_volume"] = int(m.group(1))
-    m = re.search(r"FVG candidates seen \(bar B in window\): (\d+)", text)
-    if m:
-        out["funnel"]["fvg_candidates"] = int(m.group(1))
-    m = re.search(r"orders sent: (\d+)", text)
-    if m:
-        out["funnel"]["orders_sent"] = int(m.group(1))
+    lines = FUNNEL_RE.findall(text)
+    if lines:
+        out["funnel"] = {k: int(v) for k, v in FUNNEL_KV.findall(lines[-1])}
     return out
 
 

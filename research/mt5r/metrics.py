@@ -9,7 +9,17 @@ def _net(trades_df):
     return trades_df["profit"] + trades_df["commission"] + trades_df["swap"]
 
 
-def trade_events(trades_df, bar_minutes=15) -> pd.DataFrame:
+TF_MINUTES = {"M1": 1, "M5": 5, "M15": 15, "M30": 30, "H1": 60}
+
+
+def bar_minutes(period: str) -> int:
+    """Minutes per signal bar for a tester period name (M5, M15, ...)."""
+    if period not in TF_MINUTES:
+        raise ValueError(f"unsupported period {period}")
+    return TF_MINUTES[period]
+
+
+def trade_events(trades_df, bar_minutes: int) -> pd.DataFrame:
     """Group positions opened on the same bar in the same direction into one event."""
     t = trades_df.sort_values("open_time", kind="mergesort").copy()
     t["bar"] = pd.to_datetime(t["open_time"]).dt.floor(f"{bar_minutes}min")
@@ -51,7 +61,7 @@ def _equity_drawdown(days_df):
     return max(m1, m2), max(p1, p2)
 
 
-def summary(trades_df, days_df=None, initial=10000.0, bar_minutes=15) -> dict:
+def summary(trades_df, days_df=None, initial=10000.0, *, bar_minutes: int) -> dict:
     """Headline metrics; events drive win rate, expectancy and profit factor."""
     net = _net(trades_df)
     ev = trade_events(trades_df, bar_minutes)

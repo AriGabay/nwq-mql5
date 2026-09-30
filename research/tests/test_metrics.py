@@ -25,7 +25,7 @@ def trades():
 
 
 def test_trade_events_groups_same_bar_same_direction():
-    ev = metrics.trade_events(trades())
+    ev = metrics.trade_events(trades(), 15)
     assert len(ev) == 3
     first = ev[(ev.direction == 1) & (ev.open_time == pd.Timestamp("2026-03-02 10:00"))].iloc[0]
     assert first.n_positions == 3
@@ -38,7 +38,7 @@ def test_trade_events_groups_same_bar_same_direction():
 
 
 def test_summary_balance_drawdown_and_event_stats():
-    s = metrics.summary(trades())
+    s = metrics.summary(trades(), bar_minutes=15)
     assert s["net_profit"] == pytest.approx(144.0 - 302.0 + 77.0)
     assert s["n_trades"] == 5 and s["n_events"] == 3
     assert s["win_rate"] == pytest.approx(2 / 3)
@@ -51,9 +51,9 @@ def test_summary_balance_drawdown_and_event_stats():
 
 def test_summary_edge_cases():
     only_wins = trades().iloc[[0]]
-    assert math.isinf(metrics.summary(only_wins)["profit_factor"])
+    assert math.isinf(metrics.summary(only_wins, bar_minutes=15)["profit_factor"])
     empty = trades().iloc[:0]
-    s = metrics.summary(empty)
+    s = metrics.summary(empty, bar_minutes=15)
     assert s["n_events"] == 0 and math.isnan(s["profit_factor"])
     assert s["max_balance_dd_money"] == 0.0
 
@@ -72,7 +72,7 @@ def days():
 
 
 def test_summary_equity_drawdown_from_days():
-    s = metrics.summary(trades(), days_df=days())
+    s = metrics.summary(trades(), days_df=days(), bar_minutes=15)
     assert s["max_equity_dd_money"] == pytest.approx(300.0)
     assert s["max_equity_dd_pct"] == pytest.approx(300.0 / 10200.0 * 100)
     assert s["recovery_factor"] == pytest.approx(s["net_profit"] / 300.0)
@@ -88,3 +88,14 @@ def test_concentration():
     c = metrics.concentration(ev)
     assert c["largest_event_share"] == pytest.approx(100.0 / 140.0)
     assert c["net_without_top2"] == pytest.approx(-10.0)
+
+
+def test_bar_minutes_from_period_and_m5_grouping():
+    assert metrics.bar_minutes("M5") == 5 and metrics.bar_minutes("M15") == 15
+    with pytest.raises(ValueError):
+        metrics.bar_minutes("H4")
+    # 10:00, 10:05 and 10:14 are one M15 bar but three M5 bars (10:00, 10:05, 10:10)
+    ev = metrics.trade_events(trades(), 5)
+    assert len(ev) == 5
+    with pytest.raises(TypeError):
+        metrics.summary(trades())      # bar minutes must come from the timeframe, no hidden default

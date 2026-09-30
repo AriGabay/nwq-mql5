@@ -7,7 +7,7 @@
   "currency": "USD",
   "leverage": "1:100",
   "risk_inputs": {"RiskPercent": 1.0, "MaxExposures": 3, "RiskRR": 2.0},
-  "display_inputs": {"DrawObjects": false},
+  "display_inputs": {},
   "symbol_spec": {
     "tick_size": 0.01,
     "stops_level_points_observed": 20,

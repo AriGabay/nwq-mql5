@@ -1,13 +1,17 @@
-"""Walk-forward selection (R16) and OOS deposit chaining (R19)."""
+"""Walk-forward selection (KTD12, KTD13) and OOS deposit chaining (R22).
+
+Categorical axes (e.g. ObMode, EntryMode) have no order: smoothing and neighbours only compare passes
+with exactly the same categorical values, and step one index along one ordinal axis at a time.
+"""
 import itertools
 
 import numpy as np
 import pandas as pd
 
 
-def trade_floor(baseline_trades: int) -> int:
-    """R16 minimum trade count T, set from the baseline's trade count only."""
-    return 15 if baseline_trades >= 15 else max(5, baseline_trades // 2)
+def trade_floor(train_months: int, per_month: int = 15) -> int:
+    """KTD12 minimum train fills: per_month x train months (45 for a 3-month train window)."""
+    return int(per_month) * int(train_months)
 
 
 def merge_grids(dfs: list, axes: dict) -> pd.DataFrame:
@@ -31,12 +35,13 @@ def _axes_from(grid_df, param_cols):
     return {c: sorted(grid_df[c].unique()) for c in param_cols}
 
 
-def score(grid_df, param_cols, trade_floor, dd_max_pct=10.0) -> pd.DataFrame:
+def score(grid_df, param_cols, trade_floor, dd_max_pct=10.0, categorical=()) -> pd.DataFrame:
     """Add eligible, raw_score and neighbor-smoothed score.
 
-    raw_score = profit / eq_dd_money for eligible passes, 0 otherwise.
+    raw_score = profit / eq_dd_money (recovery factor) for eligible passes, 0 otherwise.
     A pass with zero drawdown uses profit / 1.0 (drawdown floored at 1 USD).
-    smoothed = mean over the pass and its existing distance-1 neighbors.
+    smoothed = mean over the pass and its existing ordinal distance-1 neighbors in the same
+    categorical cell.
     """
     out = grid_df.copy()
     out["eligible"] = (out["trades"] >= trade_floor) & (out["eq_dd_pct"] <= dd_max_pct)
@@ -51,7 +56,7 @@ def score(grid_df, param_cols, trade_floor, dd_max_pct=10.0) -> pd.DataFrame:
     smoothed = []
     for key in keys:
         vals = [raw[key]]
-        for d in range(len(param_cols)):
+        for d in _ordinal_dims(param_cols, categorical):
             for step in (-1, 1):
                 nb = key[:d] + (key[d] + step,) + key[d + 1:]
                 if nb in raw:
@@ -61,6 +66,13 @@ def score(grid_df, param_cols, trade_floor, dd_max_pct=10.0) -> pd.DataFrame:
     return out
 
 
+def _ordinal_dims(param_cols, categorical):
+    unknown = set(categorical) - set(param_cols)
+    if unknown:
+        raise ValueError(f"categorical axes not in the grid: {sorted(unknown)}")
+    return [d for d, c in enumerate(param_cols) if c not in set(categorical)]
+
+
 def _index_of(axis, value):
     """Position of value on an ordered axis; nearest grid value if off-grid."""
     if value in axis:
@@ -68,13 +80,14 @@ def _index_of(axis, value):
     return int(np.argmin([abs(a - value) for a in axis]))
 
 
-def select(grid_df, param_cols, defaults: dict, trade_floor, dd_max_pct=10.0) -> dict:
-    """Pick the eligible pass with the highest smoothed score (R16, AE1, AE2).
+def select(grid_df, param_cols, defaults: dict, trade_floor, dd_max_pct=10.0, categorical=()) -> dict:
+    """Pick the eligible pass with the highest smoothed score (KTD12).
 
-    Ties: smaller total index distance to the defaults, then smallest axis
-    indices in parameter order.
+    Ties: smaller distance to the defaults (index steps on ordinal axes, 1 per differing
+    categorical axis), then smallest axis indices in parameter order.
+    No eligible pass: the defaults with status no_eligible_pass.
     """
-    scored = score(grid_df, param_cols, trade_floor, dd_max_pct)
+    scored = score(grid_df, param_cols, trade_floor, dd_max_pct, categorical)
     eligible = scored[scored["eligible"]]
     if eligible.empty:
         return {"params": dict(defaults), "status": "no_eligible_pass", "scored": scored}
@@ -86,17 +99,22 @@ def select(grid_df, param_cols, defaults: dict, trade_floor, dd_max_pct=10.0) ->
 
     def rank(combo):
         idx = [axes[c].index(v) for c, v in zip(param_cols, combo)]
-        return (sum(abs(i - h) for i, h in zip(idx, home)), idx)
+        dist = sum((i != h) if c in categorical else abs(i - h) for c, i, h in zip(param_cols, idx, home))
+        return (dist, idx)
 
     chosen = min(top[param_cols].itertuples(index=False, name=None), key=rank)
     params = {c: v.item() if hasattr(v, "item") else v for c, v in zip(param_cols, chosen)}
     return {"params": params, "status": "selected", "scored": scored}
 
 
-def neighbors(params: dict, axes: dict) -> list:
-    """Distance-1 grid neighbors: one axis moved one step, lower before upper."""
+def neighbors(params: dict, axes: dict, categorical=()) -> list:
+    """Distance-1 grid neighbors: one ordinal axis moved one step, lower before upper.
+
+    Categorical axes keep the candidate's value (exact match)."""
     out = []
     for name, values in axes.items():
+        if name in categorical:
+            continue
         i = list(values).index(params[name])
         for j in (i - 1, i + 1):
             if 0 <= j < len(values):

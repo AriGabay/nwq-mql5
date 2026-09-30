@@ -18,9 +18,18 @@ def make_grid(axes, cells):
     return pd.DataFrame(rows)
 
 
-@pytest.mark.parametrize("baseline,expected", [(40, 15), (12, 6), (4, 5), (15, 15), (11, 5)])
-def test_trade_floor(baseline, expected):
-    assert wfo.trade_floor(baseline) == expected
+def test_trade_floor_is_per_month_times_train_months():
+    # KTD12: eligible when train fills >= 15 x train months
+    assert wfo.trade_floor(3) == 45
+    assert wfo.trade_floor(1) == 15
+    assert wfo.trade_floor(3, per_month=10) == 30
+
+
+def test_trade_floor_boundary_44_ineligible_45_eligible():
+    axes = {"A": [1, 2]}
+    cells = {(1,): (500.0, 44, 100.0, 5.0), (2,): (500.0, 45, 100.0, 5.0)}
+    scored = wfo.score(make_grid(axes, cells), ["A"], trade_floor=wfo.trade_floor(3))
+    assert list(scored["eligible"]) == [False, True]
 
 
 def test_merge_grids_ok_and_sorted():
@@ -112,3 +121,50 @@ def test_neighbors_interior_and_edges():
 def test_chain_deposits():
     assert wfo.chain_deposits(10000.0, [10123.456, 9987.001, 10500.0]) == [10000.0, 10123.46, 9987.0]
     assert wfo.chain_deposits(10000.0, []) == []
+
+
+CAT_AXES = {"EntryMode": [0, 1, 2, 3], "ObMaxAgeBars": [48, 96, 144]}
+
+
+def test_categorical_smoothing_never_crosses_entry_mode():
+    cells = {(1, 96): (1000.0, 50, 100.0, 5.0),   # raw 10, same-cell neighbours ineligible
+             (0, 96): (800.0, 50, 100.0, 5.0),    # raw 8, adjacent EntryMode values
+             (2, 96): (800.0, 50, 100.0, 5.0)}
+    scored = wfo.score(make_grid(CAT_AXES, cells), ["EntryMode", "ObMaxAgeBars"], trade_floor=45,
+                       categorical=["EntryMode"]).set_index(["EntryMode", "ObMaxAgeBars"])
+    # mean of itself and (1,48), (1,144) only; (0,96) and (2,96) are other categories
+    assert scored.loc[(1, 96), "smoothed"] == pytest.approx(10.0 / 3)
+    assert scored.loc[(0, 96), "smoothed"] == pytest.approx(8.0 / 3)
+    assert scored.loc[(1, 48), "smoothed"] == pytest.approx(10.0 / 2)
+    assert scored.loc[(3, 96), "smoothed"] == pytest.approx(0.0)
+
+
+def test_categorical_neighbors_differ_by_one_ordinal_step():
+    assert wfo.neighbors({"EntryMode": 1, "ObMaxAgeBars": 96}, CAT_AXES, categorical=["EntryMode"]) == [
+        {"EntryMode": 1, "ObMaxAgeBars": 48}, {"EntryMode": 1, "ObMaxAgeBars": 144}]
+    axes = {"ObMode": [0, 1], "EntryMode": [0, 1, 2, 3], "ObMaxAgeBars": [48, 96, 144],
+            "FvgWindowBars": [6, 12, 18], "OrderExpiryBars": [6, 12, 18]}
+    nbs = wfo.neighbors({"ObMode": 1, "EntryMode": 2, "ObMaxAgeBars": 48, "FvgWindowBars": 12,
+                         "OrderExpiryBars": 18}, axes, categorical=["ObMode", "EntryMode"])
+    assert nbs == [
+        {"ObMode": 1, "EntryMode": 2, "ObMaxAgeBars": 96, "FvgWindowBars": 12, "OrderExpiryBars": 18},
+        {"ObMode": 1, "EntryMode": 2, "ObMaxAgeBars": 48, "FvgWindowBars": 6, "OrderExpiryBars": 18},
+        {"ObMode": 1, "EntryMode": 2, "ObMaxAgeBars": 48, "FvgWindowBars": 18, "OrderExpiryBars": 18},
+        {"ObMode": 1, "EntryMode": 2, "ObMaxAgeBars": 48, "FvgWindowBars": 12, "OrderExpiryBars": 12}]
+
+
+def test_categorical_tie_break_counts_category_change_as_one():
+    cells = {(3, 96): (900.0, 50, 100.0, 5.0),    # smoothed 9/3 = 3
+             (1, 144): (600.0, 50, 100.0, 5.0)}   # smoothed 6/2 = 3
+    grid = make_grid(CAT_AXES, cells)
+    res = wfo.select(grid, ["EntryMode", "ObMaxAgeBars"], {"EntryMode": 0, "ObMaxAgeBars": 96}, 45,
+                     categorical=["EntryMode"])
+    # (3,96): category differs (1) + 0 steps = 1; (1,144): 1 + 1 step = 2
+    assert res["params"] == {"EntryMode": 3, "ObMaxAgeBars": 96}
+
+
+def test_categorical_no_eligible_pass_returns_defaults():
+    res = wfo.select(make_grid(CAT_AXES, {}), ["EntryMode", "ObMaxAgeBars"],
+                     {"EntryMode": 0, "ObMaxAgeBars": 96}, 45, categorical=["EntryMode"])
+    assert res["status"] == "no_eligible_pass"
+    assert res["params"] == {"EntryMode": 0, "ObMaxAgeBars": 96}
