@@ -1,0 +1,28 @@
+{
+  "note": "Fixed run facts for the OB-FVG retest research (plan KTD9). Not the frozen protocol: research/preregistration.json is created at U7 after the chart gate.",
+  "symbol": "XAUUSD.s",
+  "server": "Bybit-Live-4",
+  "model": 4,
+  "deposit": 10000,
+  "currency": "USD",
+  "leverage": "1:100",
+  "risk_inputs": {"RiskPercent": 1.0, "MaxExposures": 3, "RiskRR": 2.0},
+  "display_inputs": {"DrawObjects": false},
+  "symbol_spec": {
+    "tick_size": 0.01,
+    "stops_level_points_observed": 20,
+    "stops_level_note": "Observed in the previous research's tester journal ('stops level 20 pts'); the EA reads SYMBOL_TRADE_STOPS_LEVEL at every placement and has no fixed threshold (plan R37).",
+    "contract_size": 100,
+    "commission": 0,
+    "commission_note": "0 on XAUUSD.s; cost is in the real-tick spread (median 0.14-0.24 USD)",
+    "account_margin_mode": "hedging",
+    "terminal_build": 6230
+  },
+  "real_ticks_begin": "2025.11.24",
+  "generated_ticks_note": "14.3% of minute bars in 2025.12.01-2026.07.31 used generated ticks (24 whole days), concentrated in Dec 2025 and Jan 2026; Feb-Jul fully real.",
+  "windows": {
+    "wfo": ["2025.12.01", "2026.07.31"],
+    "holdout_non_independent": ["2026.08.01", "2026.09.29"]
+  },
+  "exposure_record": "archive/2026-09-30-new-test-sweepob/README.md"
+}

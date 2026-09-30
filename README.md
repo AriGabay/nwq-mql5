@@ -1,13 +1,13 @@
-# nwq-mql5 — `new_test` robust parameter research
+# nwq-mql5 — OB-FVG retest EA and its research
 
-Research pipeline that optimizes the MT5 EA `new_test` (SweepOB, XAUUSD.s) with a pre-registered
-walk-forward protocol in an isolated, credential-free MT5 copy.
+MT5 Expert Advisor for the Order Block → return → confirmation FVG → retest strategy on XAUUSD.s,
+researched with a gated, pre-registered protocol in an isolated MT5 copy (Strategy Tester only).
 
-- Plan / protocol: `docs/plans/2026-09-30-1722-feat-new-test-robust-optimization-plan.md`
-- Original EA and saved profile (byte copies, never edited): `original/`
-- EA v1.04 (adds `SignalTF`) and the research logging build: `mql5/Experts/`
+- Plan / protocol: `docs/plans/2026-09-30-2310-feat-ob-fvg-retest-ea-plan.md`
+- EA and its research-logging build: `mql5/Experts/`
 - Python pipeline: `research/` (`python -m pytest research/tests`, CLI `python research/cli.py --help`)
-- Curated evidence: `results/`; deliverables: `deliverables/`
+- Run constants: `research/run_constants.json`; frozen protocol (after the chart gate): `research/preregistration.json`
+- Previous strategy (`new_test`, SweepOB) and all of its evidence: `archive/2026-09-30-new-test-sweepob/`
 
-Safety: the pipeline never touches the live MT5 terminal or account. It reads the live data
-directory only to copy cached XAUUSD.s bars/ticks and to scan logs.
+Safety: the pipeline never touches the live MT5 terminal or account, runs only while the live terminal
+is closed, and keeps no credentials in git.
