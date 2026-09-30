@@ -1,0 +1,31 @@
+{
+ "run_id": "f4_oos_procedure",
+ "ex5": "new_test_research.ex5",
+ "ex5_sha256": "90fefdd09a264b5cc0419d088d861ed41415ae9cc2def436ce5d333c976a972b",
+ "ini_sha256": "1086866d3f39d225852905d2c3ce2563f3f987a265d0514aa62c9e69b30341a6",
+ "meta": {
+  "kind": "research",
+  "role": "oos_procedure",
+  "values": {
+   "DrawObjects": false,
+   "DebugMode": false,
+   "PopupAlerts": false,
+   "LotMode": 1,
+   "RiskPercent": 1.0,
+   "MaxOpenPositions": 3,
+   "EnableTrading": true,
+   "SignalTF": 15,
+   "PivL": 5,
+   "PivR": 4,
+   "SweepToSetupBars": 18,
+   "VolumeMultiplier": 1.2,
+   "ConfirmationBars": 9,
+   "ResearchRunTag": "f4_oos_procedure"
+  }
+ },
+ "started": "2026-09-30T19:06:57",
+ "status": "ok",
+ "seconds": 14.7,
+ "report": "f4_oos_procedure.htm",
+ "exit_code": 0
+}

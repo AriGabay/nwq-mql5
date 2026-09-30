@@ -1,0 +1,18 @@
+{
+ "tag": "f2",
+ "train": [
+  "2026.01.01",
+  "2026.03.31"
+ ],
+ "baseline_trades": 0,
+ "trade_floor": 5,
+ "status": "selected",
+ "params": {
+  "PivL": 4,
+  "PivR": 3,
+  "SweepToSetupBars": 12,
+  "VolumeMultiplier": 1.2,
+  "ConfirmationBars": 6
+ },
+ "eligible_passes": 96
+}

@@ -1,0 +1,18 @@
+{
+ "tag": "final",
+ "train": [
+  "2026.05.01",
+  "2026.07.31"
+ ],
+ "baseline_trades": 0,
+ "trade_floor": 5,
+ "status": "selected",
+ "params": {
+  "PivL": 5,
+  "PivR": 3,
+  "SweepToSetupBars": 24,
+  "VolumeMultiplier": 1.2,
+  "ConfirmationBars": 6
+ },
+ "eligible_passes": 102
+}

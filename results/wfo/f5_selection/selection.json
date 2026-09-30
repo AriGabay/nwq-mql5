@@ -1,0 +1,18 @@
+{
+ "tag": "f5",
+ "train": [
+  "2026.04.01",
+  "2026.06.30"
+ ],
+ "baseline_trades": 0,
+ "trade_floor": 5,
+ "status": "selected",
+ "params": {
+  "PivL": 5,
+  "PivR": 3,
+  "SweepToSetupBars": 24,
+  "VolumeMultiplier": 1.2,
+  "ConfirmationBars": 6
+ },
+ "eligible_passes": 119
+}
