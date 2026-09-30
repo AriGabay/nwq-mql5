@@ -1,0 +1,387 @@
+{
+ "acceptance": {
+  "a_min_oos_trade_events": {
+   "value": 8,
+   "threshold": 30,
+   "pass": false,
+   "note": "raw trades 8"
+  },
+  "b_stitched_profit": {
+   "value": -284.3,
+   "threshold": "> 0 and > baseline 0.0",
+   "pass": false,
+   "note": ""
+  },
+  "c_bootstrap": {
+   "value": {
+    "ci90_mean_daily_pnl": [
+     -6.51,
+     0.96
+    ],
+    "paired_prob_le_zero": 0.8823
+   },
+   "threshold": "lower > 0 and paired prob < 0.2",
+   "pass": false,
+   "note": ""
+  },
+  "d_folds_beating_baseline": {
+   "value": 2,
+   "threshold": 3,
+   "pass": false,
+   "note": "compared as fold returns (%) because deposits are chained separately"
+  },
+  "e_concentration": {
+   "value": {
+    "largest_event_share": NaN,
+    "net_without_top2": -430.38
+   },
+   "threshold": "net after top-2 > 0 and max share <= 0.5",
+   "pass": false,
+   "note": ""
+  },
+  "f_loss_limits": {
+   "value": {
+    "stitched_first_breach": null,
+    "monte_carlo": {
+     "breach_prob": 0.1917,
+     "daily_breach_prob": 0.0,
+     "total_breach_prob": 0.1917,
+     "seed": 20260930,
+     "horizon": 252,
+     "n_paths": 10000,
+     "mean_block": 5,
+     "final_return_p1": -0.10719386450442349,
+     "final_return_p5": -0.10382107517102565,
+     "final_return_p50": -0.06455733863194035,
+     "final_return_p95": -0.006725244848955948,
+     "final_return_p99": 0.01812728633543527,
+     "max_dd_pct_p50": 7.798232899628655,
+     "max_dd_pct_p95": 11.088813089907092,
+     "max_dd_pct_p99": 11.701313149880992
+    }
+   },
+   "threshold": "no breach and MC breach prob <= 0.1",
+   "pass": false,
+   "note": ""
+  },
+  "g_spread_stress_1x": {
+   "value": -290.09,
+   "threshold": "> 0",
+   "pass": false,
+   "note": "delay run net -277.72"
+  },
+  "h_neighbor_stability": {
+   "value": 0.0,
+   "threshold": 0.6,
+   "pass": false,
+   "note": "Mar-Apr only (outside the candidate's training window)"
+  },
+  "i_dsr": {
+   "value": {
+    "sr": -0.0863,
+    "psr_value": 0.0,
+    "sr0": 0.2752,
+    "n": 109,
+    "skew": -2.7778,
+    "kurt": 20.6966
+   },
+   "threshold": 0.9,
+   "pass": false,
+   "note": ""
+  },
+  "j_static_candidate_mar_apr": {
+   "value": {
+    "candidate": -186.36,
+    "baseline": 0.0
+   },
+   "threshold": "> 0 and > baseline",
+   "pass": false,
+   "note": ""
+  },
+  "_passed_all": false
+ },
+ "recommended": false,
+ "independent_subperiod": false,
+ "fold_rows": [
+  {
+   "fold": 1,
+   "params": {
+    "PivL": 3,
+    "PivR": 2,
+    "SweepToSetupBars": 12,
+    "VolumeMultiplier": 1.2,
+    "ConfirmationBars": 6
+   },
+   "status": "selected",
+   "procedure_net": -126.04,
+   "baseline_net": 0.0,
+   "procedure_ret": -0.012604,
+   "baseline_ret": 0.0,
+   "procedure_trades": 3
+  },
+  {
+   "fold": 2,
+   "params": {
+    "PivL": 4,
+    "PivR": 3,
+    "SweepToSetupBars": 12,
+    "VolumeMultiplier": 1.2,
+    "ConfirmationBars": 6
+   },
+   "status": "selected",
+   "procedure_net": -175.99,
+   "baseline_net": 0.0,
+   "procedure_ret": -0.017823649275468,
+   "baseline_ret": 0.0,
+   "procedure_trades": 2
+  },
+  {
+   "fold": 3,
+   "params": {
+    "PivL": 5,
+    "PivR": 4,
+    "SweepToSetupBars": 18,
+    "VolumeMultiplier": 1.2,
+    "ConfirmationBars": 6
+   },
+   "status": "selected",
+   "procedure_net": -93.45,
+   "baseline_net": 0.0,
+   "procedure_ret": -0.009636037232534232,
+   "baseline_ret": 0.0,
+   "procedure_trades": 1
+  },
+  {
+   "fold": 4,
+   "params": {
+    "PivL": 5,
+    "PivR": 4,
+    "SweepToSetupBars": 18,
+    "VolumeMultiplier": 1.2,
+    "ConfirmationBars": 9
+   },
+   "status": "selected",
+   "procedure_net": 0.0,
+   "baseline_net": 0.0,
+   "procedure_ret": 0.0,
+   "baseline_ret": 0.0,
+   "procedure_trades": 0
+  },
+  {
+   "fold": 5,
+   "params": {
+    "PivL": 5,
+    "PivR": 3,
+    "SweepToSetupBars": 24,
+    "VolumeMultiplier": 1.2,
+    "ConfirmationBars": 6
+   },
+   "status": "selected",
+   "procedure_net": 111.18,
+   "baseline_net": 0.0,
+   "procedure_ret": 0.011575799727628242,
+   "baseline_ret": 0.0,
+   "procedure_trades": 2
+  }
+ ],
+ "delay_net": {
+  "procedure": -277.72,
+  "baseline": 0.0
+ },
+ "static": {
+  "candidate": -186.36,
+  "baseline": 0.0
+ },
+ "neighbors": {
+  "profitable_share": 0.0,
+  "rows": [
+   {
+    "params": {
+     "PivL": 4,
+     "PivR": 3,
+     "SweepToSetupBars": 24,
+     "VolumeMultiplier": 1.2,
+     "ConfirmationBars": 6
+    },
+    "oos_mar_apr_net": -261.2,
+    "insample_may_jul_net": 304.47
+   },
+   {
+    "params": {
+     "PivL": 5,
+     "PivR": 2,
+     "SweepToSetupBars": 24,
+     "VolumeMultiplier": 1.2,
+     "ConfirmationBars": 6
+    },
+    "oos_mar_apr_net": -253.5,
+    "insample_may_jul_net": 314.89
+   },
+   {
+    "params": {
+     "PivL": 5,
+     "PivR": 4,
+     "SweepToSetupBars": 24,
+     "VolumeMultiplier": 1.2,
+     "ConfirmationBars": 6
+    },
+    "oos_mar_apr_net": -82.77,
+    "insample_may_jul_net": 70.23
+   },
+   {
+    "params": {
+     "PivL": 5,
+     "PivR": 3,
+     "SweepToSetupBars": 18,
+     "VolumeMultiplier": 1.2,
+     "ConfirmationBars": 6
+    },
+    "oos_mar_apr_net": -80.76,
+    "insample_may_jul_net": 304.47
+   },
+   {
+    "params": {
+     "PivL": 5,
+     "PivR": 3,
+     "SweepToSetupBars": 24,
+     "VolumeMultiplier": 1.5,
+     "ConfirmationBars": 6
+    },
+    "oos_mar_apr_net": -88.3,
+    "insample_may_jul_net": 81.96
+   },
+   {
+    "params": {
+     "PivL": 5,
+     "PivR": 3,
+     "SweepToSetupBars": 24,
+     "VolumeMultiplier": 1.2,
+     "ConfirmationBars": 3
+    },
+    "oos_mar_apr_net": -186.36,
+    "insample_may_jul_net": 304.47
+   },
+   {
+    "params": {
+     "PivL": 5,
+     "PivR": 3,
+     "SweepToSetupBars": 24,
+     "VolumeMultiplier": 1.2,
+     "ConfirmationBars": 9
+    },
+    "oos_mar_apr_net": -186.36,
+    "insample_may_jul_net": 218.62
+   }
+  ],
+  "candidate_insample_may_jul_net": 304.47
+ },
+ "var_sr": 0.00602900216006275,
+ "checks": {
+  "aug_sep_candidate": {
+   "net_profit": -109.65,
+   "trades": 3,
+   "profit_factor": 0.41,
+   "recovery_factor": -0.34,
+   "equity_dd_money": 318.62,
+   "equity_dd_pct": 3.15,
+   "balance_dd_pct": 1.87,
+   "final_balance": NaN,
+   "events": 3,
+   "breach": null
+  },
+  "aug_sep_baseline": {
+   "net_profit": 0.0,
+   "trades": 0,
+   "profit_factor": 0.0,
+   "recovery_factor": 0.0,
+   "equity_dd_money": 0.0,
+   "equity_dd_pct": 0.0,
+   "balance_dd_pct": 0.0,
+   "final_balance": NaN,
+   "events": 0,
+   "breach": null
+  },
+  "sep16_29_candidate": {
+   "net_profit": 77.43,
+   "trades": 1,
+   "profit_factor": 0.0,
+   "recovery_factor": 1.92,
+   "equity_dd_money": 40.26,
+   "equity_dd_pct": 0.4,
+   "balance_dd_pct": 0.0,
+   "final_balance": NaN,
+   "events": 1,
+   "breach": null
+  },
+  "sep16_29_baseline": {
+   "net_profit": 0.0,
+   "trades": 0,
+   "profit_factor": 0.0,
+   "recovery_factor": 0.0,
+   "equity_dd_money": 0.0,
+   "equity_dd_pct": 0.0,
+   "balance_dd_pct": 0.0,
+   "final_balance": NaN,
+   "events": 0,
+   "breach": null
+  }
+ },
+ "procedure_stitched": {
+  "net": -284.3,
+  "summary": {
+   "net_profit": -284.29999999999995,
+   "n_trades": 8,
+   "n_events": 8,
+   "win_rate": 0.375,
+   "expectancy_per_event": -35.537499999999994,
+   "expectancy_per_trade": -35.537499999999994,
+   "profit_factor": 0.3488020523157268,
+   "max_balance_dd_money": 395.47999999999956,
+   "max_balance_dd_pct": 3.9547999999999957,
+   "max_equity_dd_money": 871.2600000000002,
+   "max_equity_dd_pct": 8.344075558867079,
+   "recovery_factor": -0.32630902371278364
+  }
+ },
+ "baseline_stitched": {
+  "net": 0.0,
+  "summary": {
+   "net_profit": 0.0,
+   "n_trades": 0,
+   "n_events": 0,
+   "win_rate": NaN,
+   "expectancy_per_event": NaN,
+   "expectancy_per_trade": NaN,
+   "profit_factor": NaN,
+   "max_balance_dd_money": 0.0,
+   "max_balance_dd_pct": 0.0,
+   "max_equity_dd_money": 0.0,
+   "max_equity_dd_pct": 0.0,
+   "recovery_factor": NaN
+  }
+ },
+ "stress_spread": {
+  "1.0": -290.09000000000003,
+  "2.0": -295.88
+ },
+ "stress_spread_baseline": {
+  "1.0": 0.0,
+  "2.0": 0.0
+ },
+ "shuffle_mc": {
+  "seed": 20260930,
+  "n_paths": 10000,
+  "max_dd_pct_p50": 3.418223659957286,
+  "max_dd_pct_p95": 4.351498840216784,
+  "max_dd_pct_p99": 4.351498840216798,
+  "max_losing_streak_p50": 3.0,
+  "max_losing_streak_p95": 5.0,
+  "max_losing_streak_p99": 5.0
+ },
+ "m5_reference": {
+  "oos_net": 0.0,
+  "oos_trades": 0,
+  "check_net": 0.0,
+  "check_trades": 0
+ }
+}

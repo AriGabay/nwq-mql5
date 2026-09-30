@@ -27,7 +27,8 @@ def load_run(run_id: str, root: pathlib.Path = None) -> dict:
 def stitch(runs: list) -> dict:
     """Chronological concatenation of chained runs (each month counted once)."""
     days = pd.concat([r["days"] for r in runs], ignore_index=True).sort_values("date").reset_index(drop=True)
-    trades = pd.concat([r["trades"] for r in runs], ignore_index=True).sort_values("open_time").reset_index(drop=True)
+    parts = [r["trades"] for r in runs if not r["trades"].empty] or [runs[0]["trades"]]
+    trades = pd.concat(parts, ignore_index=True).sort_values("open_time").reset_index(drop=True)
     return {"days": days, "trades": trades, "initial": runs[0]["deposit"],
             "net_profit": float(sum(r["summary"]["net_profit"] for r in runs))}
 

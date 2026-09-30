@@ -1,0 +1,26 @@
+{
+ "run_id": "check_sep16_29_baseline",
+ "ex5": "new_test_research.ex5",
+ "ex5_sha256": "90fefdd09a264b5cc0419d088d861ed41415ae9cc2def436ce5d333c976a972b",
+ "ini_sha256": "e2ae8d7bc01d7f3a1b689582bd00cd250889c8aa0de1cc3a0e1dfe470327ccb8",
+ "meta": {
+  "kind": "research",
+  "role": "check_period",
+  "values": {
+   "DrawObjects": false,
+   "DebugMode": false,
+   "PopupAlerts": false,
+   "LotMode": 1,
+   "RiskPercent": 1.0,
+   "MaxOpenPositions": 3,
+   "EnableTrading": true,
+   "SignalTF": 15,
+   "ResearchRunTag": "check_sep16_29_baseline"
+  }
+ },
+ "started": "2026-09-30T19:41:04",
+ "status": "ok",
+ "seconds": 13.4,
+ "report": "check_sep16_29_baseline.htm",
+ "exit_code": 0
+}

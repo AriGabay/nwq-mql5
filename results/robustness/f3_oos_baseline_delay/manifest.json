@@ -1,0 +1,26 @@
+{
+ "run_id": "f3_oos_baseline_delay",
+ "ex5": "new_test_research.ex5",
+ "ex5_sha256": "90fefdd09a264b5cc0419d088d861ed41415ae9cc2def436ce5d333c976a972b",
+ "ini_sha256": "42fec09753520d9d1c1c3e302e114e3bb5bc541d570bdf23242f43e19b4f7a5c",
+ "meta": {
+  "kind": "research",
+  "role": "stress_delay",
+  "values": {
+   "DrawObjects": false,
+   "DebugMode": false,
+   "PopupAlerts": false,
+   "LotMode": 1,
+   "RiskPercent": 1.0,
+   "MaxOpenPositions": 3,
+   "EnableTrading": true,
+   "SignalTF": 15,
+   "ResearchRunTag": "f3_oos_baseline_delay"
+  }
+ },
+ "started": "2026-09-30T19:29:48",
+ "status": "ok",
+ "seconds": 13.3,
+ "report": "f3_oos_baseline_delay.htm",
+ "exit_code": 0
+}
