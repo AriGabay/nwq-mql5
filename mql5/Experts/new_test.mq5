@@ -1104,11 +1104,11 @@ double OnTester()
      {
       double commission, swap, lots, entries;
       RL_CostTotals(commission, swap, lots, entries);
-      int n = ArraySize(rlDays);
+      int cnt = ArraySize(rlDays);
       double data[];
-      ArrayResize(data, 4 + n);
+      ArrayResize(data, 4 + cnt);
       data[0] = commission; data[1] = swap; data[2] = lots; data[3] = entries;
-      for(int i = 0; i < n; i++) data[4 + i] = rlDays[i];
+      for(int i = 0; i < cnt; i++) data[4 + i] = rlDays[i];
       FrameAdd("rl", 1, sharpe, data);
      }
    return sharpe;
