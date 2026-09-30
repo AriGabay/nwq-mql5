@@ -18,3 +18,25 @@ It holds no password written by the pipeline; the Strategy Tester still requires
 
 ### Trade-safe
 The state of the isolated copy in which it cannot place orders or expose trading tools: automated trading disabled, the terminal's built-in MCP server off, and no stored password in its configuration.
+
+## Strategy
+
+### Order Block
+The most recent opposite-colored candle at or before the first candle of an Identifying FVG, qualified under the selected mode (the Identifying FVG alone, or together with a break of structure); its zone is that candle's full high-to-low range.
+*Avoid:* OB zone, supply/demand zone
+
+### Touch
+The first return of price into an active Order Block after it qualified; it starts the search for a confirming FVG but never triggers an entry by itself.
+
+### Identifying FVG
+The Fair Value Gap formed by the impulse away from an Order Block; it is how the Order Block is found and qualified, completes before any touch, and never confirms an entry.
+*Avoid:* displacement FVG, impulse FVG
+
+### Confirmation FVG
+A new Fair Value Gap in the trade direction whose first candle is at or after the touch bar, valid only once its third candle has closed within the allowed window; it marks the reaction to the touch and is the only FVG that can lead to an order.
+
+### Retest
+The second return of price, after the confirmation FVG completes, to the pre-chosen entry level in the FVG or the Order Block; the entry fills only on the retest.
+
+### Retired
+The state of an Order Block after its single setup was filled, cancelled, expired or skipped; a retired Order Block never starts another setup.
