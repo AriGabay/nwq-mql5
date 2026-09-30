@@ -35,3 +35,21 @@ def test_isolated_process_filter(monkeypatch):
                   "2 wine64-preloader C:\\mt5r\\terminal64.exe /portable\n")
     monkeypatch.setattr(runner.subprocess, "run", lambda *a, **k: R())
     assert runner.isolated_processes() == ["2 wine64-preloader C:\\mt5r\\terminal64.exe /portable"]
+
+
+def test_live_terminal_detection(monkeypatch):
+    class R:
+        stdout = "1 wine64-preloader C:\\Program Files\\MetaTrader 5\\terminal64.exe \n"
+    monkeypatch.setattr(runner.subprocess, "run", lambda *a, **k: R())
+    assert runner.live_terminal_running()
+
+
+def test_run_refuses_while_live_terminal_runs(monkeypatch, tmp_path):
+    import pytest
+    from mt5r import env
+    monkeypatch.setattr(runner, "live_terminal_running", lambda: True)
+    monkeypatch.setattr(runner, "_free_gb", lambda p: 100.0)
+    cfg = env.Config(live_mt5_dir=tmp_path, live_prefix=tmp_path / "l", isolated_prefix=tmp_path / "i",
+                     wine_dir=tmp_path, server="S", symbol="X")
+    with pytest.raises(RuntimeError, match="live MT5 terminal is running"):
+        runner.run(cfg, "x", "", "e.ex5")

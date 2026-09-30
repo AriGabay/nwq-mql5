@@ -37,6 +37,16 @@ def isolated_processes() -> list:
     return [l.strip() for l in out.splitlines() if ISO_EXE_MARKER in l]
 
 
+LIVE_EXE_MARKER = "C:\\Program Files\\MetaTrader 5\\terminal64.exe"
+
+
+def live_terminal_running() -> bool:
+    """True when the user's live terminal runs. On 2026-09-30 an isolated run coincided with the live
+    terminal stopping ("system shutdown"), so research runs only while the live terminal is closed."""
+    out = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True).stdout
+    return any(LIVE_EXE_MARKER in l for l in out.splitlines())
+
+
 def shutdown_prefix(cfg: envmod.Config) -> None:
     envmod.assert_isolated(cfg)
     subprocess.run([str(cfg.wine_dir / "bin" / "wineserver"), "-k"], env=cfg.env(), timeout=60)
@@ -60,6 +70,8 @@ def run(cfg: envmod.Config, run_id: str, ini_text: str, expert_ex5: str, timeout
     """Execute one /config job. `expert_ex5` is the ex5 file name under MQL5/Experts."""
     if _free_gb(cfg.mt5_dir) < MIN_FREE_GB:
         raise RuntimeError("less than 5 GB free disk; aborting before run")
+    if live_terminal_running():
+        raise RuntimeError("live MT5 terminal is running; research runs only while it is closed")
     busy = isolated_processes()
     if busy:
         raise RuntimeError(f"isolated terminal already running: {busy}")
@@ -70,6 +82,7 @@ def run(cfg: envmod.Config, run_id: str, ini_text: str, expert_ex5: str, timeout
     ini_rel = pathlib.Path("runs_ini") / f"{run_id}.ini"
     envmod.write_utf16(cfg.mt5_dir / ini_rel, ini_text)
     (run_dir / "tester.ini").write_text(ini_text)
+    (cfg.mt5_dir / "reports").mkdir(exist_ok=True)
     for old in (cfg.mt5_dir / "reports").glob(f"{run_id}*"):
         old.unlink()
     ex5 = cfg.mt5_dir / "MQL5" / "Experts" / expert_ex5
