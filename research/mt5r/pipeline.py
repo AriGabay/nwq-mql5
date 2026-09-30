@@ -74,3 +74,26 @@ def _same(a, b) -> bool:
         return abs(float(a) - float(b)) < 1e-9
     except ValueError:
         return False
+
+
+def run_optimization(cfg, run_id: str, kind: str, period: str, start: str, end: str, fixed: dict,
+                     ranges: dict, deposit: float = 10000.0, role: str = "", purpose: str = "",
+                     timeout: int = 14400):
+    """Complete (Optimization=1) run; returns (RunResult, passes DataFrame or None)."""
+    tf = ini.PERIODS[period]
+    vals = base_values(kind, tf)
+    vals.update(fixed)
+    if kind == "research":
+        vals["ResearchRunTag"] = run_id
+    lines = setfile.render_lines(specs(kind), vals, ranges)
+    ex5 = BUILDS[kind][0]
+    text = ini.render(expert=ex5, symbol=PREREG["symbol"], period=period, from_date=start, to_date_inclusive=end,
+                      deposit=deposit, report=f"reports\\{run_id}", set_lines=lines, optimization=1)
+    res = runner.run(cfg, run_id, text, ex5, timeout=timeout,
+                     meta={"kind": kind, "role": role, "values": vals, "ranges": ranges})
+    df = reports.parse_opt_xml(res.report) if res.report and res.report.suffix == ".xml" else None
+    explog.append({"id": run_id, "purpose": purpose, "role": role, "expert": ex5, "period": period, "from": start,
+                   "to": end, "deposit": deposit, "status": res.status if df is not None else "failed",
+                   "seconds": res.seconds, "fixed": fixed, "ranges": ranges,
+                   "passes": None if df is None else len(df)})
+    return res, df

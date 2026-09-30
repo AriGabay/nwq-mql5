@@ -1,0 +1,16 @@
+{
+ "discarded_days": 2,
+ "discarded_minutes": 3590,
+ "total_minute_bars": 205740,
+ "real_ticks_begin": "2026.01.02 00:00:00",
+ "warmup_bars": 3000,
+ "stops_level_pts": 20,
+ "tick": 0.01,
+ "final_balance": 9904.08,
+ "every_tick_generation_used": true,
+ "funnel": {
+  "rejected_by_volume": 3633,
+  "fvg_candidates": 3650,
+  "orders_sent": 1
+ }
+}

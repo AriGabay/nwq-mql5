@@ -1,0 +1,12 @@
+{
+ "run_id": "pilot_m15_202603_dbg",
+ "ex5": "new_test.ex5",
+ "ex5_sha256": "57638ca721219aadea9acc23c506849dae4d4be9aca80392fd3bc04c780c865a",
+ "ini_sha256": "f1a3e56ab313cf107ee43d8ae03ee0245b59929ec179a513e85fdfdd2f58563c",
+ "meta": {},
+ "started": "2026-09-30T18:20:16",
+ "status": "ok",
+ "seconds": 14.4,
+ "report": "pilot_m15_202603_dbg.htm",
+ "exit_code": 0
+}
