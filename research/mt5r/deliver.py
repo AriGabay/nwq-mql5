@@ -54,7 +54,7 @@ def charts(d: dict, out: pathlib.Path) -> list:
     proc = evaluate.stitch([evaluate.load_run(f["oos"]["procedure"]["run_id"]) for f in d["folds"]])
     base = evaluate.stitch([evaluate.load_run(f["oos"]["baseline"]["run_id"]) for f in d["folds"]])
 
-    fig, ax = plt.subplots(figsize=(8, 3.6), facecolor=SURFACE)
+    fig, ax = plt.subplots(figsize=(9.5, 3.6), facecolor=SURFACE)
     _style(ax)
     for s, color, label in ((proc, BLUE, "WFO procedure"), (base, ORANGE, "Baseline (code defaults, M15)")):
         ax.plot(s["days"]["date"], s["days"]["eq_close"], color=color, linewidth=2, label=label)
@@ -63,7 +63,8 @@ def charts(d: dict, out: pathlib.Path) -> list:
     ax.axhline(9000, color=MUTED, linewidth=1, linestyle="--")
     ax.text(proc["days"]["date"].iloc[0], 9010, "total loss limit 9,000", fontsize=7, color=MUTED)
     ax.set_title("Stitched OOS equity, Mar-Jul 2026 (USD, daily close)", fontsize=10, color=INK, loc="left")
-    ax.legend(frameon=False, fontsize=8, loc="upper left")
+    ax.legend(frameon=False, fontsize=8, loc="center left", bbox_to_anchor=(0.0, 0.42))
+    ax.set_xlim(right=proc["days"]["date"].iloc[-1] + (proc["days"]["date"].iloc[-1] - proc["days"]["date"].iloc[0]) * 0.35)
     fig.tight_layout()
     fig.savefig(out / "oos_equity.png", dpi=150)
     plt.close(fig)
@@ -78,6 +79,12 @@ def charts(d: dict, out: pathlib.Path) -> list:
     ax.bar(x - 0.2, pv, width=0.38, color=BLUE, label="WFO procedure")
     ax.bar(x + 0.2, bv, width=0.38, color=ORANGE, label="Baseline")
     ax.axhline(0, color=MUTED, linewidth=1)
+    for i, (pv_i, bv_i, f) in enumerate(zip(pv, bv, folds)):
+        ax.text(i - 0.2, pv_i, f"{pv_i:+.0f}\n({f['oos']['procedure']['trades']} tr)", ha="center",
+                va="bottom" if pv_i >= 0 else "top", fontsize=7, color=INK)
+        if bv_i == 0:
+            ax.text(i + 0.2, 0, "no trades", ha="center", va="bottom", fontsize=7, color=MUTED)
+    ax.margins(y=0.25)
     ax.set_xticks(x, [f["test"][0][:7] for f in folds])
     ax.set_title("OOS net profit per fold (USD)", fontsize=10, color=INK, loc="left")
     ax.legend(frameon=False, fontsize=8)

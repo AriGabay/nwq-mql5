@@ -118,3 +118,11 @@ ref_m5_base_202605,2026-09-30T19:41:58,ref_m5_base,m5_reference,new_test_researc
 ref_m5_base_202606,2026-09-30T19:42:15,ref_m5_base,m5_reference,new_test_research.ex5,M5,2026.06.01,2026.06.30,10000.0,ok,0.0,0,0.0,
 ref_m5_base_202607,2026-09-30T19:42:29,ref_m5_base,m5_reference,new_test_research.ex5,M5,2026.07.01,2026.07.31,10000.0,ok,0.0,0,0.0,
 ref_m5_base_check_202608,2026-09-30T19:42:47,ref_m5_base_check,m5_reference,new_test_research.ex5,M5,2026.08.01,2026.09.29,10000,ok,0.0,0,0.0,
+validate_new_test_candidate,2026-09-30T19:44:18,R29 .set validation (dev window),set_validation,,,,,,ok,214.59,15,,
+validate_new_test_baseline_m15,2026-09-30T19:44:43,R29 .set validation (dev window),set_validation,,,,,,ok,0.0,0,,
+validate_new_test_original,2026-09-30T19:45:23,"R29 .set validation (original EA, M5)",set_validation,,,,,,ok,0.0,0,,
+pilot_m15_202603_attempt1,2026-09-30T17:56:26,U5 pilot,pilot,new_test.ex5,M15,2026.03.01,2026.03.31,10000,failed,,,,tester not started because the account is not specified (no account configured in isolated copy); logged retroactively; runner called directly before the experiment log was wired in
+pilot_m15_202603_attempt2,2026-09-30T18:08:24,U5 pilot,pilot,new_test.ex5,M15,2026.03.01,2026.03.31,10000,failed,,,,tester not started because the account is not specified (account number without password in common.ini); logged retroactively; runner called directly before the experiment log was wired in
+pilot_m15_202603_attempt3,2026-09-30T18:08:45,U5 pilot,pilot,new_test.ex5,M15,2026.03.01,2026.03.31,10000,failed,,,,tester not started because the account is not specified (account number in /config [Common] section); logged retroactively; runner called directly before the experiment log was wired in
+pilot_m15_202603_attempt4,2026-09-30T18:19:30,U5 pilot after user login,pilot,new_test.ex5,M15,2026.03.01,2026.03.31,10000,failed,0.0,0,,test ran (0 trades) but report not saved: reports folder missing; fixed in runner; logged retroactively; runner called directly before the experiment log was wired in
+pilot_m15_202603_dbg,2026-09-30T18:20:20,U5 pilot with DebugMode (volume ratios),pilot,new_test.ex5,M15,2026.03.01,2026.03.31,10000,ok,0.0,0,,max volume ratio 1.95 < 2.0; logged retroactively; runner called directly before the experiment log was wired in

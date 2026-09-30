@@ -1,0 +1,36 @@
+{
+ "new_test_candidate.set": {
+  "inputs_in_file": 26,
+  "mismatches": [],
+  "net_profit": 214.59,
+  "trades": 15,
+  "period": [
+   "2026.03.01",
+   "2026.07.31"
+  ],
+  "build": "6230"
+ },
+ "new_test_baseline_m15.set": {
+  "inputs_in_file": 26,
+  "mismatches": [],
+  "net_profit": 0.0,
+  "trades": 0,
+  "period": [
+   "2026.03.01",
+   "2026.07.31"
+  ],
+  "build": "6230"
+ },
+ "new_test_original.set": {
+  "inputs_in_file": 25,
+  "mismatches": [],
+  "net_profit": 0.0,
+  "trades": 0,
+  "period": [
+   "2026.03.01",
+   "2026.07.31"
+  ],
+  "build": "6230",
+  "ea": "original v1.03 on M5"
+ }
+}
