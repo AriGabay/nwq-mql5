@@ -1,0 +1,7 @@
+# Copy to research/config.yaml (gitignored) and adjust paths. No credentials belong here.
+live_mt5_dir: "~/Library/Application Support/net.metaquotes.wine.metatrader5/drive_c/Program Files/MetaTrader 5"   # read-only input
+live_prefix: "~/Library/Application Support/net.metaquotes.wine.metatrader5"                                       # never written
+isolated_prefix: "~/mt5-research/prefix"        # separate Wine prefix for the research terminal
+wine_dir: "/Applications/MetaTrader 5.app/Contents/SharedSupport/wine"
+server: "Bybit-Live-4"
+symbol: "XAUUSD.s"

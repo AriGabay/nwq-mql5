@@ -1,0 +1,11 @@
+# raw MT5 run directories (large); curated evidence lives in results/
+runs/
+# local machine paths (never secrets, but machine-specific)
+research/config.yaml
+# never track MT5 account/credential stores
+*.dat
+accounts.*
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
