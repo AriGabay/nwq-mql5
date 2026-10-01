@@ -49,7 +49,7 @@ def has_tick_volume(bars: pd.DataFrame) -> bool:
 
 def fvg_vol_ratios(row, bars: pd.DataFrame, period_seconds: int, lookback_hours=VOLUME_LOOKBACK_HOURS):
     """(identifying, confirmation) middle-candle volume ratios: the logged value, else recomputed from the bars
-    when all look-back bars are logged, else None."""
+    when the whole look-back window is logged, else None."""
     out = []
     for ratio_f, c1_f in (("idfvg_vol_ratio", "idfvg_c1_time"), ("cfvg_vol_ratio", "cfvg_c1_time")):
         v = cf._flt(row, ratio_f)
@@ -380,7 +380,7 @@ def render(setups: pd.DataFrame, bars: pd.DataFrame, deals: pd.DataFrame, out_di
         "server time; for the two FVG columns this is candle 3. placement, fill and exit are tick times with "
         "milliseconds. Net is profit + commission + swap; realized R = net / (|intended entry - SL| x volume x "
         f"contract size {size:g}). idFVG / cFVG vol ratio = tick volume of the FVG's middle candle / mean tick "
-        "volume of the VolumeLookbackHours of bars before it, as logged by the EA (recomputed from the bars with "
+        "volume of the bars opening in the VolumeLookbackHours wall-clock hours before it, as logged by the EA (recomputed from the bars with "
         f"{VOLUME_LOOKBACK_HOURS} h when not logged). The filter (>= VolumeMultiplier, R41) applies to the "
         "identifying FVG only; the cFVG ratio is informational (AMENDMENT B).",
         "",

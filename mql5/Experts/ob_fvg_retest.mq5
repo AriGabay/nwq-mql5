@@ -26,7 +26,7 @@ input int             ImpulseWindowBars = 2;     // look-back from identifying-F
 input int             BosWindowBars     = 6;     // FVG+BOS: break close must occur within N bars after the OB candle (R6)
 input int             SwingStrength     = 3;     // pivot strength each side (R6)
 input double          VolumeMultiplier  = 2.0;   // middle candle tick volume >= k x average of the previous lookback bars (R41)
-input int             VolumeLookbackHours = 24;  // lookback = VolumeLookbackHours*60/period minutes bars (96 on M15, 288 on M5) (R41)
+input int             VolumeLookbackHours = 24;  // average over the bars opening in the last VolumeLookbackHours wall-clock hours before the push bar (R41, AMENDMENT C)
 input int             ObMaxAgeBars      = 96;    // touch window after activation (R8)
 input int             FvgWindowBars     = 12;    // confirmation window after touch (R9), must be >= 2
 input int             OrderExpiryBars   = 12;    // pending-order window after confirmation bar (R11)
@@ -57,6 +57,9 @@ input string          ResearchRunTag    = "";    // tag for research CSV files (
 #define MC_RETRY_MAX     120     // at most this many placement attempts per setup
 #define MC_RETRY_GAP_MSC 60000   // at most one attempt per 60 s of tick time
 #define FUNNEL_LINE_MAX  180     // MT5's journal truncates long lines: the funnel is split (AMENDMENT B)
+#define VOL_OK           0       // R41 ratio computed
+#define VOL_NO_HISTORY   1       // loaded history starts after the window start: bars may be missing
+#define VOL_EMPTY        2       // no bar (or no tick volume) in the window, e.g. right after the weekend
 
 struct Piv
   {
@@ -134,7 +137,7 @@ datetime gT[];
 long     gV[];                // tick volume per bar (MqlRates.tick_volume, R41)
 long     gVCum[];             // prefix sums: gVCum[k] = gV[0] + ... + gV[k-1] (size gBars + 1)
 int      gBars = 0;
-int      gVolN = 0;           // R41 lookback in bars = VolumeLookbackHours*60 / period minutes
+long     gVolSec = 0;         // R41 lookback window in seconds of wall-clock time (AMENDMENT C)
 datetime gLastTime = 0;
 long     gPeriodSec = 0;
 
@@ -162,6 +165,7 @@ string   gReasons[] = {"expired_untouched", "invalidated_active", "invalidated_t
 int      gReasonCnt[];
 int      gCntActivated = 0, gCntTouched = 0, gCntConfirmed = 0, gCntPlaced = 0, gCntWarmupDropped = 0;
 int      gCntIdfvgRejVol = 0, gCntMcRetries = 0;   // R41 / R42 funnel keys
+int      gCntIdfvgVolNoHist = 0, gCntIdfvgVolEmpty = 0;   // R41 identifying FVGs not judged (AMENDMENT C)
 
 //==================================================================
 // SMALL HELPERS
@@ -568,6 +572,8 @@ void PrintFunnel()
      }
    FunnelAdd(line, "warmup_dropped", gCntWarmupDropped);
    FunnelAdd(line, "idfvg_rejected_volume", gCntIdfvgRejVol);
+   FunnelAdd(line, "idfvg_volume_no_history", gCntIdfvgVolNoHist);
+   FunnelAdd(line, "idfvg_volume_empty_window", gCntIdfvgVolEmpty);
    FunnelAdd(line, "market_closed_retries", gCntMcRetries);
    Print(line);
   }
@@ -665,26 +671,54 @@ int AppendBar(const MqlRates &r)
    return n;
   }
 
-// R41: middle-candle tick volume ratio of an FVG whose middle candle is m: gV[m] / mean(gV[m-N .. m-1]),
-// N = gVolN closed bars counted (not wall time; warm-up bars count). False (ratio 0) when fewer than N bars
-// precede m or the reference volume is zero.
-bool VolumeRatio(int m, double &ratio)
+// first bar index j < hi with gT[j] >= t (gT ascending); hi when there is none
+int FirstBarAtOrAfter(datetime t, int hi)
   {
-   ratio = 0;
-   int nb = gVolN;
-   if(nb <= 0 || m < nb || m >= gBars) return false;
-   long sum = gVCum[m] - gVCum[m - nb];               // bars m-nb .. m-1
-   if(sum <= 0) return false;                         // no reference volume
+   int lo = 0;
+   while(lo < hi)
+     {
+      int mid = (lo + hi) / 2;
+      if(gT[mid] < t) lo = mid + 1;
+      else            hi = mid;
+     }
+   return lo;
+  }
+
+// R41 (AMENDMENT C): middle-candle tick volume ratio of an FVG whose middle candle (push bar) is m:
+// gV[m] / mean(gV[j .. m-1]) over the bars that OPEN in the wall-clock window [gT[m] - VolumeLookbackHours h, gT[m]).
+// The push bar is excluded, no bar from before the window is used to fill a quota, and closed-market hours add no
+// bars (none exist). VOL_NO_HISTORY when the loaded history starts after the window start, VOL_EMPTY when the window
+// holds no bar or no volume; ratio 0 and nb = bars in the window otherwise unset.
+int VolumeRatio(int m, double &ratio, int &nb)
+  {
+   ratio = 0; nb = 0;
+   if(m < 0 || m >= gBars) return VOL_EMPTY;
+   datetime start = gT[m] - (datetime)gVolSec;
+   if(gT[0] > start) return VOL_NO_HISTORY;
+   int j = FirstBarAtOrAfter(start, m);
+   nb = m - j;
+   long sum = gVCum[m] - gVCum[j];                     // bars j .. m-1
+   if(nb <= 0 || sum <= 0) return VOL_EMPTY;
    ratio = (double)gV[m] * (double)nb / (double)sum;
-   return true;
+   return VOL_OK;
   }
 
 // R41 filter, applied to the identifying FVG only (AMENDMENT B): ratio >= VolumeMultiplier; a ratio that cannot
-// be computed does not qualify
-bool VolumeQualifies(int m, double &ratio)
+// be computed (status != VOL_OK) does not qualify
+bool VolumeQualifies(int m, double &ratio, int &status)
   {
-   if(!VolumeRatio(m, ratio)) return false;
+   int nb = 0;
+   status = VolumeRatio(m, ratio, nb);
+   if(status != VOL_OK) return false;
    return ratio >= VolumeMultiplier - 1e-9;           // >= (float noise tolerated), never >
+  }
+
+// funnel key of an identifying FVG that would have produced a setup but did not pass R41
+void CountVolumeReject(int status)
+  {
+   if(status == VOL_NO_HISTORY)  gCntIdfvgVolNoHist++;
+   else if(status == VOL_EMPTY)  gCntIdfvgVolEmpty++;
+   else                          gCntIdfvgRejVol++;
   }
 
 // strict pivot tests (ties are not pivots), adapted from the archived EA
@@ -807,7 +841,8 @@ void NewCandidate(int dir, int n, bool live)
    if(ob < 0) return;
    if(ObUsed(gT[ob])) return;                        // each candle becomes an OB at most once
    double vr = 0;
-   bool volOk = VolumeQualifies(n - 1, vr);           // middle candle = n - 1 (R41)
+   int volStatus = VOL_OK;
+   bool volOk = VolumeQualifies(n - 1, vr, volStatus); // middle candle = n - 1 (R41)
    if(volOk) MarkObUsed(gT[ob], n);
 
    Setup s; InitSetup(s);
@@ -824,7 +859,7 @@ void NewCandidate(int dir, int n, bool live)
 
    if(ObMode == OB_FVG)
      {
-      if(!volOk) { if(live) gCntIdfvgRejVol++; return; }   // would have activated: rejected by volume
+      if(!volOk) { if(live) CountVolumeReject(volStatus); return; }   // would have activated: rejected by volume
       Activate(s, n); PushSetup(s); return;
      }
 
@@ -833,7 +868,7 @@ void NewCandidate(int dir, int n, bool live)
    for(int b = ob + 1; b <= n && b - ob <= BosWindowBars; b++)
       if(FindBreak(s, b)) { brk = true; break; }
    if(!brk && n - ob >= BosWindowBars) return;        // BOS window elapsed
-   if(!volOk) { if(live) gCntIdfvgRejVol++; return; }   // would have been tracked: rejected by volume
+   if(!volOk) { if(live) CountVolumeReject(volStatus); return; }   // would have been tracked: rejected by volume
    if(brk) Activate(s, n);                            // activation at the later of c3 and break close
    PushSetup(s);
   }
@@ -911,7 +946,8 @@ void ProcessBar(const MqlRates &r, bool live, bool canTrade)
       bool bullF = gL[n] > gH[n - 2];
       bool bearF = gH[n] < gL[n - 2];
       double cvr = -1;
-      if((bullF || bearF) && !VolumeRatio(n - 1, cvr)) cvr = -1;
+      int cnb = 0;
+      if((bullF || bearF) && VolumeRatio(n - 1, cvr, cnb) != VOL_OK) cvr = -1;
       int bestL = -1, bestS = -1;
       for(int i = 0; i < ArraySize(S); i++)
         {
@@ -1261,10 +1297,9 @@ int OnInit()
             "VolumeMultiplier >= 0, VolumeLookbackHours > 0)");
       return INIT_PARAMETERS_INCORRECT;
      }
-   // R41: lookback in closed bars = VolumeLookbackHours * 60 / period minutes (96 on M15, 288 on M5)
-   long periodMin = PeriodSeconds(SignalTF) / 60;
-   gVolN = (periodMin > 0) ? (int)((long)VolumeLookbackHours * 60 / periodMin) : 0;
-   if(gVolN < 1)
+   // R41 (AMENDMENT C): lookback = a wall-clock window of VolumeLookbackHours hours before the push bar opens
+   gVolSec = (long)VolumeLookbackHours * 3600;
+   if(gVolSec < PeriodSeconds(SignalTF))
      {
       Print("OBR: VolumeLookbackHours shorter than one ", EnumToString(SignalTF), " bar");
       return INIT_PARAMETERS_INCORRECT;
@@ -1303,7 +1338,7 @@ int OnInit()
      }
    gOrphansDone = false;
    Print("OBR initialised. Warm-up bars: ", got, ", ob mode ", EnumToString(ObMode), ", entry mode ", EnumToString(EntryMode),
-         ", volume lookback ", gVolN, " bars x", DoubleToString(VolumeMultiplier, 2),
+         ", volume lookback ", VolumeLookbackHours, " h window x", DoubleToString(VolumeMultiplier, 2),
          ", tracked setups ", ArraySize(S), ", tick ", DoubleToString(gTick, gDigits),
          ", stops level ", SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL), " pts");
    return INIT_SUCCEEDED;

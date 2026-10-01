@@ -10,11 +10,12 @@ while k <= N. The OB look-back (R5, KTD3) inspects ImpulseWindowBars bars counte
 candle 1 inclusive (candle 1 is bar 1 of the look-back).
 
 Volume filter (AMENDMENT A1, R41; AMENDMENT B): an identifying FVG qualifies only when its middle candle m has
-tick_volume[m] / mean(tick_volume[m-N .. m-1]) >= VolumeMultiplier, N = VolumeLookbackHours*60 / period minutes,
-counted in bars, and the OB search considers only such FVGs. The confirmation FVG has NO volume requirement: any FVG
+tick_volume[m] / mean(tick_volume of the bars opening in [open(m) - VolumeLookbackHours h, open(m))) >= VolumeMultiplier
+(AMENDMENT C: a wall-clock window, not a bar count; the push bar is excluded, nothing before the window is used, and
+closed-market hours add no bars), and the OB search considers only such FVGs. The confirmation FVG has NO volume requirement: any FVG
 (R7) after the touch confirms, and its logged cfvg_vol_ratio is informational (only checked for consistency with the
-recomputed ratio, never against the threshold). Ratios are recomputed from rl_bars only when all N prior bars are
-logged (warm-up history is not); otherwise the logged ratio is the only evidence. Bars without tick_volume
+recomputed ratio, never against the threshold). Ratios are recomputed from rl_bars only when the logged bars reach
+back to the window start (warm-up history is not logged); otherwise the logged ratio is the only evidence. Bars without tick_volume
 (pre-amendment runs) carry no volume evidence, so the volume rules are not applied to them. Market closed at placement (A2, R42): a placement may follow a
 TRADE_RETCODE_MARKET_CLOSED refusal (market_closed_first_msc) on a later tick inside the order window.
 """
@@ -156,51 +157,71 @@ class _Bars:
         """The OB candle colour: bearish (close < open) for longs, bullish for shorts. A doji is neither."""
         return self.c[i] < self.o[i] if sign > 0 else self.c[i] > self.o[i]
 
-    def vol_detail(self, m, N):
-        """(tick volume of m, mean of the N bars before m, ratio), or None when not all N prior bars are logged."""
-        if m is None or N <= 0 or m - N < 0 or m >= self.n:
+    def vol_detail(self, m, lookback_s):
+        """(tick volume of m, mean over the window, ratio), or None when the window is not fully logged or empty."""
+        if m is None or not 0 <= m < self.n or not np.isfinite(self.v[m]):
             return None
-        w = self.v[m - N:m]
-        if not (np.isfinite(w).all() and np.isfinite(self.v[m])):
+        w = vol_window(self.t, self.v, m, lookback_s)
+        if w["status"] != "ok" or not np.isfinite(w["average"]):
             return None
-        avg = float(w.mean())
-        if avg <= 0:
-            return None
-        return float(self.v[m]), avg, float(self.v[m]) / avg
+        return float(self.v[m]), w["average"], w["ratio"]
 
-    def vol_ratio(self, m, N):
-        d = self.vol_detail(m, N)
+    def vol_ratio(self, m, lookback_s):
+        d = self.vol_detail(m, lookback_s)
         return None if d is None else d[2]
 
-    def vol_pass(self, m, N, k):
+    def vol_pass(self, m, lookback_s, k):
         """True / False when recomputable; True without any volume evidence (pre-amendment bars); else None."""
         if not self.has_vol:
             return True
-        r = self.vol_ratio(m, N)
+        r = self.vol_ratio(m, lookback_s)
         return None if r is None else r >= k
 
 
-def vol_lookback_bars(period_seconds: int, lookback_hours) -> int:
-    """N = VolumeLookbackHours*60 / period minutes (96 on M15, 288 on M5 for 24 h)."""
-    return int(round(float(lookback_hours) * 3600 / int(period_seconds)))
+def vol_window(t, v, m: int, lookback_s: int) -> dict:
+    """R41 window of push bar m (AMENDMENT C): the bars opening in [t[m] - lookback_s, t[m]), from ascending open
+    times t and tick volumes v. Returns dict(status, start, n, average, ratio); status "ok", "no_history" (the first
+    bar opens after the window start, so bars may be missing) or "empty" (no bar or zero volume in the window)."""
+    start = int(t[m]) - int(lookback_s)
+    out = {"status": "ok", "start": start, "n": 0, "average": None, "ratio": None}
+    if int(t[0]) > start:
+        out["status"] = "no_history"
+        return out
+    j = int(np.searchsorted(t, start, side="left"))
+    w = np.asarray(v[j:m], dtype=float)
+    out["n"] = int(m - j)
+    total = float(w.sum()) if len(w) else 0.0
+    if out["n"] <= 0 or not total > 0:
+        out["status"] = "empty"
+        return out
+    out["average"] = total / out["n"]
+    out["ratio"] = float(v[m]) / out["average"]
+    return out
 
 
-def _vol_n(prm, P):
-    return vol_lookback_bars(P, prm["VolumeLookbackHours"])
+def vol_lookback_seconds(lookback_hours) -> int:
+    """Wall-clock lookback of R41 in seconds (AMENDMENT C)."""
+    return int(round(float(lookback_hours) * 3600))
+
+
+def _vol_s(prm):
+    return vol_lookback_seconds(prm["VolumeLookbackHours"])
 
 
 def fvg_volume(bars: pd.DataFrame, c1_time, period_seconds: int, lookback_hours=24):
     """Middle-candle volume facts of the FVG whose candle 1 opens at c1_time: dict(middle_time, tick_volume,
-    average, ratio, n) with average/ratio None when the N prior bars are not all in ``bars``; None if c1 is unknown."""
+    average, ratio, n, window_start, status); average/ratio None unless the window is fully logged and not empty,
+    n = bars in the window. None if c1 is unknown."""
     B = bars if isinstance(bars, _Bars) else _Bars(bars, period_seconds)
     c1 = B.i(c1_time)
     if c1 is None or c1 + 1 >= B.n:
         return None
-    m, N = c1 + 1, vol_lookback_bars(period_seconds, lookback_hours)
-    d = B.vol_detail(m, N)
+    m, L = c1 + 1, vol_lookback_seconds(lookback_hours)
+    w = vol_window(B.t, B.v, m, L)
+    d = B.vol_detail(m, L)
     vol = float(B.v[m]) if np.isfinite(B.v[m]) else None
     return {"middle_time": int(B.t[m]), "tick_volume": vol, "average": None if d is None else d[1],
-            "ratio": None if d is None else d[2], "n": N}
+            "ratio": None if d is None else d[2], "n": w["n"], "window_start": w["start"], "status": w["status"]}
 
 
 def _ob_search(B: _Bars, c1: int, sign: int, window: int):
@@ -555,12 +576,12 @@ def _check_row(r, sid, B, prm, tol, used, ob_count, add):
 
 
 def _check_volume(r, B, prm, field, m, rule, add):
-    """R41 on one FVG. With a ``rule`` (the identifying FVG) the recomputed (when all N prior bars are logged) and the
+    """R41 on one FVG. With a ``rule`` (the identifying FVG) the recomputed (when the whole window is logged) and the
     logged middle-candle ratio must be >= VolumeMultiplier. Without one (the confirmation FVG, AMENDMENT B) the ratio
     is informational: no threshold, and an empty value is flagged only when the ratio is recomputable. Either way a
     logged ratio must agree with the recomputed one."""
     k = float(prm["VolumeMultiplier"])
-    rec = B.vol_ratio(m, _vol_n(prm, B.P)) if m is not None else None
+    rec = B.vol_ratio(m, _vol_s(prm)) if m is not None else None
     logged = _flt(r, field)
     if rule is not None:
         if rec is not None and rec < k:
@@ -625,7 +646,7 @@ def occurrences(setups: pd.DataFrame, bars: pd.DataFrame, period_seconds: int, p
             "market_closed_retry_placed", "idfvg_volume_checked", "cfvg_volume_checked",
             "activation_bar_touch_ignored", "ob_search_skipped_doji", "duplicate_ob_candle"]
     keys += [k for k in OCCURRENCE_BY_REASON if k not in keys]
-    N, k_vol = _vol_n(prm, B.P), float(prm["VolumeMultiplier"])
+    L, k_vol = _vol_s(prm), float(prm["VolumeMultiplier"])
     occ = dict.fromkeys(keys, 0)
     records = setups.to_dict("records")
     used_obs = {}
@@ -641,7 +662,7 @@ def occurrences(setups: pd.DataFrame, bars: pd.DataFrame, period_seconds: int, p
                                               and _int(r, "place_time_msc") is not None)
         for c1_field, key in (("idfvg_c1_time", "idfvg_volume_checked"), ("cfvg_c1_time", "cfvg_volume_checked")):
             fi = B.i(_int(r, c1_field))
-            occ[key] += fi is not None and B.vol_ratio(fi + 1, N) is not None
+            occ[key] += fi is not None and B.vol_ratio(fi + 1, L) is not None
         tt, c1t = _int(r, "touch_time"), _int(r, "cfvg_c1_time")
         occ["cfvg_c1_is_touch_bar"] += tt is not None and tt == c1t
         occ["idfvg_c1_is_ob"] += _int(r, "ob_time") is not None and _int(r, "ob_time") == _int(r, "idfvg_c1_time")
@@ -667,7 +688,7 @@ def occurrences(setups: pd.DataFrame, bars: pd.DataFrame, period_seconds: int, p
     for (d, ob_i), id_c3 in used_obs.items():
         sign = 1 if d == "L" else -1
         for c1 in range(ob_i, min(ob_i + int(prm["ImpulseWindowBars"]), B.n - 2)):
-            if (id_c3 is None or c1 + 2 > id_c3) and B.is_fvg(c1, sign) and B.vol_pass(c1 + 1, N, k_vol) is True \
+            if (id_c3 is None or c1 + 2 > id_c3) and B.is_fvg(c1, sign) and B.vol_pass(c1 + 1, L, k_vol) is True \
                     and _ob_search(B, c1, sign, prm["ImpulseWindowBars"]) == ob_i:
                 occ["duplicate_ob_candle"] += 1
     return {k: int(v) for k, v in occ.items()}

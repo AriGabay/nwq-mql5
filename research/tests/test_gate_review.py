@@ -22,7 +22,8 @@ def test_volume_rows_judge_only_the_identifying_fvg():
     assert len(ident) == 2 and len(conf) == 2
     assert all(c[-1] == "pass" for c in ident)
     assert all(c[-1] == "info" for c in conf)
-    assert conf[0][7] == "1.3953"  # the ratio itself is still shown
+    assert conf[0][9] == "1.3953"  # the ratio itself is still shown
+    assert conf[0][7] == "4"       # 1 h window on M15 with no closure: 4 bars (AMENDMENT C)
     assert "FAIL" not in "\n".join(rows)
 
 

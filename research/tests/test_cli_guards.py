@@ -116,6 +116,22 @@ def test_install_refuses_while_live_terminal_runs(monkeypatch):
         cli.cmd_install(argparse.Namespace())
 
 
+def test_install_turns_mcp_off_before_the_trade_safety_check(monkeypatch):
+    """Build 6231 re-adds an empty [MCP.Custom] on exit; install disables it first, as runner.run does."""
+    calls = []
+    monkeypatch.setattr(runner, "live_terminal_running", lambda: False)
+    monkeypatch.setattr(env, "load_config", lambda: "cfg")
+    monkeypatch.setattr(env, "disable_mcp", lambda cfg: calls.append("disable_mcp"))
+
+    def safety(cfg):
+        calls.append("assert_trade_safety")
+        raise RuntimeError("stop here")
+    monkeypatch.setattr(env, "assert_trade_safety", safety)
+    with pytest.raises(RuntimeError, match="stop here"):
+        cli.cmd_install(argparse.Namespace())
+    assert calls == ["disable_mcp", "assert_trade_safety"]
+
+
 def test_freeze_rules_refuses_period_other_than_pilot_choice(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, "PREREG_PATH", tmp_path / "preregistration.json")
     pilot = tmp_path / "pilot_summary.json"

@@ -53,7 +53,8 @@ REASON_CODES = [
     "skipped_volume", "skipped_margin", "skipped_cap", "skipped_duplicate", "expired_unfilled", "filled",
     "filled_late", "run_end_pending", "skipped_market_closed", "skipped_broker_reject",
 ]
-FUNNEL_EXTRA_KEYS = ["idfvg_rejected_volume", "market_closed_retries"]
+FUNNEL_EXTRA_KEYS = ["idfvg_rejected_volume", "idfvg_volume_no_history", "idfvg_volume_empty_window",
+                     "market_closed_retries"]  # AMENDMENT C: unjudged identifying FVGs counted apart
 FUNNEL_LINE_MAX = 180  # MT5's journal truncates long lines (AMENDMENT B)
 RESEARCH_BLOCK = re.compile(r"#ifdef RESEARCH_LOG\b(.*?)#endif", re.S)
 
@@ -236,6 +237,27 @@ def test_volume_filter_uses_tick_volume_and_lookback(src):
     assert "VolumeQualifies" in _function_body(code, "NewCandidate")
     research = "".join(RESEARCH_BLOCK.findall(src))
     assert "tick_volume" in _function_body(_strip_comments(research), "RL_WriteRunFiles")
+
+
+def test_volume_average_uses_a_wall_clock_window(src):
+    """AMENDMENT C: the average covers the bars that OPEN in [open(m) - VolumeLookbackHours h, open(m)): a time
+    window, not a bar count. The push bar is excluded, nothing from before the window is pulled in, closed hours add
+    no bars, and a history that starts after the window start is a separate outcome (not a volume failure)."""
+    code = _strip_comments(src)
+    assert not re.search(r"\bgVolN\b", code), "no fixed bar count for the lookback"
+    vr = _function_body(code, "VolumeRatio")
+    assert "gT[m]" in vr and "gVolSec" in vr, "window start = open time of the push bar - lookback seconds"
+    assert re.search(r"gT\[0\]\s*>\s*start", vr), "history shortage: first loaded bar after the window start"
+    assert "VOL_NO_HISTORY" in vr and "VOL_EMPTY" in vr
+    assert re.search(r"gVCum\[m\]\s*-\s*gVCum\[j\]", vr), "sum over bars j .. m-1 (push bar m excluded)"
+    assert re.search(r"gVolSec\s*=\s*\(long\)VolumeLookbackHours\s*\*\s*3600", code)
+    first = _function_body(code, "FirstBarAtOrAfter")
+    assert "gT[" in first and "<" in first, "binary search for the first bar opening at or after the window start"
+    nc = _function_body(code, "NewCandidate")
+    assert "CountVolumeReject" in nc
+    cnt = _function_body(code, "CountVolumeReject")
+    for k in ("VOL_NO_HISTORY", "VOL_EMPTY", "gCntIdfvgRejVol", "gCntIdfvgVolNoHist", "gCntIdfvgVolEmpty"):
+        assert k in cnt
 
 
 def test_confirmation_fvg_has_no_volume_gate(src):

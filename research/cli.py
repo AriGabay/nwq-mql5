@@ -152,6 +152,7 @@ def cmd_install(args) -> None:
     if runner.live_terminal_running():
         raise SystemExit("live MT5 terminal is running; install only while it is closed (R35)")
     cfg = env.load_config()
+    env.disable_mcp(cfg)   # build 6231 re-adds an empty [MCP.Custom] on every exit; the check below still decides
     env.assert_trade_safety(cfg)
     env.install_sources(cfg)
     out, bad = {"ea_sha256": ea_sha()}, []
