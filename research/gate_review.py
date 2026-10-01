@@ -1,7 +1,11 @@
 """Gate-review diagnostics for the R39 chart gate (no new optimization; reads existing pilot evidence).
 
-python research/gate_review.py  -> results/gate_review/{pilot_diagnostics.json, trades_shown.md, skips.md, chart_prices.json}
+python research/gate_review.py [--m15-run RUN] [--m5-run RUN] [--folder pilot] [--out DIR] [SETUP_ID ...]
+  -> <out>/{pilot_diagnostics.json, trades_shown.md, skips.md, volume_examples.md, chart_prices.json, ...}
+Runs are read from results/<folder>/<run id>/ (default pilot_m15 / pilot_m5 under results/pilot). SETUP_IDs are added
+to the up-to-6 filled setups shown in volume_examples.md (AMENDMENT A1, R41).
 """
+import argparse
 import json
 import pathlib
 import sys
@@ -18,7 +22,11 @@ OUT = RES / "gate_review"
 CONTRACT = 100.0
 PERIOD_S = {"M5": 300, "M15": 900}
 SHOWN = {"pilot_m15": [1161, 1424, 1398, 1151, 1668, 2111]}
-SKIP_REASONS = ["skipped_volume", "skipped_too_close", "skipped_price_past", "skipped_cap"]
+SKIP_REASONS = ["skipped_volume", "skipped_too_close", "skipped_price_past", "skipped_cap", "skipped_market_closed",
+                "skipped_broker_reject"]
+FILLED = ("filled", "filled_late")
+EXTRA_RUNS = (("smoke_m15_bos", "smoke"), ("gate_entry_ob_edge_m15", "gate_review"),
+              ("gate_entry_ob_mid_m15", "gate_review"))
 
 
 def _ts(sec):
@@ -27,6 +35,10 @@ def _ts(sec):
 
 def _tms(ms):
     return pd.Timestamp(int(ms), unit="ms").strftime("%Y-%m-%d %H:%M:%S.%f")[:-3] if pd.notna(ms) else "-"
+
+
+def _exists(run_id: str, folder: str) -> bool:
+    return (RES / folder / run_id / f"rl_setups_{run_id}.csv").exists()
 
 
 def load(run_id: str, folder: str):
@@ -97,11 +109,12 @@ def side_stats(p):
     }
 
 
-def diagnostics():
+def diagnostics(runs=None, folder="pilot"):
     out = {}
+    runs = runs or {"M5": "pilot_m5", "M15": "pilot_m15"}
     for tf in ("M5", "M15"):
-        run = f"pilot_{tf.lower()}"
-        setups, bars, deals, days = load(run, "pilot")
+        run = runs[tf]
+        setups, bars, deals, days = load(run, folder)
         p = positions(setups, deals)
         dd_usd, dd_pct = max_equity_dd(days)
         out[tf] = {"all": side_stats(p), "long": side_stats(p[p["dir"] == "L"]),
@@ -174,8 +187,14 @@ def skips(run, folder, tf, per_reason=3):
                               rows[rows["setup_id"].isin(rejected)].head(per_reason)])
         else:
             rows = rows.head(per_reason)
-        lines.append(f"\n### {reason} ({int((setups['reason'] == reason).sum())} in the pilot)\n")
-        if reason in ("skipped_price_past", "skipped_too_close"):
+        lines.append(f"\n### {reason} ({int((setups['reason'] == reason).sum())} in {run})\n")
+        if reason == "skipped_market_closed":
+            lines.append("| setup | dir | entry | confirmation c3 closed | first market-closed refusal | placement attempts | "
+                         "gave up at | closed bars since c3 at give-up |\n|---|---|---|---|---|---|---|---|")
+        elif reason == "skipped_broker_reject":
+            lines.append("| setup | dir | entry | SL | TP | confirmation c3 closed | rejected at | placement attempts | "
+                         "broker refusal (journal) |\n|---|---|---|---|---|---|---|---|---|")
+        elif reason in ("skipped_price_past", "skipped_too_close"):
             lines.append("| setup | dir | entry | placement tick (first bar after c3) | Bid at placement | median spread that day | "
                          "est. Ask | distance to entry (points; <= 0 = already past) | stops level (points) | broker refusal |\n|---|---|---|---|---|---|---|---|---|---|")
         elif reason == "skipped_volume":
@@ -186,7 +205,18 @@ def skips(run, folder, tf, per_reason=3):
                          "|---|---|---|---|---|---|---|")
         for _, r in rows.iterrows():
             t_place = int(r["cfvg_c3_time"]) + P
-            if reason in ("skipped_price_past", "skipped_too_close"):
+            attempts = r.get("place_attempts")
+            attempts = int(attempts) if pd.notna(attempts) else "-"
+            if reason == "skipped_market_closed":
+                t_end = r["reason_time_msc"] / 1000 if pd.notna(r["reason_time_msc"]) else np.nan
+                closed = int(((bars["time"] > int(r["cfvg_c3_time"])) & (bars["time"] + P <= t_end)).sum())
+                lines.append(f"| {int(r.setup_id)} | {r.dir} | {r.entry:.2f} | {_ts(t_place)} | "
+                             f"{_tms(r.get('market_closed_first_msc'))} | {attempts} | {_tms(r['reason_time_msc'])} | "
+                             f"{closed} |")
+            elif reason == "skipped_broker_reject":
+                lines.append(f"| {int(r.setup_id)} | {r.dir} | {r.entry:.2f} | {r.sl:.2f} | {r.tp:.2f} | {_ts(t_place)} | "
+                             f"{_tms(r['reason_time_msc'])} | {attempts} | {rejected.get(int(r.setup_id), '-')} |")
+            elif reason in ("skipped_price_past", "skipped_too_close"):
                 nxt = bars[bars["time"] >= t_place].iloc[0]          # first tick after c3 closes (session gaps)
                 bid, t_tick = float(nxt["open"]), int(nxt["time"])
                 day = pd.Timestamp(t_tick, unit="s").strftime("%Y.%m.%d")
@@ -213,6 +243,56 @@ def skips(run, folder, tf, per_reason=3):
     return "\n".join(lines)
 
 
+def volume_rows(setups, bars, period_s, ids=None, n=6, multiplier=2.0, lookback_hours=24):
+    """Markdown table rows for both FVGs of up to n filled setups (lowest ids) plus ``ids``: middle candle, its tick
+    volume, the N-bar average, the ratio and pass/fail, all recomputed from rl_bars (logged ratio alongside)."""
+    filled = setups[setups["reason"].isin(FILLED)].sort_values("setup_id")["setup_id"].astype(int).head(n).tolist()
+    extra = [int(i) for i in (ids or []) if int(i) not in filled and (setups["setup_id"] == int(i)).any()]
+    N = cf.vol_lookback_bars(period_s, lookback_hours)
+    B = cf._Bars(bars, period_s)
+    rows = [f"| setup | dir | reason | FVG | middle candle (bar open) | tick volume | average of previous {N} bars | "
+            f"ratio | logged ratio | >= {multiplier:g}x |", "|---|---|---|---|---|---|---|---|---|---|"]
+    for sid in filled + extra:
+        r = setups[setups["setup_id"] == sid].iloc[0]
+        for name, c1_f, logged_f in (("identifying", "idfvg_c1_time", "idfvg_vol_ratio"),
+                                     ("confirmation", "cfvg_c1_time", "cfvg_vol_ratio")):
+            logged = r.get(logged_f)
+            logged = f"{logged:.4f}" if logged is not None and pd.notna(logged) else "-"
+            d = cf.fvg_volume(B, r[c1_f], period_s, lookback_hours) if pd.notna(r[c1_f]) else None
+            if d is None:
+                why = "no such FVG" if pd.isna(r[c1_f]) else "middle candle not in rl_bars"
+                rows.append(f"| {sid} | {r.dir} | {r.reason} | {name} | {why} | - | - | - | {logged} | - |")
+                continue
+            vol = "n/a" if d["tick_volume"] is None else f"{d['tick_volume']:.0f}"
+            if d["ratio"] is None:
+                rows.append(f"| {sid} | {r.dir} | {r.reason} | {name} | {_ts(d['middle_time'])} | {vol} | "
+                            f"n/a (fewer than {N} logged bars with tick volume before it) | n/a | {logged} | n/a |")
+                continue
+            ok = "pass" if d["ratio"] >= multiplier else "FAIL"
+            rows.append(f"| {sid} | {r.dir} | {r.reason} | {name} | {_ts(d['middle_time'])} | {vol} | "
+                        f"{d['average']:.2f} | {d['ratio']:.4f} | {logged} | {ok} |")
+    return rows
+
+
+def volume_examples(runs, folder, ids=None, multiplier=2.0, lookback_hours=24):
+    parts = ["# Volume filter on both FVGs (R41): worked examples from rl_bars\n",
+             f"ratio = tick volume of the FVG's middle candle (candle 2) / mean tick volume of the N bars before it, "
+             f"N = {lookback_hours:g} h x 60 / period minutes (bars counted, closures skipped); the FVG qualifies when "
+             f"ratio >= {multiplier:g}. Averages and ratios are recomputed here from rl_bars; the logged ratio is the "
+             "EA's own rl_setups value. Up to 6 filled setups per run (lowest setup ids) plus any ids given on the "
+             "command line."]
+    for tf, run in runs.items():
+        parts.append(f"\n## {run} ({tf})\n")
+        if not _exists(run, folder):
+            parts.append(f"results/{folder}/{run} not found.")
+            continue
+        setups, bars, deals, days = load(run, folder)
+        if not cf._Bars(bars, PERIOD_S[tf]).has_vol:
+            parts.append("rl_bars has no tick_volume column (pre-amendment run): nothing to recompute.\n")
+        parts += volume_rows(setups, bars, PERIOD_S[tf], ids, multiplier=multiplier, lookback_hours=lookback_hours)
+    return "\n".join(parts) + "\n"
+
+
 def bos_details(run, folder, ids):
     setups, bars, deals, days = load(run, folder)
     rows = ["| setup | dir | swing peak bar | swing confirmed (bar closed) | swing level | break close bar | OB candle | "
@@ -225,42 +305,69 @@ def bos_details(run, folder, ids):
     return "\n".join(rows)
 
 
-def extra_charts():
+def extra_charts(out=OUT):
     from mt5r import charts_setups
     made = {}
     for run, folder in (("gate_entry_ob_edge_m15", "gate_review"), ("gate_entry_ob_mid_m15", "gate_review")):
+        if not _exists(run, folder):
+            continue
         setups, bars, deals, days = load(run, folder)
         p = positions(setups, deals)
         closed = p[p["close_time"].notna() & p["exit_kind"].isin(["tp", "sl"])]
         ids = [int(closed[closed["dir"] == d]["setup_id"].iloc[0]) for d in ("L", "S")
                if (closed["dir"] == d).any()]
-        res = charts_setups.render(setups[setups["setup_id"].isin(ids)], bars, deals, OUT / run, PERIOD_S["M15"])
+        res = charts_setups.render(setups[setups["setup_id"].isin(ids)], bars, deals, out / run, PERIOD_S["M15"])
         made[run] = {"ids": ids, "charts": [str(c) for c in res["charts"]]}
     return made
 
 
-def main():
-    OUT.mkdir(parents=True, exist_ok=True)
-    diag = diagnostics()
-    (OUT / "pilot_diagnostics.json").write_text(json.dumps(diag, indent=1))
-    md, _ = trades_table("pilot_m15", "pilot", SHOWN["pilot_m15"])
-    (OUT / "trades_shown.md").write_text("# Charted pilot trades from MT5 deal records (M15)\n\n" + md + "\n")
-    (OUT / "skips.md").write_text("# Skip reasons with the numbers behind them (pilot M15)\n\n"
+def parse_args(argv=None):
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--m15-run", default="pilot_m15", help="M15 run id (default pilot_m15)")
+    ap.add_argument("--m5-run", default="pilot_m5", help="M5 run id (default pilot_m5)")
+    ap.add_argument("--folder", default="pilot", help="results/<folder>/<run id> holds both runs (default pilot)")
+    ap.add_argument("--out", default=str(OUT), help="output directory (default results/gate_review)")
+    ap.add_argument("--shown", type=int, nargs="*", default=None,
+                    help="setup ids for trades_shown.md (default: the charted ids of pilot_m15, else every position)")
+    ap.add_argument("--volume-multiplier", type=float, default=2.0, help="VolumeMultiplier of the runs (default 2.0)")
+    ap.add_argument("--volume-lookback-hours", type=float, default=24, help="VolumeLookbackHours (default 24)")
+    ap.add_argument("--no-extra", action="store_true", help="skip the smoke/gate_review extra evidence")
+    ap.add_argument("setup_ids", type=int, nargs="*", help="extra setup ids for volume_examples.md")
+    return ap.parse_args(argv)
+
+
+def main(argv=None):
+    a = parse_args(argv)
+    out = pathlib.Path(a.out)
+    out.mkdir(parents=True, exist_ok=True)
+    runs, folder, m15 = {"M15": a.m15_run, "M5": a.m5_run}, a.folder, a.m15_run
+    diag = diagnostics(runs, folder)
+    (out / "pilot_diagnostics.json").write_text(json.dumps(diag, indent=1))
+    md, _ = trades_table(m15, folder, a.shown if a.shown is not None else SHOWN.get(m15))
+    (out / "trades_shown.md").write_text(f"# Charted trades from MT5 deal records ({m15}, M15)\n\n" + md + "\n")
+    (out / "skips.md").write_text(f"# Skip reasons with the numbers behind them ({m15}, M15)\n\n"
                                   "Bid at placement = open of the bar after the confirmation candle 3 (the placement tick is "
                                   "that bar's first tick). Ask is estimated as Bid + that day's median spread. Balance at "
                                   "placement = deposit + net of deals closed before it. Exposures are reconstructed from the "
-                                  "setup log.\n" + skips("pilot_m15", "pilot", "M15"))
-    chk = {r: chart_prices_check(r, "pilot") for r in ("pilot_m15", "pilot_m5")}
-    chk.update({r: chart_prices_check(r, f) for r, f in (("smoke_m15_bos", "smoke"),
-               ("gate_entry_ob_edge_m15", "gate_review"), ("gate_entry_ob_mid_m15", "gate_review"))})
-    made = extra_charts()
-    parts = ["# Extra gate evidence\n", "## FVG+BOS examples (smoke M15, ObMode=1)\n", bos_details("smoke_m15_bos", "smoke", [189, 200]),
-             "\n\n## Trades from MT5 deal records: FVG+BOS examples\n", trades_table("smoke_m15_bos", "smoke", [189, 200])[0]]
-    for run, m in made.items():
-        parts += [f"\n\n## Trades from MT5 deal records: {run}\n", trades_table(run, "gate_review", m["ids"])[0]]
-    (OUT / "extra_examples.md").write_text("\n".join(parts) + "\n")
-    (OUT / "extra_charts.json").write_text(json.dumps(made, indent=1))
-    (OUT / "chart_prices.json").write_text(json.dumps(chk, indent=1))
+                                  "setup log. Market-closed rows: the first TRADE_RETCODE_MARKET_CLOSED refusal and the "
+                                  "attempt count come from rl_setups; broker refusals come from the run journal.\n"
+                                  + skips(m15, folder, "M15"))
+    (out / "volume_examples.md").write_text(volume_examples(runs, folder, a.setup_ids, a.volume_multiplier,
+                                                            a.volume_lookback_hours))
+    chk = {r: chart_prices_check(r, folder) for r in (m15, a.m5_run)}
+    if not a.no_extra:
+        chk.update({r: chart_prices_check(r, f) for r, f in EXTRA_RUNS if _exists(r, f)})
+        made = extra_charts(out)
+        parts = ["# Extra gate evidence\n"]
+        if _exists("smoke_m15_bos", "smoke"):
+            parts += ["## FVG+BOS examples (smoke M15, ObMode=1)\n", bos_details("smoke_m15_bos", "smoke", [189, 200]),
+                      "\n\n## Trades from MT5 deal records: FVG+BOS examples\n",
+                      trades_table("smoke_m15_bos", "smoke", [189, 200])[0]]
+        for run, m in made.items():
+            parts += [f"\n\n## Trades from MT5 deal records: {run}\n", trades_table(run, "gate_review", m["ids"])[0]]
+        (out / "extra_examples.md").write_text("\n".join(parts) + "\n")
+        (out / "extra_charts.json").write_text(json.dumps(made, indent=1))
+    (out / "chart_prices.json").write_text(json.dumps(chk, indent=1))
     print(json.dumps(diag, indent=1))
     print(json.dumps(chk, indent=1))
 

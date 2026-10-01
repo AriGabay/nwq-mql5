@@ -22,6 +22,8 @@ CONTRACT_INPUTS = [
     ("int", "ImpulseWindowBars", "2"),
     ("int", "BosWindowBars", "6"),
     ("int", "SwingStrength", "3"),
+    ("double", "VolumeMultiplier", "2.0"),
+    ("int", "VolumeLookbackHours", "24"),
     ("int", "ObMaxAgeBars", "96"),
     ("int", "FvgWindowBars", "12"),
     ("int", "OrderExpiryBars", "12"),
@@ -42,15 +44,16 @@ SETUPS_HEADER = (
     "bos_pivot_time,bos_pivot_conf_time,bos_level,bos_break_time,activation_time,touch_time,cfvg_c1_time,"
     "cfvg_c3_time,cfvg_low,cfvg_high,entry,sl,tp,volume,stops_level_pts,place_time_msc,order_ticket,"
     "fill_time_msc,fill_price,position_id,exit_time_msc,exit_price,exit_kind,reason,reason_time_msc,"
-    "retest_seen_no_fill"
+    "retest_seen_no_fill,idfvg_vol_ratio,cfvg_vol_ratio,market_closed_first_msc,place_attempts"
 )
-BARS_HEADER = "time,open,high,low,close"
+BARS_HEADER = "time,open,high,low,close,tick_volume"
 REASON_CODES = [
     "expired_untouched", "invalidated_active", "invalidated_touched", "invalidated_confirmed",
     "invalidated_pending", "cancelled_no_fvg", "skipped_price_past", "skipped_too_close", "skipped_sl_stops",
     "skipped_volume", "skipped_margin", "skipped_cap", "skipped_duplicate", "expired_unfilled", "filled",
-    "filled_late", "run_end_pending",
+    "filled_late", "run_end_pending", "skipped_market_closed", "skipped_broker_reject",
 ]
+FUNNEL_EXTRA_KEYS = ["idfvg_rejected_volume", "cfvg_rejected_volume", "market_closed_retries"]
 RESEARCH_BLOCK = re.compile(r"#ifdef RESEARCH_LOG\b(.*?)#endif", re.S)
 
 
@@ -185,6 +188,52 @@ def test_journal_lines_and_reason_codes(src):
         assert f'"{code}"' in src, code
     for key in ("activated", "touched", "confirmed", "placed"):
         assert f'"{key}"' in src, key
+    funnel = _function_body(_strip_comments(src), "PrintFunnel")
+    for key in FUNNEL_EXTRA_KEYS:
+        assert re.search(r'KV\(\s*"' + key + r'"', funnel), key
+    reasons = re.search(r"gReasons\[\]\s*=\s*\{(.*?)\}\s*;", src, re.S)
+    assert reasons
+    assert re.findall(r'"(\w+)"', reasons.group(1)) and \
+        set(re.findall(r'"(\w+)"', reasons.group(1))) == set(REASON_CODES)
+
+
+def test_fail_reason_fallback_is_broker_reject(src):
+    body = _function_body(_strip_comments(src), "FailReason")
+    assert "skipped_price_past" not in body
+    returns = re.findall(r'return\s+"(\w+)"\s*;', body)
+    assert returns and returns[-1] == "skipped_broker_reject"
+    assert "TRADE_RETCODE_MARKET_CLOSED" not in body, "market closed is retried, never mapped to a skip code"
+
+
+def test_market_closed_retry_has_cap_and_throttle(src):
+    code = _strip_comments(src)
+    assert "TRADE_RETCODE_MARKET_CLOSED" in _code(src)
+    cap = re.search(r"#define\s+(\w+)\s+120\b", code)
+    gap = re.search(r"#define\s+(\w+)\s+60000\b", code)
+    assert cap and gap, "attempt cap 120 and 60 s (60000 ms) throttle constants"
+    place = _function_body(code, "PlaceSetup")
+    assert re.search(r"placeAttempts\s*>=\s*" + cap.group(1), place), "attempt cap check"
+    assert re.search(r"time_msc\s*-\s*s\.lastAttemptMsc\s*<\s*" + gap.group(1) + r"|msc\s*-\s*s\.lastAttemptMsc\s*<\s*"
+                     + gap.group(1), place), "60 s tick-time throttle"
+    assert "TRADE_RETCODE_MARKET_CLOSED" in place
+    assert '"skipped_market_closed"' in place
+    # the window rule: OrderExpiryBars closed bars since candle 3 while awaiting placement
+    bar = _function_body(code, "ProcessBar")
+    assert re.search(r"ST_CONFIRMED[^;]*OrderExpiryBars|OrderExpiryBars[^;]*ST_CONFIRMED", bar) or \
+        re.search(r'"skipped_market_closed"', bar)
+
+
+def test_volume_filter_uses_tick_volume_and_lookback(src):
+    code = _strip_comments(src)
+    assert "tick_volume" in _function_body(code, "ProcessBar") or "tick_volume" in _function_body(code, "AppendBar")
+    assert "VolumeLookbackHours" in code and "VolumeMultiplier" in code
+    vq = _function_body(code, "VolumeQualifies")
+    assert re.search(r">=\s*VolumeMultiplier", vq), "ratio >= multiplier (not >)"
+    # applied to both the identifying and the confirmation FVG
+    assert "VolumeQualifies" in _function_body(code, "NewCandidate")
+    assert "VolumeQualifies" in _function_body(code, "ProcessBar")
+    research = "".join(RESEARCH_BLOCK.findall(src))
+    assert "tick_volume" in _function_body(_strip_comments(research), "RL_WriteRunFiles")
 
 
 def test_oninit_guards(src):

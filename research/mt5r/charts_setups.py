@@ -2,7 +2,9 @@
 
 Candlesticks are drawn with plain matplotlib (no mplfinance). Bars sit at their integer position in ``rl_bars`` so
 weekend gaps do not stretch the chart; tick labels carry the bar open time (server time). Labels are English; the
-report around the charts is Hebrew.
+report around the charts is Hebrew. AMENDMENT A1: the title and table carry the identifying-FVG and confirmation-FVG
+middle-candle tick-volume ratios, and a tick-volume panel under the price panel highlights both middle candles when
+rl_bars has tick_volume.
 """
 from __future__ import annotations
 
@@ -25,15 +27,38 @@ from . import conformance as cf  # noqa: E402
 BLUE, ORANGE, AQUA = "#2a78d6", "#eb6834", "#1baf7a"
 VIOLET, GREEN, RED = "#4a3aa7", "#008300", "#e34948"
 INK, MUTED, SURFACE, GRID = "#1f1f1e", "#6b6a64", "#fcfcfb", "#e6e5df"
+VOL_BASE = "#b5b3aa"  # context tick-volume bars: recessive neutral, darker than the grid
 
 STAGE_LABELS = ("OB", "identifying FVG", "touch", "confirmation FVG", "placement", "fill", "entry", "SL", "TP",
                 "exit")
 FILLED = {"filled", "filled_late"}
 SIDES = (("L", "long"), ("S", "short"))
 TABLE_COLUMNS = ["setup", "category", "dir", "OB", "identifying FVG", "activation", "touch", "confirmation FVG",
-                 "placement", "fill", "exit", "intended entry", "fill price", "SL", "TP", "planned RR",
+                 "idFVG vol ratio", "cFVG vol ratio", "placement", "fill", "exit", "intended entry", "fill price", "SL", "TP", "planned RR",
                  "realized R", "net after costs (USD)", "reason"]
 RUN_CONSTANTS = pathlib.Path(__file__).resolve().parents[1] / "run_constants.json"
+VOLUME_LOOKBACK_HOURS = 24  # EA default (R41); used only when a setup row has no logged ratio
+
+
+def has_tick_volume(bars: pd.DataFrame) -> bool:
+    return "tick_volume" in bars and bool(np.isfinite(pd.to_numeric(bars["tick_volume"], errors="coerce")).any())
+
+
+def fvg_vol_ratios(row, bars: pd.DataFrame, period_seconds: int, lookback_hours=VOLUME_LOOKBACK_HOURS):
+    """(identifying, confirmation) middle-candle volume ratios: the logged value, else recomputed from the bars
+    when all look-back bars are logged, else None."""
+    out = []
+    for ratio_f, c1_f in (("idfvg_vol_ratio", "idfvg_c1_time"), ("cfvg_vol_ratio", "cfvg_c1_time")):
+        v = cf._flt(row, ratio_f)
+        if v is None and cf._int(row, c1_f) is not None and has_tick_volume(bars):
+            d = cf.fvg_volume(bars, cf._int(row, c1_f), period_seconds, lookback_hours)
+            v = None if d is None else d["ratio"]
+        out.append(v)
+    return tuple(out)
+
+
+def _fmt_ratio(v):
+    return "-" if v is None else f"{v:.2f}"
 
 
 # --- data helpers ----------------------------------------------------------------------------------------------
@@ -127,8 +152,8 @@ def _planned_rr(row):
     return abs(t - e) / abs(e - s)
 
 
-def draw_setup(ax, row, bars: pd.DataFrame, period_seconds: int, net=None, category=None) -> list[str]:
-    """Draw one setup on ``ax``; returns the stage labels that were drawn."""
+def draw_setup(ax, row, bars: pd.DataFrame, period_seconds: int, net=None, category=None, vax=None) -> list[str]:
+    """Draw one setup on ``ax`` (and its tick volume on ``vax`` when given); returns the labels that were drawn."""
     row = dict(row)
     B = cf._Bars(bars, period_seconds)
     ms_bar = lambda f: None if cf._int(row, f) is None else B.bar_at_ms(cf._int(row, f))  # noqa: E731
@@ -238,6 +263,10 @@ def draw_setup(ax, row, bars: pd.DataFrame, period_seconds: int, net=None, categ
     parts.append(f"planned RR {rr:.2f}" if rr is not None else "planned RR n/a")
     if entry is not None:
         parts.append(f"entry {entry:.2f} vs fill {fp:.2f}" if fp is not None else f"entry {entry:.2f}, not filled")
+    id_r, c_r = fvg_vol_ratios(row, bars, period_seconds)
+    vol_parts = [f"{name} vol {r:.2f}x" for name, r in (("idFVG", id_r), ("cFVG", c_r)) if r is not None]
+    if vol_parts:
+        parts.append(", ".join(vol_parts))
     ax.set_title(" | ".join(parts), fontsize=9, color=INK, loc="left")
 
     ax.set_facecolor(SURFACE)
@@ -250,14 +279,50 @@ def draw_setup(ax, row, bars: pd.DataFrame, period_seconds: int, net=None, categ
     ax.set_xlim(left - 1, right + 6)
     ticks = np.unique(np.linspace(left, right, min(8, right - left + 1)).astype(int))
     ax.set_xticks(ticks)
-    ax.set_xticklabels([_fmt_bar(B.t[i])[5:] for i in ticks])
-    ax.set_xlabel("bar open time (server, MM-DD HH:MM)", fontsize=7, color=MUTED)
     ax.set_ylabel("price", fontsize=7, color=MUTED)
+    labels_ax = ax
+    if vax is not None and np.isfinite(B.v[left:right + 1]).any():
+        _draw_volume(vax, B, left, right, ((idc1, VIOLET, "idFVG", id_r), (cc1, AQUA, "cFVG", c_r)))
+        drawn.append("tick volume")
+        vax.set_xlim(left - 1, right + 6)
+        vax.set_xticks(ticks)
+        ax.tick_params(labelbottom=False)
+        labels_ax = vax
+    labels_ax.set_xticklabels([_fmt_bar(B.t[i])[5:] for i in ticks])
+    labels_ax.set_xlabel("bar open time (server, MM-DD HH:MM)", fontsize=7, color=MUTED)
     return drawn
 
 
+def _draw_volume(vax, B, left, right, fvgs):
+    """Tick-volume bars; the middle candle of each FVG wears that FVG's box colour and is labelled with its ratio."""
+    colors = {}
+    for c1, color, name, ratio in fvgs:
+        if c1 is not None and left <= c1 + 1 <= right:
+            colors[c1 + 1] = (color, f"{name} {ratio:.2f}x" if ratio is not None else name)
+    for x in range(left, right + 1):
+        v = B.v[x]
+        if not np.isfinite(v):
+            continue
+        color, label = colors.get(x, (VOL_BASE, None))
+        vax.add_patch(Rectangle((x - 0.36, 0), 0.72, v, facecolor=color, edgecolor=SURFACE, linewidth=0.6,
+                                zorder=3))
+        if label:
+            vax.annotate(label, (x, v), xytext=(0, 2), textcoords="offset points", fontsize=7, color=INK,
+                         ha="center", va="bottom", zorder=6)
+    top = np.nanmax(B.v[left:right + 1])
+    vax.set_ylim(0, top * 1.3 if top > 0 else 1)
+    vax.set_facecolor(SURFACE)
+    for s in ("top", "right"):
+        vax.spines[s].set_visible(False)
+    for s in ("left", "bottom"):
+        vax.spines[s].set_color(MUTED)
+    vax.tick_params(colors=MUTED, labelsize=7)
+    vax.grid(axis="y", color=GRID, linewidth=0.6)
+    vax.set_ylabel("tick volume", fontsize=7, color=MUTED)
+
+
 # --- rendering -------------------------------------------------------------------------------------------------
-def _table_row(row, contract_size):
+def _table_row(row, contract_size, ratios=(None, None)):
     rr = _planned_rr(row)
     net = row.get("net")
     net = None if net is None or pd.isna(net) else float(net)
@@ -268,7 +333,8 @@ def _table_row(row, contract_size):
     return [str(cf._int(row, "setup_id")), row.get("category", ""), cf._str(row, "dir") or "-",
             _fmt_bar(cf._int(row, "ob_time")), _fmt_bar(cf._int(row, "idfvg_c3_time")),
             _fmt_bar(cf._int(row, "activation_time")), _fmt_bar(cf._int(row, "touch_time")),
-            _fmt_bar(cf._int(row, "cfvg_c3_time")), _fmt_ms(cf._int(row, "place_time_msc")),
+            _fmt_bar(cf._int(row, "cfvg_c3_time")), _fmt_ratio(ratios[0]), _fmt_ratio(ratios[1]),
+            _fmt_ms(cf._int(row, "place_time_msc")),
             _fmt_ms(cf._int(row, "fill_time_msc")), _fmt_ms(cf._int(row, "exit_time_msc")),
             _fmt_px(e), _fmt_px(cf._flt(row, "fill_price")), _fmt_px(s), _fmt_px(cf._flt(row, "tp")),
             "-" if rr is None else f"{rr:.2f}", "-" if realized is None else f"{realized:+.2f}",
@@ -285,24 +351,32 @@ def render(setups: pd.DataFrame, bars: pd.DataFrame, deals: pd.DataFrame, out_di
     missing = list(sel.attrs.get("missing", []))
     size = _contract_size(contract_size)
     charts, rows = [], []
+    with_volume = has_tick_volume(bars)
     for row in sel.to_dict("records"):
-        fig, ax = plt.subplots(figsize=(11, 5.2), facecolor=SURFACE)
+        if with_volume:
+            fig, (ax, vax) = plt.subplots(2, 1, figsize=(11, 6.4), facecolor=SURFACE, sharex=True,
+                                          gridspec_kw={"height_ratios": [4, 1]})
+        else:
+            fig, ax = plt.subplots(figsize=(11, 5.2), facecolor=SURFACE)
+            vax = None
         try:
-            draw_setup(ax, row, bars, period_seconds, net=row.get("net"), category=row.get("category"))
+            draw_setup(ax, row, bars, period_seconds, net=row.get("net"), category=row.get("category"), vax=vax)
             fig.tight_layout()
             path = charts_dir / f"setup_{cf._int(row, 'setup_id'):06d}_{row['category']}.png"
             fig.savefig(path, dpi=110, facecolor=SURFACE)
             charts.append(str(path))
         finally:
             plt.close(fig)
-        rows.append(_table_row(row, size))
+        rows.append(_table_row(row, size, fvg_vol_ratios(row, bars, period_seconds)))
     lines = [
         "# Pilot setups for the R39 chart gate",
         "",
         "Bar-time columns (OB, identifying FVG, activation, touch, confirmation FVG) show the bar open time in "
         "server time; for the two FVG columns this is candle 3. placement, fill and exit are tick times with "
         "milliseconds. Net is profit + commission + swap; realized R = net / (|intended entry - SL| x volume x "
-        f"contract size {size:g}).",
+        f"contract size {size:g}). idFVG / cFVG vol ratio = tick volume of the FVG's middle candle / mean tick "
+        "volume of the VolumeLookbackHours of bars before it, as logged by the EA (recomputed from the bars with "
+        f"{VOLUME_LOOKBACK_HOURS} h when not logged); the filter needs >= VolumeMultiplier (R41).",
         "",
         "| " + " | ".join(TABLE_COLUMNS) + " |",
         "|" + "|".join("---" for _ in TABLE_COLUMNS) + "|",

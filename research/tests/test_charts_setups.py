@@ -49,7 +49,42 @@ def test_chart_draws_every_stage_marker_and_reason():
     title = ax.get_title(loc="left")
     assert "LONG" in title and "filled" in title and "+194.60" in title and "RR 2.00" in title
     assert "2003.80" in title  # planned vs actual fill
+    assert "idFVG vol 3.07x" in title and "cFVG vol 3.16x" in title  # AMENDMENT A1 ratios from the setup row
     plt.close(fig)
+
+
+def test_table_has_the_fvg_volume_ratio_columns(tmp_path):
+    setups, bars, deals = load()
+    out = cs.render(setups, bars, deals, tmp_path, P)
+    text = pathlib.Path(out["table"]).read_text()
+    header = next(line for line in text.splitlines() if line.startswith("| setup"))
+    cols = [c.strip() for c in header.strip("|").split("|")]
+    assert "idFVG vol ratio" in cols and "cFVG vol ratio" in cols
+    row1 = next(line for line in text.splitlines() if line.startswith("| 1 |"))
+    cells = [c.strip() for c in row1.strip("|").split("|")]
+    assert cells[cols.index("idFVG vol ratio")] == "3.07" and cells[cols.index("cFVG vol ratio")] == "3.16"
+    row3 = next(line for line in text.splitlines() if line.startswith("| 3 |"))  # invalidated before any cFVG
+    cells = [c.strip() for c in row3.strip("|").split("|")]
+    assert cells[cols.index("cFVG vol ratio")] == "-"
+
+
+def test_volume_panel_highlights_both_middle_candles():
+    setups, bars, deals = load()
+    fig, (ax, vax) = plt.subplots(2, 1, sharex=True)
+    row = setups[setups.setup_id == 1].iloc[0]
+    drawn = cs.draw_setup(ax, row, bars, P, net=194.60, vax=vax)
+    assert "tick volume" in drawn
+    heights = {round(p.get_x() + p.get_width() / 2): p.get_height() for p in vax.patches}
+    assert heights[4] == 330 and heights[10] == 340  # identifying and confirmation FVG middle candles
+    colors = {round(p.get_x() + p.get_width() / 2): p.get_facecolor() for p in vax.patches}
+    assert colors[4] != colors[5] and colors[10] != colors[9]
+    plt.close(fig)
+
+
+def test_bars_without_tick_volume_still_render(tmp_path):
+    setups, bars, deals = load()
+    out = cs.render(setups, bars.drop(columns=["tick_volume"]), deals, tmp_path, P)
+    assert len(out["charts"]) == 4
 
 
 def _many(n=20):

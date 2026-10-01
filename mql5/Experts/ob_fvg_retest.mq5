@@ -3,8 +3,9 @@
 //|  Order Block (found from its identifying FVG) -> touch -> new    |
 //|  confirmation FVG -> Limit order at a retest level.              |
 //|  Plan: docs/plans/2026-09-30-2310-feat-ob-fvg-retest-ea-plan.md  |
-//|  Rules R4-R18, R36-R38. Closed-bar signals only; the chart       |
-//|  period must equal SignalTF. Long is described; short mirrors.   |
+//|  Rules R4-R18, R36-R38, R41-R42. Closed-bar signals only; the    |
+//|  chart period must equal SignalTF. Long is described; short      |
+//|  mirrors.                                                        |
 //+------------------------------------------------------------------+
 #property copyright ""
 #property version   "1.00"
@@ -24,6 +25,8 @@ input ENUM_ENTRY_MODE EntryMode         = ENTRY_FVG_EDGE; // Limit price (R10)
 input int             ImpulseWindowBars = 2;     // look-back from identifying-FVG candle 1 for the OB candle (R5)
 input int             BosWindowBars     = 6;     // FVG+BOS: break close must occur within N bars after the OB candle (R6)
 input int             SwingStrength     = 3;     // pivot strength each side (R6)
+input double          VolumeMultiplier  = 2.0;   // middle candle tick volume >= k x average of the previous lookback bars (R41)
+input int             VolumeLookbackHours = 24;  // lookback = VolumeLookbackHours*60/period minutes bars (96 on M15, 288 on M5) (R41)
 input int             ObMaxAgeBars      = 96;    // touch window after activation (R8)
 input int             FvgWindowBars     = 12;    // confirmation window after touch (R9), must be >= 2
 input int             OrderExpiryBars   = 12;    // pending-order window after confirmation bar (R11)
@@ -50,6 +53,10 @@ input string          ResearchRunTag    = "";    // tag for research CSV files (
 #define ST_FILLED    5   // position open, only SL/TP manage it (R38)
 #define ST_DONE      6   // retired; removed from the working list
 
+// R42: market-closed placement retries (TRADE_RETCODE_MARKET_CLOSED)
+#define MC_RETRY_MAX     120     // at most this many placement attempts per setup
+#define MC_RETRY_GAP_MSC 60000   // at most one attempt per 60 s of tick time
+
 struct Piv
   {
    int      peak;     // absolute index of the peak bar
@@ -73,6 +80,7 @@ struct Setup
    int      idC3;
    double   idLow;
    double   idHigh;
+   double   idVolRatio;   // middle-candle tick volume ratio (R41)
    // FVG+BOS qualification (R6)
    int      bosPivBar;
    int      bosPivConf;
@@ -86,6 +94,7 @@ struct Setup
    int      cC3;
    double   cLow;
    double   cHigh;
+   double   cVolRatio;    // middle-candle tick volume ratio (R41)
    // order
    bool     priced;
    double   entry;
@@ -96,6 +105,9 @@ struct Setup
    long     stopsPts;
    long     placeMsc;
    ulong    ticket;
+   int      placeAttempts;   // placement attempts made (R42)
+   long     lastAttemptMsc;  // tick time of the last attempt (R42 throttle)
+   long     mcFirstMsc;      // tick time of the first market-closed refusal, 0 = none (R42)
    // fill / exit
    long     fillMsc;
    double   fillPrice;
@@ -118,7 +130,10 @@ struct Setup
 // closed signal-timeframe bars by absolute index (0 = first processed bar)
 double   gO[], gH[], gL[], gC[];
 datetime gT[];
+long     gV[];                // tick volume per bar (MqlRates.tick_volume, R41)
+long     gVCum[];             // prefix sums: gVCum[k] = gV[0] + ... + gV[k-1] (size gBars + 1)
 int      gBars = 0;
+int      gVolN = 0;           // R41 lookback in bars = VolumeLookbackHours*60 / period minutes
 datetime gLastTime = 0;
 long     gPeriodSec = 0;
 
@@ -141,9 +156,11 @@ string   gCmtPrefix = "";
 string   gReasons[] = {"expired_untouched", "invalidated_active", "invalidated_touched", "invalidated_confirmed",
                        "invalidated_pending", "cancelled_no_fvg", "skipped_price_past", "skipped_too_close",
                        "skipped_sl_stops", "skipped_volume", "skipped_margin", "skipped_cap", "skipped_duplicate",
-                       "expired_unfilled", "filled", "filled_late", "run_end_pending"};
+                       "expired_unfilled", "filled", "filled_late", "run_end_pending", "skipped_market_closed",
+                       "skipped_broker_reject"};
 int      gReasonCnt[];
 int      gCntActivated = 0, gCntTouched = 0, gCntConfirmed = 0, gCntPlaced = 0, gCntWarmupDropped = 0;
+int      gCntIdfvgRejVol = 0, gCntCfvgRejVol = 0, gCntMcRetries = 0;   // R41 / R42 funnel keys
 
 //==================================================================
 // SMALL HELPERS
@@ -174,12 +191,12 @@ void InitSetup(Setup &s)
   {
    s.id = 0; s.dir = 0; s.state = ST_CANDIDATE; s.actSeq = 0;
    s.obBar = -1; s.obHigh = 0; s.obLow = 0;
-   s.idC1 = -1; s.idC3 = -1; s.idLow = 0; s.idHigh = 0;
+   s.idC1 = -1; s.idC3 = -1; s.idLow = 0; s.idHigh = 0; s.idVolRatio = 0;
    s.bosPivBar = -1; s.bosPivConf = -1; s.bosLevel = 0; s.bosBreakBar = -1;
    s.actBar = -1; s.touchBar = -1;
-   s.cC1 = -1; s.cC3 = -1; s.cLow = 0; s.cHigh = 0;
+   s.cC1 = -1; s.cC3 = -1; s.cLow = 0; s.cHigh = 0; s.cVolRatio = 0;
    s.priced = false; s.entry = 0; s.sl = 0; s.tp = 0; s.sized = false; s.volume = 0; s.stopsPts = 0;
-   s.placeMsc = 0; s.ticket = 0;
+   s.placeMsc = 0; s.ticket = 0; s.placeAttempts = 0; s.lastAttemptMsc = 0; s.mcFirstMsc = 0;
    s.fillMsc = 0; s.fillPrice = 0; s.posId = 0; s.exitMsc = 0; s.exitPrice = 0; s.exitKind = "";
    s.reason = ""; s.reasonMsc = 0;
    s.cancelDue = false; s.cancelReason = ""; s.cancelDueMsc = 0; s.retestSeen = false;
@@ -205,7 +222,7 @@ bool Touches(const Setup &s, int bar)
 #ifdef RESEARCH_LOG
 #define RL_DAY_FIELDS  8
 #define RL_SPREAD_BINS 20000
-#define RL_SETUPS_HEADER "setup_id,dir,ob_mode,entry_mode,ob_time,ob_high,ob_low,idfvg_c1_time,idfvg_c3_time,idfvg_low,idfvg_high,bos_pivot_time,bos_pivot_conf_time,bos_level,bos_break_time,activation_time,touch_time,cfvg_c1_time,cfvg_c3_time,cfvg_low,cfvg_high,entry,sl,tp,volume,stops_level_pts,place_time_msc,order_ticket,fill_time_msc,fill_price,position_id,exit_time_msc,exit_price,exit_kind,reason,reason_time_msc,retest_seen_no_fill"
+#define RL_SETUPS_HEADER "setup_id,dir,ob_mode,entry_mode,ob_time,ob_high,ob_low,idfvg_c1_time,idfvg_c3_time,idfvg_low,idfvg_high,bos_pivot_time,bos_pivot_conf_time,bos_level,bos_break_time,activation_time,touch_time,cfvg_c1_time,cfvg_c3_time,cfvg_low,cfvg_high,entry,sl,tp,volume,stops_level_pts,place_time_msc,order_ticket,fill_time_msc,fill_price,position_id,exit_time_msc,exit_price,exit_kind,reason,reason_time_msc,retest_seen_no_fill,idfvg_vol_ratio,cfvg_vol_ratio,market_closed_first_msc,place_attempts"
 datetime rlDay = 0;
 double   rlBalOpen = 0, rlEqOpen = 0, rlEqMin = 0, rlEqMax = 0, rlBalClose = 0, rlEqClose = 0;
 int      rlSpreadHist[RL_SPREAD_BINS];
@@ -385,7 +402,11 @@ void RL_AddSetupRow(const Setup &s)
                 + "," + s.exitKind
                 + "," + s.reason
                 + "," + IntegerToString(s.reasonMsc)
-                + "," + (s.retestSeen ? "1" : "0");
+                + "," + (s.retestSeen ? "1" : "0")
+                + "," + DoubleToString(s.idVolRatio, 4)
+                + "," + (conf ? DoubleToString(s.cVolRatio, 4) : "")
+                + "," + RL_L(s.mcFirstMsc, s.mcFirstMsc > 0)
+                + "," + IntegerToString(s.placeAttempts);
    int sz = ArraySize(rlSetupRows);
    ArrayResize(rlSetupRows, sz + 1, 4096);
    rlSetupRows[sz] = row;
@@ -435,15 +456,15 @@ void RL_WriteRunFiles()
          FileWriteString(h, rlSetupRows[i] + "\r\n");
       FileClose(h);
      }
-   // rl_bars: closed signal-timeframe OHLC processed while trading was enabled (KTD8, R39)
+   // rl_bars: closed signal-timeframe OHLC + tick volume processed while trading was enabled (KTD8, R39, R41)
    h = FileOpen("rl_bars_" + ResearchRunTag + ".csv", FILE_WRITE | FILE_TXT | FILE_ANSI);
    if(h != INVALID_HANDLE)
      {
-      FileWriteString(h, "time,open,high,low,close\r\n");
+      FileWriteString(h, "time,open,high,low,close,tick_volume\r\n");
       for(int i = 0; i < ArraySize(rlBars); i++)
          FileWriteString(h, IntegerToString((long)rlBars[i].time) + "," + DoubleToString(rlBars[i].open, gDigits) + "," +
                          DoubleToString(rlBars[i].high, gDigits) + "," + DoubleToString(rlBars[i].low, gDigits) + "," +
-                         DoubleToString(rlBars[i].close, gDigits) + "\r\n");
+                         DoubleToString(rlBars[i].close, gDigits) + "," + IntegerToString(rlBars[i].tick_volume) + "\r\n");
       FileClose(h);
      }
   }
@@ -532,6 +553,9 @@ void PrintFunnel()
       line += KV(gReasons[i], gReasonCnt[i]);
      }
    line += KV("warmup_dropped", gCntWarmupDropped);
+   line += KV("idfvg_rejected_volume", gCntIdfvgRejVol);
+   line += KV("cfvg_rejected_volume", gCntCfvgRejVol);
+   line += KV("market_closed_retries", gCntMcRetries);
    Print(line);
   }
 
@@ -617,11 +641,28 @@ int AppendBar(const MqlRates &r)
   {
    int n = gBars;
    ArrayResize(gO, n + 1, 65536); ArrayResize(gH, n + 1, 65536); ArrayResize(gL, n + 1, 65536);
-   ArrayResize(gC, n + 1, 65536); ArrayResize(gT, n + 1, 65536);
+   ArrayResize(gC, n + 1, 65536); ArrayResize(gT, n + 1, 65536); ArrayResize(gV, n + 1, 65536);
+   ArrayResize(gVCum, n + 2, 65536);
    gO[n] = r.open; gH[n] = r.high; gL[n] = r.low; gC[n] = r.close; gT[n] = r.time;
+   gV[n] = (long)r.tick_volume;
+   if(n == 0) gVCum[0] = 0;
+   gVCum[n + 1] = gVCum[n] + gV[n];
    gBars = n + 1;
    gLastTime = r.time;
    return n;
+  }
+
+// R41: volume filter on an FVG's middle candle m. ratio = gV[m] / mean(gV[m-N .. m-1]), N = gVolN closed
+// bars counted (not wall time; warm-up bars count). Fewer than N bars before m -> does not qualify.
+bool VolumeQualifies(int m, double &ratio)
+  {
+   ratio = 0;
+   int nb = gVolN;
+   if(nb <= 0 || m < nb || m >= gBars) return false;
+   long sum = gVCum[m] - gVCum[m - nb];               // bars m-nb .. m-1
+   if(sum <= 0) return false;                         // no reference volume: not qualifying
+   ratio = (double)gV[m] * (double)nb / (double)sum;
+   return ratio >= VolumeMultiplier - 1e-9;           // >= (float noise tolerated), never >
   }
 
 // strict pivot tests (ties are not pivots), adapted from the archived EA
@@ -730,8 +771,9 @@ void MarkObUsed(datetime t, int n)
 //==================================================================
 // SIGNAL STATE MACHINE (one closed bar, KTD2 order)
 //==================================================================
-// R5, R7, R15: identifying FVG completed at bar n -> look back from its candle 1 for the OB candle
-void NewCandidate(int dir, int n)
+// R5, R7, R15: identifying FVG completed at bar n -> look back from its candle 1 for the OB candle.
+// R41: an identifying FVG failing the volume filter qualifies no OB (and does not consume the OB candle).
+void NewCandidate(int dir, int n, bool live)
   {
    int c1 = n - 2;
    int ob = -1;
@@ -742,7 +784,9 @@ void NewCandidate(int dir, int n)
      }
    if(ob < 0) return;
    if(ObUsed(gT[ob])) return;                        // each candle becomes an OB at most once
-   MarkObUsed(gT[ob], n);
+   double vr = 0;
+   bool volOk = VolumeQualifies(n - 1, vr);           // middle candle = n - 1 (R41)
+   if(volOk) MarkObUsed(gT[ob], n);
 
    Setup s; InitSetup(s);
    s.dir = dir; s.state = ST_CANDIDATE;
@@ -750,25 +794,34 @@ void NewCandidate(int dir, int n)
    s.idC1 = c1; s.idC3 = n;
    s.idLow  = (dir == 1) ? gH[c1] : gH[n];
    s.idHigh = (dir == 1) ? gL[n]  : gL[c1];
+   s.idVolRatio = vr;
 
    // R6: a close beyond the OB before activation discards the candidate
    for(int j = ob + 1; j <= n; j++)
       if(CloseBeyond(s, j)) return;
 
-   if(ObMode == OB_FVG) { Activate(s, n); PushSetup(s); return; }
+   if(ObMode == OB_FVG)
+     {
+      if(!volOk) { if(live) gCntIdfvgRejVol++; return; }   // would have activated: rejected by volume
+      Activate(s, n); PushSetup(s); return;
+     }
 
    // FVG+BOS: the break close may already have happened between the OB candle and candle 3
+   bool brk = false;
    for(int b = ob + 1; b <= n && b - ob <= BosWindowBars; b++)
-      if(FindBreak(s, b)) { Activate(s, n); break; }          // activation at the later of c3 and break close
-   if(s.state == ST_CANDIDATE && n - ob >= BosWindowBars) return;   // BOS window elapsed
+      if(FindBreak(s, b)) { brk = true; break; }
+   if(!brk && n - ob >= BosWindowBars) return;        // BOS window elapsed
+   if(!volOk) { if(live) gCntIdfvgRejVol++; return; }   // would have been tracked: rejected by volume
+   if(brk) Activate(s, n);                            // activation at the later of c3 and break close
    PushSetup(s);
   }
 
 // R9, R36: record the confirmation FVG; warm-up confirmations are dropped (KTD6)
-void Confirm(Setup &s, int n, bool canTrade, long closeMsc)
+void Confirm(Setup &s, int n, bool canTrade, long closeMsc, double volRatio)
   {
    int d = s.dir;
    s.cC1 = n - 2; s.cC3 = n;
+   s.cVolRatio = volRatio;
    s.cLow  = (d == 1) ? gH[n - 2] : gH[n];
    s.cHigh = (d == 1) ? gL[n]     : gL[n - 2];
    if(!canTrade) { Retire(s, "warmup_dropped", closeMsc); return; }
@@ -797,12 +850,15 @@ void ProcessBar(const MqlRates &r, bool live, bool canTrade)
    UpdatePivots(n);
    long closeMsc = BarCloseMsc(n);
 
-   // 1) pending orders: window count, then close beyond the OB (R11, R38)
+   // 1) pending orders: window count, then close beyond the OB (R11, R38). A confirmed setup still
+   //    awaiting placement after a market-closed refusal gives up after OrderExpiryBars bars (R42).
    for(int i = 0; i < ArraySize(S); i++)
      {
       if(S[i].state == ST_PENDING && !S[i].cancelDue) PendingBarCheck(S[i], n, closeMsc, false);
       else if(S[i].state == ST_FILLED && S[i].fillMsc >= closeMsc && S[i].reason == "filled")
          PendingBarCheck(S[i], n, closeMsc, true);
+      else if(S[i].state == ST_CONFIRMED && n - S[i].cC3 >= OrderExpiryBars)
+         Skip(S[i], "skipped_market_closed", closeMsc);
      }
 
    // 2) close beyond the OB: candidate discard, active / touched / confirmed invalidation (R6, R11)
@@ -826,11 +882,13 @@ void ProcessBar(const MqlRates &r, bool live, bool canTrade)
       else if(k >= ObMaxAgeBars) Retire(S[i], "expired_untouched", closeMsc);
      }
 
-   // 4) confirmation FVG with this bar as candle 3 (R9, R16, R36)
+   // 4) confirmation FVG with this bar as candle 3 (R9, R16, R36); it must pass the volume filter (R41)
    if(n >= 2)
      {
       bool bullF = gL[n] > gH[n - 2];
       bool bearF = gH[n] < gL[n - 2];
+      double cvr = 0;
+      bool cVolOk = (bullF || bearF) ? VolumeQualifies(n - 1, cvr) : false;
       int bestL = -1, bestS = -1;
       for(int i = 0; i < ArraySize(S); i++)
         {
@@ -842,9 +900,17 @@ void ProcessBar(const MqlRates &r, bool live, bool canTrade)
          if(S[i].dir == 1) { if(bestL < 0 || S[i].actSeq > S[bestL].actSeq) bestL = i; }
          else              { if(bestS < 0 || S[i].actSeq > S[bestS].actSeq) bestS = i; }
         }
-      // one confirmation FVG confirms only the most recently activated eligible OB (R16)
-      if(bestL >= 0) Confirm(S[bestL], n, canTrade, closeMsc);
-      if(bestS >= 0) Confirm(S[bestS], n, canTrade, closeMsc);
+      // one confirmation FVG confirms only the most recently activated eligible OB (R16); a volume-failing
+      // FVG confirms nothing and the touched OBs keep waiting for the first passing FVG in their window
+      if(!cVolOk)
+        {
+         if(live && (bestL >= 0 || bestS >= 0)) gCntCfvgRejVol++;
+        }
+      else
+        {
+         if(bestL >= 0) Confirm(S[bestL], n, canTrade, closeMsc, cvr);
+         if(bestS >= 0) Confirm(S[bestS], n, canTrade, closeMsc, cvr);
+        }
      }
    for(int i = 0; i < ArraySize(S); i++)
       if(S[i].state == ST_TOUCHED && n - S[i].touchBar >= FvgWindowBars)
@@ -859,8 +925,8 @@ void ProcessBar(const MqlRates &r, bool live, bool canTrade)
      }
    if(n >= 2)
      {
-      if(gL[n] > gH[n - 2])      NewCandidate(1, n);
-      else if(gH[n] < gL[n - 2]) NewCandidate(-1, n);
+      if(gL[n] > gH[n - 2])      NewCandidate(1, n, live);
+      else if(gH[n] < gL[n - 2]) NewCandidate(-1, n, live);
      }
    // 6) setups now in ST_CONFIRMED are placed by OnTick on this tick, oldest activation first
   }
@@ -926,28 +992,41 @@ string FailReason(uint rc)
    if(rc == TRADE_RETCODE_INVALID_VOLUME || rc == TRADE_RETCODE_LIMIT_VOLUME) return "skipped_volume";
    if(rc == TRADE_RETCODE_LIMIT_ORDERS || rc == TRADE_RETCODE_LIMIT_POSITIONS) return "skipped_cap";
    if(rc == TRADE_RETCODE_INVALID_PRICE || rc == TRADE_RETCODE_PRICE_OFF) return "skipped_too_close";
-   return "skipped_price_past";
+   return "skipped_broker_reject";
   }
 
 // R10: Limit order on the first tick after the confirmation FVG's candle 3 closed. Never a market order,
 // never a clamp: every failed check skips the setup with its reason code.
+// R42: a TRADE_RETCODE_MARKET_CLOSED refusal keeps the setup in ST_CONFIRMED; it is retried on later ticks
+// (at most once per MC_RETRY_GAP_MSC of tick time, at most MC_RETRY_MAX attempts) with the original
+// entry/SL/TP, re-running every check below in the same order. ProcessBar ends the wait at a close beyond
+// the OB (invalidated_confirmed) or after OrderExpiryBars bars since candle 3 (skipped_market_closed).
 void PlaceSetup(Setup &s, const MqlTick &tk)
   {
    int  d   = s.dir;
    long msc = tk.time_msc;
 
-   // entry per EntryMode (R10); half-tick midpoints are rounded deeper into the zone
-   double e;
-   if(EntryMode == ENTRY_FVG_EDGE)      e = (d == 1) ? s.cHigh : s.cLow;
-   else if(EntryMode == ENTRY_FVG_MID)  e = RoundTick((s.cLow + s.cHigh) / 2.0, d != 1);
-   else if(EntryMode == ENTRY_OB_EDGE)  e = (d == 1) ? s.obHigh : s.obLow;
-   else                                 e = RoundTick((s.obLow + s.obHigh) / 2.0, d != 1);
-   e = NormalizeDouble(e, gDigits);
-   // R13: SL beyond the OB by the buffer (rounded away from entry); TP from the intended entry
-   double buf = StopBufferPoints * _Point;
-   double sl  = (d == 1) ? RoundTick(s.obLow - buf, false) : RoundTick(s.obHigh + buf, true);
-   double tp  = RoundTickNearest(e + d * RiskRR * MathAbs(e - sl));
-   s.entry = e; s.sl = sl; s.tp = tp; s.priced = true;
+   if(s.placeAttempts > 0 && msc - s.lastAttemptMsc < MC_RETRY_GAP_MSC) return;   // retry throttle (R42)
+   s.placeAttempts++;
+   s.lastAttemptMsc = msc;
+   if(s.placeAttempts > 1) gCntMcRetries++;
+
+   if(!s.priced)
+     {
+      // entry per EntryMode (R10); half-tick midpoints are rounded deeper into the zone
+      double pe;
+      if(EntryMode == ENTRY_FVG_EDGE)      pe = (d == 1) ? s.cHigh : s.cLow;
+      else if(EntryMode == ENTRY_FVG_MID)  pe = RoundTick((s.cLow + s.cHigh) / 2.0, d != 1);
+      else if(EntryMode == ENTRY_OB_EDGE)  pe = (d == 1) ? s.obHigh : s.obLow;
+      else                                 pe = RoundTick((s.obLow + s.obHigh) / 2.0, d != 1);
+      pe = NormalizeDouble(pe, gDigits);
+      // R13: SL beyond the OB by the buffer (rounded away from entry); TP from the intended entry
+      double buf = StopBufferPoints * _Point;
+      double psl = (d == 1) ? RoundTick(s.obLow - buf, false) : RoundTick(s.obHigh + buf, true);
+      double ptp = RoundTickNearest(pe + d * RiskRR * MathAbs(pe - psl));
+      s.entry = pe; s.sl = psl; s.tp = ptp; s.priced = true;
+     }
+   double e = s.entry, sl = s.sl, tp = s.tp;              // retries keep the original prices (R42)
 
    // R37: the broker stops level, read at every placement - the only distance threshold
    long stops = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
@@ -988,7 +1067,14 @@ void PlaceSetup(Setup &s, const MqlTick &tk)
    ulong ticket = trade.ResultOrder();
    if(!ok || ticket == 0 || (rc != TRADE_RETCODE_DONE && rc != TRADE_RETCODE_PLACED))
      {
-      Print("OBR setup #", s.id, " placement rejected, retcode ", rc, " ", trade.ResultComment());
+      Print("OBR setup #", s.id, " placement rejected, retcode ", rc, " ", trade.ResultComment(),
+            ", attempt ", s.placeAttempts);
+      if(rc == TRADE_RETCODE_MARKET_CLOSED)
+        {
+         if(s.mcFirstMsc == 0) s.mcFirstMsc = msc;
+         if(s.placeAttempts >= MC_RETRY_MAX) { Skip(s, "skipped_market_closed", msc); return; }
+         return;                                          // stays ST_CONFIRMED, retried later (R42)
+        }
       Skip(s, FailReason(rc), msc);
       return;
      }
@@ -1004,7 +1090,8 @@ void PlaceSetup(Setup &s, const MqlTick &tk)
          " @", Fmt(e), " SL ", Fmt(sl), " TP ", Fmt(tp), " ticket ", ticket, " ", cmt);
   }
 
-// placements for OBs confirmed at the bar that just closed, oldest activation first (KTD2 step 6)
+// placements for OBs confirmed at the bar that just closed, plus market-closed retries (R42),
+// oldest activation first (KTD2 step 6)
 void PlaceQueued(const MqlTick &tk)
   {
    int q[];
@@ -1152,9 +1239,19 @@ int OnInit()
      }
    // KTD2 / R9: windows must be positive, the confirmation window at least 2 bars
    if(FvgWindowBars < 2 || ImpulseWindowBars <= 0 || BosWindowBars <= 0 || SwingStrength <= 0 || ObMaxAgeBars <= 0 ||
-      OrderExpiryBars <= 0 || StopBufferPoints < 0 || RiskRR <= 0 || RiskPercent <= 0 || MaxExposures <= 0 || WarmupBars < 0)
+      OrderExpiryBars <= 0 || StopBufferPoints < 0 || RiskRR <= 0 || RiskPercent <= 0 || MaxExposures <= 0 || WarmupBars < 0 ||
+      VolumeMultiplier < 0 || VolumeLookbackHours <= 0)
      {
-      Print("OBR: invalid inputs (FvgWindowBars >= 2, windows > 0, RiskRR > 0, RiskPercent > 0, MaxExposures > 0)");
+      Print("OBR: invalid inputs (FvgWindowBars >= 2, windows > 0, RiskRR > 0, RiskPercent > 0, MaxExposures > 0, ",
+            "VolumeMultiplier >= 0, VolumeLookbackHours > 0)");
+      return INIT_PARAMETERS_INCORRECT;
+     }
+   // R41: lookback in closed bars = VolumeLookbackHours * 60 / period minutes (96 on M15, 288 on M5)
+   long periodMin = PeriodSeconds(SignalTF) / 60;
+   gVolN = (periodMin > 0) ? (int)((long)VolumeLookbackHours * 60 / periodMin) : 0;
+   if(gVolN < 1)
+     {
+      Print("OBR: VolumeLookbackHours shorter than one ", EnumToString(SignalTF), " bar");
       return INIT_PARAMETERS_INCORRECT;
      }
    // KTD4: hedging account only
@@ -1191,6 +1288,7 @@ int OnInit()
      }
    gOrphansDone = false;
    Print("OBR initialised. Warm-up bars: ", got, ", ob mode ", EnumToString(ObMode), ", entry mode ", EnumToString(EntryMode),
+         ", volume lookback ", gVolN, " bars x", DoubleToString(VolumeMultiplier, 2),
          ", tracked setups ", ArraySize(S), ", tick ", DoubleToString(gTick, gDigits),
          ", stops level ", SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL), " pts");
    return INIT_SUCCEEDED;

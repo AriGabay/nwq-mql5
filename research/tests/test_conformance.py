@@ -5,6 +5,9 @@ Fixture bars (fixtures/ob_fvg/rl_bars.csv, M15, bar i opens at T0 + 900*i):
               an FVG 6..8 whose candle 1 precedes the touch (AE1), confirmation FVG 9..11 (2003.50-2003.80),
               entry 2003.80 / SL 1994.90 / TP 2021.60, placed in bar 12, filled in bar 13, TP in bar 16.
   short 18-35: price mirror (4000 - p) of the long up to the fill bar 31, then an SL path (loss).
+tick_volume: 100/110/120 repeating, with spikes on the four FVG middle candles (long idFVG 4, long cFVG 10, short
+idFVG 22, short cFVG 28). PARAMS use VolumeLookbackHours=1, i.e. a 4-bar look-back on M15, so every fixture FVG
+ratio is recomputable from rl_bars (AMENDMENT A1); the logged ratios in the setup CSVs match those recomputations.
 """
 import pathlib
 
@@ -16,7 +19,8 @@ from mt5r import conformance as cf
 FX = pathlib.Path(__file__).parent / "fixtures" / "ob_fvg"
 T0, P = 1767225600, 900
 PARAMS = dict(ObMode=0, EntryMode=0, ImpulseWindowBars=2, BosWindowBars=6, SwingStrength=3, ObMaxAgeBars=96,
-              FvgWindowBars=12, OrderExpiryBars=12, StopBufferPoints=10, RiskRR=2.0, point=0.01)
+              FvgWindowBars=12, OrderExpiryBars=12, StopBufferPoints=10, RiskRR=2.0, point=0.01,
+              VolumeMultiplier=2.0, VolumeLookbackHours=1)
 
 
 def t(i):
@@ -131,7 +135,115 @@ def test_reason_inconsistent_with_bars(setups, bars):
 def test_confirmation_must_be_first_qualifying_fvg(setups, bars):
     b = bars.copy()
     b.loc[10, "low"] = 2003.10  # FVG 8..10 now qualifies (2003.10 > bar 8 high 2003.00): earlier than 9..11
+    b.loc[9, "tick_volume"] = 1000  # ... and its middle candle passes the volume filter
     assert "cfvg_not_first" in rules(cf.check(long_only(setups), b, P, PARAMS))
+
+
+# --- volume filter on both FVGs (AMENDMENT A1, R41) -------------------------------------------------------------
+def test_readers_accept_tick_volume_and_the_amendment_columns(setups, bars):
+    assert bars["tick_volume"].tolist()[:5] == [100, 110, 120, 100, 330]
+    assert setups.loc[0, "idfvg_vol_ratio"] == pytest.approx(3.0698)
+    assert setups.loc[1, "cfvg_vol_ratio"] == pytest.approx(3.3488)
+    assert pd.isna(setups.loc[0, "market_closed_first_msc"]) and int(setups.loc[0, "place_attempts"]) == 1
+
+
+def test_old_files_without_volume_columns_are_still_readable(tmp_path):
+    old_bars = tmp_path / "rl_bars.csv"
+    lines = (FX / "rl_bars.csv").read_text().splitlines()
+    old_bars.write_text("\n".join(",".join(x.split(",")[:5]) for x in lines) + "\n")
+    old_setups = tmp_path / "rl_setups.csv"
+    lines = (FX / "rl_setups.csv").read_text().splitlines()
+    old_setups.write_text("\n".join(",".join(x.split(",")[:37]) for x in lines) + "\n")
+    b, s = cf.read_bars(old_bars), cf.read_setups(old_setups)
+    assert "tick_volume" in b and b["tick_volume"].isna().all()
+    assert len(s) == 2 and s.loc[0, "reason"] == "filled"
+    assert cf.check(s, b, P, PARAMS) == []  # pre-amendment runs: no volume evidence, no volume violations
+
+
+def test_confirmation_fvg_failing_volume_is_flagged(setups, bars):
+    b = bars.copy()
+    b.loc[10, "tick_volume"] = 150  # cFVG 9..11 middle candle: 150 / 107.5 = 1.40 < 2.0
+    row = long_only(setups, cfvg_vol_ratio=round(150 / 107.5, 4))
+    v = rules(cf.check(row, b, P, PARAMS))
+    assert "cfvg_volume" in v and "vol_ratio_mismatch" not in v
+    # Without the confirmation every later FVG in the window fails volume too: no confirmation at all.
+    assert "reason_inconsistent" in v
+
+
+def test_identifying_fvg_failing_volume_is_flagged(setups, bars):
+    b = bars.copy()
+    b.loc[4, "tick_volume"] = 200  # 200 / 107.5 = 1.86 < 2.0
+    row = long_only(setups, idfvg_vol_ratio=round(200 / 107.5, 4))
+    assert rules(cf.check(row, b, P, PARAMS)) == {"idfvg_volume"}
+
+
+def test_logged_ratio_below_multiplier_is_flagged_without_enough_history(setups, bars):
+    # Default 24 h look-back (96 bars) cannot be recomputed from 36 logged bars; the logged ratio still has to pass.
+    params = {**PARAMS, "VolumeLookbackHours": 24}
+    assert cf.check(long_only(setups), bars, P, params) == []
+    assert rules(cf.check(long_only(setups, cfvg_vol_ratio=1.5), bars, P, params)) == {"cfvg_volume"}
+
+
+def test_earlier_fvg_failing_volume_does_not_break_first_fvg_rule(setups, bars):
+    b = bars.copy()
+    b.loc[10, "low"] = 2003.10  # FVG 8..10 forms by price, but its middle candle 9 has 100 / 112.5 = 0.89
+    assert cf.check(long_only(setups), b, P, PARAMS) == []
+
+
+def test_logged_ratio_mismatch_is_flagged(setups, bars):
+    assert rules(cf.check(long_only(setups, cfvg_vol_ratio=2.9), bars, P, PARAMS)) == {"vol_ratio_mismatch"}
+    assert rules(cf.check(long_only(setups, idfvg_vol_ratio=3.2), bars, P, PARAMS)) == {"vol_ratio_mismatch"}
+    assert cf.check(long_only(setups, cfvg_vol_ratio=3.1629), bars, P, PARAMS) == []  # 4-decimal rounding
+
+
+# --- market closed at placement (AMENDMENT A2, R42) -------------------------------------------------------------
+def test_market_closed_retry_placement_after_the_refusal_passes(setups, bars):
+    refusal = t(12) * 1000 + 200  # first tick after confirmation c3 (bar 11) closes
+    ok = long_only(setups, market_closed_first_msc=refusal, place_time_msc=t(13) * 1000 + 100, place_attempts=3)
+    assert cf.check(ok, bars, P, PARAMS) == []
+    occ = cf.occurrences(ok, bars, P, PARAMS)
+    assert occ["market_closed_retry_placed"] == 1
+    early = long_only(setups, market_closed_first_msc=refusal, place_time_msc=refusal - 100, place_attempts=3)
+    assert "place_before_market_closed" in rules(cf.check(early, bars, P, PARAMS))
+    # A refusal cannot precede the close of confirmation candle 3.
+    pre = long_only(setups, market_closed_first_msc=t(11) * 1000 + 5, place_attempts=3)
+    assert "market_closed_before_c3_close" in rules(cf.check(pre, bars, P, PARAMS))
+
+
+def test_late_placement_without_a_market_closed_refusal_is_flagged(setups, bars):
+    late = long_only(setups, place_time_msc=t(13) * 1000 + 100)
+    assert "place_not_first_bar" in rules(cf.check(late, bars, P, PARAMS))
+
+
+def test_market_closed_retry_after_the_order_window_is_flagged(setups, bars):
+    params = {**PARAMS, "OrderExpiryBars": 1}  # only bar 12 may still place the order
+    late = long_only(setups, market_closed_first_msc=t(12) * 1000 + 200, place_time_msc=t(13) * 1000 + 100,
+                     place_attempts=3)
+    assert "place_after_retry_window" in rules(cf.check(late, bars, P, params))
+
+
+def _skipped_market_closed(setups, **changes):
+    gone = {k: float("nan") for k in ("place_time_msc", "order_ticket", "fill_time_msc", "fill_price", "position_id",
+                                       "exit_time_msc", "exit_price", "exit_kind")}
+    return long_only(setups, **{**gone, "reason": "skipped_market_closed", "market_closed_first_msc": t(12) * 1000 + 200,
+                                "place_attempts": 120, "reason_time_msc": t(14) * 1000 + 300, **changes})
+
+
+def test_skipped_market_closed_rows(setups, bars):
+    assert cf.check(_skipped_market_closed(setups), bars, P, PARAMS) == []
+    with_ticket = _skipped_market_closed(setups, order_ticket=5001)
+    assert "reason_fields" in rules(cf.check(with_ticket, bars, P, PARAMS))
+    no_refusal = _skipped_market_closed(setups, market_closed_first_msc=float("nan"))
+    assert "reason_fields" in rules(cf.check(no_refusal, bars, P, PARAMS))
+    occ = cf.occurrences(_skipped_market_closed(setups), bars, P, PARAMS)
+    assert occ["skipped_market_closed"] == 1 and occ["market_closed_retry_placed"] == 0
+
+
+def test_skipped_broker_reject_is_a_known_skip_reason(setups, bars):
+    row = _skipped_market_closed(setups, reason="skipped_broker_reject", market_closed_first_msc=float("nan"),
+                                 place_attempts=1, reason_time_msc=t(12) * 1000 + 200)
+    assert cf.check(row, bars, P, PARAMS) == []
+    assert {"skipped_market_closed", "skipped_broker_reject"} <= cf.SKIP_REASONS
 
 
 # --- FVG+BOS mode (R6, KTD3, AE7) ------------------------------------------------------------------------------
@@ -189,10 +301,16 @@ def test_occurrences_on_fixture(setups, bars):
     occ = cf.occurrences(setups, bars, P)
     for key in ("touch_bar_close_beyond", "cfvg_c1_is_touch_bar", "idfvg_c1_is_ob", "cap_skip", "too_close_skip",
                 "margin_skip", "volume_skip", "duplicate_skip", "filled_late", "invalidated_pending",
-                "fill_then_close_beyond_same_bar", "long", "short", "bos_mode"):
+                "fill_then_close_beyond_same_bar", "long", "short", "bos_mode", "market_closed_retry_placed",
+                "skipped_market_closed", "idfvg_volume_checked", "cfvg_volume_checked"):
         assert key in occ
     assert occ["long"] == 1 and occ["short"] == 1 and occ["bos_mode"] == 0
     assert occ["idfvg_c1_is_ob"] == 0 and occ["cfvg_c1_is_touch_bar"] == 0 and occ["filled_late"] == 0
+    # default 24 h look-back: no fixture FVG has 96 logged bars before it; a 1 h look-back recomputes all four
+    assert occ["idfvg_volume_checked"] == 0 and occ["cfvg_volume_checked"] == 0
+    occ = cf.occurrences(setups, bars, P, PARAMS)
+    assert occ["idfvg_volume_checked"] == 2 and occ["cfvg_volume_checked"] == 2
+    assert occ["market_closed_retry_placed"] == 0 and occ["skipped_market_closed"] == 0
 
 
 def test_expired_unfilled_and_retest_flag_follow_the_bars(setups, bars):
