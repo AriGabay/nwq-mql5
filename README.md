@@ -9,5 +9,9 @@ researched with a gated, pre-registered protocol in an isolated MT5 copy (Strate
 - Run constants: `research/run_constants.json`; frozen protocol (after the chart gate): `research/preregistration.json`
 - Previous strategy (`new_test`, SweepOB) and all of its evidence: `archive/2026-09-30-new-test-sweepob/`
 
+Platforms: macOS (Wine prefix, `wine_dir` set) or native Windows (portable copy at `isolated_dir`, e.g. `C:\mt5r`);
+see `research/config.example.yaml`. On a new machine: `python research/cli.py setup`, then log in once in the
+isolated terminal's GUI (`C:\mt5r\terminal64.exe /portable`, user only — the tester needs an account), then `install`.
+
 Safety: the pipeline never touches the live MT5 terminal or account, runs only while the live terminal
 is closed, and keeps no credentials in git.

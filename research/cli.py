@@ -1,6 +1,6 @@
 """OB-FVG retest research pipeline: python research/cli.py <step>  (plan KTD13)
 
-Order: install -> smoke -> conformance -> optsmoke -> pilot -> charts -> STOP (R39 chart gate, user approval)
+Order: setup (once per machine, then one manual GUI login by the user) -> install -> smoke -> conformance -> optsmoke -> pilot -> charts -> STOP (R39 chart gate, user approval)
 -> freeze-rules (commit) -> wfo -> freeze (commit) -> holdout -> robustness -> deliver.
 
 Guards: every step that runs the tester refuses while the live terminal runs (runner.run). wfo, freeze, holdout,
@@ -138,6 +138,15 @@ def _md(df: pd.DataFrame) -> str:
 
 
 # ------------------------------------------------------------------ U5: install, smoke, conformance
+def cmd_setup(args) -> None:
+    """Build or refresh the isolated copy from the allowlisted live files (env.build)."""
+    if runner.live_terminal_running():
+        raise SystemExit("live MT5 terminal is running; setup only while it is closed (R35)")
+    cfg = env.load_config()
+    man = env.build(cfg)
+    print(json.dumps({"mt5_dir": str(cfg.mt5_dir), "n_files": man["n_files"]}, indent=1))
+
+
 def cmd_install(args) -> None:
     """Copy both EA sources into the isolated copy and compile them with its MetaEditor."""
     if runner.live_terminal_running():
@@ -518,7 +527,7 @@ def cmd_deliver(args) -> None:
 
 
 # ------------------------------------------------------------------ entry point
-COMMANDS = {"install": cmd_install, "smoke": cmd_smoke, "conformance": cmd_conformance, "optsmoke": cmd_optsmoke,
+COMMANDS = {"setup": cmd_setup, "install": cmd_install, "smoke": cmd_smoke, "conformance": cmd_conformance, "optsmoke": cmd_optsmoke,
             "pilot": cmd_pilot, "charts": cmd_charts, "freeze-rules": cmd_freeze_rules, "wfo": cmd_wfo,
             "freeze": cmd_freeze, "holdout": cmd_holdout, "robustness": cmd_robustness, "deliver": cmd_deliver}
 
@@ -526,6 +535,7 @@ COMMANDS = {"install": cmd_install, "smoke": cmd_smoke, "conformance": cmd_confo
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("setup", help="build/refresh the isolated MT5 copy from allowlisted live files")
     sub.add_parser("install", help="copy EA sources into the isolated copy and compile both builds")
     s = sub.add_parser("smoke", help="one-month research-build runs + conformance")
     s.add_argument("--period", choices=["M5", "M15"], action="append")

@@ -76,6 +76,16 @@ def test_disable_mcp_turns_servers_off(tmp_path):
     assert "Enable=1" not in text and "ApiKey=abc" not in text and "[MCP.MetaEditor]\r\nEnable=0" in text
 
 
+def test_disable_mcp_fills_a_section_without_enable(tmp_path):
+    cfg = _cfg(tmp_path)
+    _touch(cfg.mt5_dir, "config/common.ini", env.common_ini(cfg))
+    _touch(cfg.mt5_dir, "config/assistant.ini", "[MCP.MetaTrader]\r\nEnable=0\r\n[MCP.Custom]\r\n")
+    with pytest.raises(RuntimeError, match=r"MCP.Custom"):
+        env.assert_trade_safety(cfg)
+    env.disable_mcp(cfg)
+    env.assert_trade_safety(cfg)
+
+
 def _safe_copy(cfg):
     _touch(cfg.mt5_dir, "config/common.ini", env.common_ini(cfg))
     _touch(cfg.mt5_dir, "config/assistant.ini", "[MCP.MetaEditor]\r\nEnable=0\r\n[MCP.MetaTrader]\r\nEnable=0\r\n")
@@ -126,3 +136,34 @@ def test_install_sources_refuses_overlapping_prefix(tmp_path, monkeypatch):
     monkeypatch.setattr(env, "REPO", tmp_path / "repo")
     with pytest.raises(RuntimeError, match="overlaps"):
         env.install_sources(cfg)
+
+
+def _native_cfg(tmp_path):
+    return env.Config(live_mt5_dir=tmp_path / "Program Files" / "MetaTrader 5", live_prefix=tmp_path / "data",
+                      isolated_prefix=tmp_path / "mt5r", wine_dir=None, server="Srv-1", symbol="XAUUSD.s",
+                      login=1234567, live_data_dir=tmp_path / "data")
+
+
+def test_native_copy_takes_binaries_from_install_and_rest_from_data_dir(tmp_path):
+    cfg = _native_cfg(tmp_path)
+    for rel in ["terminal64.exe", "MetaEditor64.exe", "uninstall.exe", "MQL5/Include/x.mqh"]:
+        _touch(cfg.live_mt5_dir, rel)
+    for rel in ["bases/Srv-1/ticks/XAUUSD.s/202603.tkc", "bases/Srv-1/trades/1/deals.dat", "config/accounts.dat",
+                "config/servers.dat", "MQL5/Include/Trade/Trade.mqh", "terminal64.exe"]:
+        _touch(cfg.data_dir, rel)
+    src = env.copy_sources(cfg)
+    assert list(src) == ["MQL5/Include/Trade/Trade.mqh", "MetaEditor64.exe", "bases/Srv-1/ticks/XAUUSD.s/202603.tkc",
+                         "config/servers.dat", "terminal64.exe"]
+    assert src["terminal64.exe"].parent == cfg.live_mt5_dir and src["config/servers.dat"].parent.parent == cfg.data_dir
+
+
+def test_native_paths_and_isolation(tmp_path):
+    cfg = _native_cfg(tmp_path)
+    assert cfg.native and cfg.mt5_dir == cfg.isolated_prefix and cfg.launcher() == []
+    assert cfg.win_path("MQL5/Experts/a.mq5") == str(cfg.mt5_dir) + r"\MQL5\Experts\a.mq5"
+    assert "DYLD_FALLBACK_LIBRARY_PATH" not in cfg.env()
+    env.assert_isolated(cfg)
+    for bad in [cfg.live_mt5_dir / "mt5r", cfg.data_dir / "x", cfg.live_mt5_dir.parent]:
+        cfg.isolated_prefix = bad
+        with pytest.raises(RuntimeError, match="overlaps"):
+            env.assert_isolated(cfg)

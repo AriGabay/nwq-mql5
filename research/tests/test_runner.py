@@ -59,7 +59,7 @@ def test_run_refuses_unsafe_isolated_config(monkeypatch, tmp_path):
     import pytest
     from mt5r import env
     monkeypatch.setattr(runner, "live_terminal_running", lambda: False)
-    monkeypatch.setattr(runner, "isolated_processes", lambda: [])
+    monkeypatch.setattr(runner, "isolated_processes", lambda cfg=None: [])
     monkeypatch.setattr(runner, "_free_gb", lambda p: 100.0)
     launched = []
     monkeypatch.setattr(runner.subprocess, "Popen", lambda *a, **k: launched.append(a))
@@ -69,3 +69,45 @@ def test_run_refuses_unsafe_isolated_config(monkeypatch, tmp_path):
     with pytest.raises(RuntimeError, match="not trade-safe"):
         runner.run(cfg, "x", "", "e.ex5")
     assert launched == []
+
+
+def test_native_shutdown_ends_only_isolated_pids(tmp_path, monkeypatch):
+    import pytest
+    from mt5r import env
+    cfg = env.Config(live_mt5_dir=tmp_path / "live", live_prefix=tmp_path / "data", isolated_prefix=tmp_path / "mt5r",
+                     wine_dir=None, server="S", symbol="X")
+    procs = [r"11 C:\Program Files\MetaTrader 5\terminal64.exe x", f"22 {cfg.mt5_dir}" + r"\terminal64.exe /portable"]
+    killed = []
+
+    def fake_run(cmd, **k):
+        if cmd[0] == "taskkill":
+            killed.append(cmd[2])
+            procs[:] = [p for p in procs if not p.startswith(cmd[2] + " ")]
+        return type("R", (), {"stdout": "\n".join(procs)})()
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    assert runner.isolated_processes(cfg) == [procs[1]]
+    runner.shutdown_prefix(cfg)
+    assert killed == ["22"] and runner.isolated_processes(cfg) == []
+    assert "pkill" not in SRC and "/IM" not in SRC
+
+
+def test_unreadable_mt5_process_blocks_but_is_never_killed(tmp_path, monkeypatch):
+    import pytest
+    from mt5r import env
+    cfg = env.Config(live_mt5_dir=tmp_path / "live", live_prefix=tmp_path / "data", isolated_prefix=tmp_path / "mt5r",
+                     wine_dir=None, server="S", symbol="X")
+    lines = ["3728 " + runner.UNREADABLE + "terminal64.exe",
+             "8208 C:/Edge/msedgewebview2.exe --user-data-dir=" + str(cfg.mt5_dir) + "/temp"]
+    killed = []
+    monkeypatch.setattr(runner.time, "sleep", lambda s: None)
+
+    def fake_run(cmd, **k):
+        if cmd[0] == "taskkill":
+            killed.append(cmd[2])
+        return type("R", (), {"stdout": "\n".join(lines)})()
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    assert runner.live_terminal_running()
+    assert runner.isolated_processes(cfg) == [lines[0]]
+    with pytest.raises(RuntimeError, match="still alive"):
+        runner.shutdown_prefix(cfg)
+    assert killed == []

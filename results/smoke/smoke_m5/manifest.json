@@ -1,7 +1,7 @@
 {
  "run_id": "smoke_m5",
  "ex5": "ob_fvg_retest_research.ex5",
- "ex5_sha256": "7e9d7be1c890d2a1b4eba2e41fef09eadca0f13cd33f84c774222b8da2793c18",
+ "ex5_sha256": "57411c8fabdc75ee940756d55cf894b2c176c40cf0741e2614254a43b491cdeb",
  "ini_sha256": "3b633ab3262ec9051717ecfd9182783f251f13e6758bccb253b9bf32aff425de",
  "meta": {
   "kind": "research",
@@ -14,9 +14,9 @@
    "ResearchRunTag": "smoke_m5"
   }
  },
- "started": "2026-10-01T16:21:46",
+ "started": "2026-10-02T00:43:06",
  "status": "ok",
- "seconds": 14.0,
+ "seconds": 24.5,
  "report": "smoke_m5.htm",
  "exit_code": 0
 }
