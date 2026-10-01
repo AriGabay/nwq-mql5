@@ -6,3 +6,5 @@ equiv_delivered_m15,2026-10-01T00:10:41,U5 delivered vs research build deal equi
 pilot_m5,2026-10-01T00:11:59,R20 frequency pilot,pilot,ob_fvg_retest_research.ex5,M5,2025.12.01,2026.07.31,10000,ok,-7490.24,1536,79.09,
 pilot_m15,2026-10-01T00:12:53,R20 frequency pilot,pilot,ob_fvg_retest_research.ex5,M15,2025.12.01,2026.07.31,10000,ok,-2152.53,456,31.03,
 smoke_m15_bos,2026-10-01T00:14:26,U5 conformance of FVG+BOS mode (not exercised by the default pilot),smoke,ob_fvg_retest_research.ex5,M15,2025.12.01,2026.07.31,10000,ok,-1168.08,211,22.51,
+gate_entry_ob_edge_m15,2026-10-01T15:33:51,R39 gate: example of OB retest entry (EntryMode=2),gate_review,ob_fvg_retest_research.ex5,M15,2026.03.01,2026.03.31,10000,ok,-888.5,44,12.26,
+gate_entry_ob_mid_m15,2026-10-01T15:34:05,R39 gate: example of OB retest entry (EntryMode=3),gate_review,ob_fvg_retest_research.ex5,M15,2026.03.01,2026.03.31,10000,ok,-658.13,37,14.05,

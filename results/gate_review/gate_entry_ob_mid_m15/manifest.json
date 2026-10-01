@@ -1,0 +1,23 @@
+{
+ "run_id": "gate_entry_ob_mid_m15",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "4c0a9e3ba215aa484e454a7055941156e9b1c70b6fdaa35f8c71ed83a6d7a57f",
+ "ini_sha256": "732472ba7cd85336af39b20a81be90992ac39c692e694b65d7e51a5da24d0037",
+ "meta": {
+  "kind": "research",
+  "role": "gate_review",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15,
+   "EntryMode": 3,
+   "ResearchRunTag": "gate_entry_ob_mid_m15"
+  }
+ },
+ "started": "2026-10-01T15:33:51",
+ "status": "ok",
+ "seconds": 14.7,
+ "report": "gate_entry_ob_mid_m15.htm",
+ "exit_code": 0
+}

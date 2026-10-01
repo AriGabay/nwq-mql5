@@ -1,0 +1,22 @@
+{
+ "gate_entry_ob_edge_m15": {
+  "ids": [
+   386,
+   383
+  ],
+  "charts": [
+   "/Users/arigabay/Code/nwq-mql5/results/gate_review/gate_entry_ob_edge_m15/charts/setup_000386_long_loser.png",
+   "/Users/arigabay/Code/nwq-mql5/results/gate_review/gate_entry_ob_edge_m15/charts/setup_000383_short_loser.png"
+  ]
+ },
+ "gate_entry_ob_mid_m15": {
+  "ids": [
+   386,
+   383
+  ],
+  "charts": [
+   "/Users/arigabay/Code/nwq-mql5/results/gate_review/gate_entry_ob_mid_m15/charts/setup_000386_long_loser.png",
+   "/Users/arigabay/Code/nwq-mql5/results/gate_review/gate_entry_ob_mid_m15/charts/setup_000383_short_loser.png"
+  ]
+ }
+}
