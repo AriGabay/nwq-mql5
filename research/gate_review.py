@@ -3,7 +3,8 @@
 python research/gate_review.py [--m15-run RUN] [--m5-run RUN] [--folder pilot] [--out DIR] [SETUP_ID ...]
   -> <out>/{pilot_diagnostics.json, trades_shown.md, skips.md, volume_examples.md, chart_prices.json, ...}
 Runs are read from results/<folder>/<run id>/ (default pilot_m15 / pilot_m5 under results/pilot). SETUP_IDs are added
-to the up-to-6 filled setups shown in volume_examples.md (AMENDMENT A1, R41).
+to the up-to-6 filled setups shown in volume_examples.md (AMENDMENT A1, R41; AMENDMENT B: the filter applies to the
+identifying FVG only, the confirmation-FVG ratio is informational).
 """
 import argparse
 import json
@@ -245,13 +246,14 @@ def skips(run, folder, tf, per_reason=3):
 
 def volume_rows(setups, bars, period_s, ids=None, n=6, multiplier=2.0, lookback_hours=24):
     """Markdown table rows for both FVGs of up to n filled setups (lowest ids) plus ``ids``: middle candle, its tick
-    volume, the N-bar average, the ratio and pass/fail, all recomputed from rl_bars (logged ratio alongside)."""
+    volume, the N-bar average, the ratio and pass/fail, all recomputed from rl_bars (logged ratio alongside).
+    Pass/fail applies to the identifying FVG only; the confirmation FVG's last cell is "info" (AMENDMENT B)."""
     filled = setups[setups["reason"].isin(FILLED)].sort_values("setup_id")["setup_id"].astype(int).head(n).tolist()
     extra = [int(i) for i in (ids or []) if int(i) not in filled and (setups["setup_id"] == int(i)).any()]
     N = cf.vol_lookback_bars(period_s, lookback_hours)
     B = cf._Bars(bars, period_s)
     rows = [f"| setup | dir | reason | FVG | middle candle (bar open) | tick volume | average of previous {N} bars | "
-            f"ratio | logged ratio | >= {multiplier:g}x |", "|---|---|---|---|---|---|---|---|---|---|"]
+            f"ratio | logged ratio | identifying FVG >= {multiplier:g}x |", "|---|---|---|---|---|---|---|---|---|---|"]
     for sid in filled + extra:
         r = setups[setups["setup_id"] == sid].iloc[0]
         for name, c1_f, logged_f in (("identifying", "idfvg_c1_time", "idfvg_vol_ratio"),
@@ -266,19 +268,21 @@ def volume_rows(setups, bars, period_s, ids=None, n=6, multiplier=2.0, lookback_
             vol = "n/a" if d["tick_volume"] is None else f"{d['tick_volume']:.0f}"
             if d["ratio"] is None:
                 rows.append(f"| {sid} | {r.dir} | {r.reason} | {name} | {_ts(d['middle_time'])} | {vol} | "
-                            f"n/a (fewer than {N} logged bars with tick volume before it) | n/a | {logged} | n/a |")
+                            f"n/a (fewer than {N} logged bars with tick volume before it) | n/a | {logged} | "
+                            f"{'info' if name == 'confirmation' else 'n/a'} |")
                 continue
-            ok = "pass" if d["ratio"] >= multiplier else "FAIL"
+            ok = "info" if name == "confirmation" else "pass" if d["ratio"] >= multiplier else "FAIL"
             rows.append(f"| {sid} | {r.dir} | {r.reason} | {name} | {_ts(d['middle_time'])} | {vol} | "
                         f"{d['average']:.2f} | {d['ratio']:.4f} | {logged} | {ok} |")
     return rows
 
 
 def volume_examples(runs, folder, ids=None, multiplier=2.0, lookback_hours=24):
-    parts = ["# Volume filter on both FVGs (R41): worked examples from rl_bars\n",
+    parts = ["# Volume filter on the identifying FVG (R41): worked examples from rl_bars\n",
              f"ratio = tick volume of the FVG's middle candle (candle 2) / mean tick volume of the N bars before it, "
-             f"N = {lookback_hours:g} h x 60 / period minutes (bars counted, closures skipped); the FVG qualifies when "
-             f"ratio >= {multiplier:g}. Averages and ratios are recomputed here from rl_bars; the logged ratio is the "
+             f"N = {lookback_hours:g} h x 60 / period minutes (bars counted, closures skipped); the identifying FVG "
+             f"qualifies when ratio >= {multiplier:g}. The confirmation FVG has no volume requirement (AMENDMENT B): "
+             "its ratio is shown as informational (\"info\"). Averages and ratios are recomputed here from rl_bars; the logged ratio is the "
              "EA's own rl_setups value. Up to 6 filled setups per run (lowest setup ids) plus any ids given on the "
              "command line."]
     for tf, run in runs.items():

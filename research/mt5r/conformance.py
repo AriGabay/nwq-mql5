@@ -9,11 +9,13 @@ Window convention (KTD2): windows count k = 1 from the first bar after the refer
 while k <= N. The OB look-back (R5, KTD3) inspects ImpulseWindowBars bars counted from the identifying FVG's
 candle 1 inclusive (candle 1 is bar 1 of the look-back).
 
-Volume filter (AMENDMENT A1, R41): an FVG (identifying or confirmation) qualifies only when its middle candle m has
+Volume filter (AMENDMENT A1, R41; AMENDMENT B): an identifying FVG qualifies only when its middle candle m has
 tick_volume[m] / mean(tick_volume[m-N .. m-1]) >= VolumeMultiplier, N = VolumeLookbackHours*60 / period minutes,
-counted in bars. The ratio is recomputed from rl_bars only when all N prior bars are logged (warm-up history is not);
-otherwise the logged ratio is the only evidence. Bars without tick_volume (pre-amendment runs) carry no volume
-evidence, so the volume rules are not applied to them. Market closed at placement (A2, R42): a placement may follow a
+counted in bars, and the OB search considers only such FVGs. The confirmation FVG has NO volume requirement: any FVG
+(R7) after the touch confirms, and its logged cfvg_vol_ratio is informational (only checked for consistency with the
+recomputed ratio, never against the threshold). Ratios are recomputed from rl_bars only when all N prior bars are
+logged (warm-up history is not); otherwise the logged ratio is the only evidence. Bars without tick_volume
+(pre-amendment runs) carry no volume evidence, so the volume rules are not applied to them. Market closed at placement (A2, R42): a placement may follow a
 TRADE_RETCODE_MARKET_CLOSED refusal (market_closed_first_msc) on a later tick inside the order window.
 """
 from __future__ import annotations
@@ -236,9 +238,8 @@ def _is_excused(used, d, sid, B, c1):
 
 def _simulate(B, sign, d, sid, ob_low, ob_high, act, prm, used):
     """Independent replay of the pre-placement stages (KTD2 order: close-beyond check before touch/confirmation).
-    A confirmation FVG must also pass the volume filter; an FVG whose ratio cannot be recomputed ends the replay."""
+    Any FVG (R7) confirms; the confirmation FVG has no volume requirement (AMENDMENT B)."""
     edge = ob_high if sign > 0 else ob_low
-    N, k_vol = _vol_n(prm, B.P), float(prm["VolumeMultiplier"])
     tch = None
     for k in range(1, int(prm["ObMaxAgeBars"]) + 1):
         j = act + k
@@ -258,11 +259,7 @@ def _simulate(B, sign, d, sid, ob_low, ob_high, act, prm, used):
         if B.beyond(j, sign, ob_low, ob_high):
             return "invalidated_touched", tch, j
         if k >= 2 and B.is_fvg(j - 2, sign) and not _is_excused(used, d, sid, B, j - 2):
-            ok = B.vol_pass(j - 1, N, k_vol)
-            if ok is None:
-                return "incomplete", tch, None
-            if ok:
-                return "confirmed", tch, j
+            return "confirmed", tch, j
     return "cancelled_no_fvg", tch, tch + int(prm["FvgWindowBars"])
 
 
@@ -402,18 +399,16 @@ def _check_row(r, sid, B, prm, tol, used, ob_count, add):
         else:
             if cc3 - tch > int(prm["FvgWindowBars"]):
                 add("cfvg_window", f"confirmation c3 k={cc3 - tch} > FvgWindowBars={prm['FvgWindowBars']}")
-            _check_volume(r, B, prm, "cfvg_vol_ratio", cc1 + 1, "cfvg_volume", add)
+            _check_volume(r, B, prm, "cfvg_vol_ratio", cc1 + 1, None, add)   # informational (AMENDMENT B)
             if not B.is_fvg(cc1, sign):
                 add("cfvg_r7", f"bars {B.t[cc1]}..{B.t[cc3]} do not form a qualifying FVG")
             else:
                 lo, hi = B.fvg_zone(cc1, sign)
                 if not (eq(_flt(r, "cfvg_low"), lo) and eq(_flt(r, "cfvg_high"), hi)):
                     add("cfvg_zone", f"row {_flt(r, 'cfvg_low')}-{_flt(r, 'cfvg_high')} vs bars {lo:.5f}-{hi:.5f}")
-            N, k_vol = _vol_n(prm, P), float(prm["VolumeMultiplier"])
-            for j in range(tch, cc1):   # only volume-passing FVGs count; an unverifiable ratio is not flagged
+            for j in range(tch, cc1):   # every FVG counts, whatever its volume (AMENDMENT B)
                 if (j + 2 - tch <= int(prm["FvgWindowBars"]) and j + 2 - tch >= 2 and B.is_fvg(j, sign)
-                        and not _is_excused(used, d, _int(r, "setup_id"), B, j)
-                        and B.vol_pass(j + 1, N, k_vol) is True):
+                        and not _is_excused(used, d, _int(r, "setup_id"), B, j)):
                     add("cfvg_not_first", f"FVG {B.t[j]}..{B.t[j + 2]} qualified earlier")
                     break
 
@@ -560,18 +555,21 @@ def _check_row(r, sid, B, prm, tol, used, ob_count, add):
 
 
 def _check_volume(r, B, prm, field, m, rule, add):
-    """R41 on one FVG: the recomputed (when all N prior bars are logged) and the logged middle-candle ratio must be
-    >= VolumeMultiplier, and the two must agree."""
+    """R41 on one FVG. With a ``rule`` (the identifying FVG) the recomputed (when all N prior bars are logged) and the
+    logged middle-candle ratio must be >= VolumeMultiplier. Without one (the confirmation FVG, AMENDMENT B) the ratio
+    is informational: no threshold, and an empty value is flagged only when the ratio is recomputable. Either way a
+    logged ratio must agree with the recomputed one."""
     k = float(prm["VolumeMultiplier"])
     rec = B.vol_ratio(m, _vol_n(prm, B.P)) if m is not None else None
     logged = _flt(r, field)
-    if rec is not None and rec < k:
-        add(rule, f"middle-candle tick volume ratio {rec:.4f} < VolumeMultiplier {k:g} (recomputed from rl_bars)")
-    elif logged is not None and logged < k:
-        add(rule, f"logged {field}={logged} < VolumeMultiplier {k:g}")
+    if rule is not None:
+        if rec is not None and rec < k:
+            add(rule, f"middle-candle tick volume ratio {rec:.4f} < VolumeMultiplier {k:g} (recomputed from rl_bars)")
+        elif logged is not None and logged < k:
+            add(rule, f"logged {field}={logged} < VolumeMultiplier {k:g}")
     if rec is not None and logged is not None and abs(logged - rec) > max(VOL_RATIO_RTOL * abs(rec), VOL_RATIO_ROUND):
         add("vol_ratio_mismatch", f"logged {field}={logged} vs recomputed {rec:.4f}")
-    if logged is None and B.has_vol and field in r:
+    if logged is None and B.has_vol and field in r and (rule is not None or rec is not None):
         add("vol_ratio_missing", f"{field} empty for a reached FVG")
 
 

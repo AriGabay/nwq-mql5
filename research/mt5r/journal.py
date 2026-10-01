@@ -5,7 +5,7 @@ import re
 from .textio import read_text
 
 REDACT_ACCT = re.compile(r"(?<![\d.])\d{7,8}(?![\d.])")
-FUNNEL_RE = re.compile(r"Funnel:((?:[ \t]+\w+=-?\d+)+)")   # EA OnDeinit line (interface contract)
+FUNNEL_RE = re.compile(r"Funnel:((?:[ \t]+\w+=-?\d+)+)")   # EA OnDeinit lines (interface contract, AMENDMENT B)
 FUNNEL_KV = re.compile(r"(\w+)=(-?\d+)")
 REDACT_IP = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b")
 
@@ -42,9 +42,10 @@ def facts(text: str) -> dict:
     m = re.search(r"final balance ([\d.]+)", text)
     if m:
         out["final_balance"] = float(m.group(1))
-    lines = FUNNEL_RE.findall(text)
-    if lines:
-        out["funnel"] = {k: int(v) for k, v in FUNNEL_KV.findall(lines[-1])}
+    # The EA prints the funnel over several "Funnel:" lines (MT5's journal truncates long lines): merge them all,
+    # later keys overriding earlier ones. run_facts() passes only the last test's text.
+    for line in FUNNEL_RE.findall(text):
+        out["funnel"].update({k: int(v) for k, v in FUNNEL_KV.findall(line)})
     return out
 
 

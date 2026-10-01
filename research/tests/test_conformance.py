@@ -8,6 +8,7 @@ Fixture bars (fixtures/ob_fvg/rl_bars.csv, M15, bar i opens at T0 + 900*i):
 tick_volume: 100/110/120 repeating, with spikes on the four FVG middle candles (long idFVG 4, long cFVG 10, short
 idFVG 22, short cFVG 28). PARAMS use VolumeLookbackHours=1, i.e. a 4-bar look-back on M15, so every fixture FVG
 ratio is recomputable from rl_bars (AMENDMENT A1); the logged ratios in the setup CSVs match those recomputations.
+AMENDMENT B: only the identifying FVG must pass the volume filter; the confirmation FVG's ratio is informational.
 """
 import pathlib
 
@@ -135,11 +136,11 @@ def test_reason_inconsistent_with_bars(setups, bars):
 def test_confirmation_must_be_first_qualifying_fvg(setups, bars):
     b = bars.copy()
     b.loc[10, "low"] = 2003.10  # FVG 8..10 now qualifies (2003.10 > bar 8 high 2003.00): earlier than 9..11
-    b.loc[9, "tick_volume"] = 1000  # ... and its middle candle passes the volume filter
+    b.loc[9, "tick_volume"] = 1000  # a high-volume middle candle changes nothing (AMENDMENT B)
     assert "cfvg_not_first" in rules(cf.check(long_only(setups), b, P, PARAMS))
 
 
-# --- volume filter on both FVGs (AMENDMENT A1, R41) -------------------------------------------------------------
+# --- volume filter on the identifying FVG only (AMENDMENT A1, R41; AMENDMENT B) ----------------------------------
 def test_readers_accept_tick_volume_and_the_amendment_columns(setups, bars):
     assert bars["tick_volume"].tolist()[:5] == [100, 110, 120, 100, 330]
     assert setups.loc[0, "idfvg_vol_ratio"] == pytest.approx(3.0698)
@@ -160,14 +161,23 @@ def test_old_files_without_volume_columns_are_still_readable(tmp_path):
     assert cf.check(s, b, P, PARAMS) == []  # pre-amendment runs: no volume evidence, no volume violations
 
 
-def test_confirmation_fvg_failing_volume_is_flagged(setups, bars):
+def test_confirmation_fvg_with_a_low_ratio_passes(setups, bars):
     b = bars.copy()
-    b.loc[10, "tick_volume"] = 150  # cFVG 9..11 middle candle: 150 / 107.5 = 1.40 < 2.0
+    b.loc[10, "tick_volume"] = 150  # cFVG 9..11 middle candle: 150 / 107.5 = 1.40 < 2.0, informational only
     row = long_only(setups, cfvg_vol_ratio=round(150 / 107.5, 4))
-    v = rules(cf.check(row, b, P, PARAMS))
-    assert "cfvg_volume" in v and "vol_ratio_mismatch" not in v
-    # Without the confirmation every later FVG in the window fails volume too: no confirmation at all.
-    assert "reason_inconsistent" in v
+    assert cf.check(row, b, P, PARAMS) == []
+
+
+def test_low_volume_confirmation_fvg_makes_cancelled_no_fvg_inconsistent(setups, bars):
+    b = bars.copy()
+    b.loc[10, "tick_volume"] = 50  # still confirms: the EA must not have cancelled for lack of an FVG
+    later = ["cfvg_c1_time", "cfvg_c3_time", "cfvg_low", "cfvg_high", "entry", "sl", "tp", "volume",
+             "stops_level_pts", "place_time_msc", "order_ticket", "fill_time_msc", "fill_price", "position_id",
+             "exit_time_msc", "exit_price", "exit_kind", "cfvg_vol_ratio"]
+    row = long_only(setups, reason="cancelled_no_fvg", reason_time_msc=(t(7) + 12 * P + P) * 1000,
+                    place_attempts=0)
+    row.loc[0, later] = float("nan")
+    assert "reason_inconsistent" in rules(cf.check(row, b, P, PARAMS))
 
 
 def test_identifying_fvg_failing_volume_is_flagged(setups, bars):
@@ -181,13 +191,14 @@ def test_logged_ratio_below_multiplier_is_flagged_without_enough_history(setups,
     # Default 24 h look-back (96 bars) cannot be recomputed from 36 logged bars; the logged ratio still has to pass.
     params = {**PARAMS, "VolumeLookbackHours": 24}
     assert cf.check(long_only(setups), bars, P, params) == []
-    assert rules(cf.check(long_only(setups, cfvg_vol_ratio=1.5), bars, P, params)) == {"cfvg_volume"}
+    assert rules(cf.check(long_only(setups, idfvg_vol_ratio=1.5), bars, P, params)) == {"idfvg_volume"}
+    assert cf.check(long_only(setups, cfvg_vol_ratio=1.5), bars, P, params) == []  # informational (AMENDMENT B)
 
 
-def test_earlier_fvg_failing_volume_does_not_break_first_fvg_rule(setups, bars):
+def test_earlier_low_volume_fvg_breaks_first_fvg_rule(setups, bars):
     b = bars.copy()
-    b.loc[10, "low"] = 2003.10  # FVG 8..10 forms by price, but its middle candle 9 has 100 / 112.5 = 0.89
-    assert cf.check(long_only(setups), b, P, PARAMS) == []
+    b.loc[10, "low"] = 2003.10  # FVG 8..10 forms by price; its middle candle 9 has 100 / 112.5 = 0.89 (AMENDMENT B)
+    assert "cfvg_not_first" in rules(cf.check(long_only(setups), b, P, PARAMS))
 
 
 def test_logged_ratio_mismatch_is_flagged(setups, bars):

@@ -4,7 +4,8 @@ Candlesticks are drawn with plain matplotlib (no mplfinance). Bars sit at their 
 weekend gaps do not stretch the chart; tick labels carry the bar open time (server time). Labels are English; the
 report around the charts is Hebrew. AMENDMENT A1: the title and table carry the identifying-FVG and confirmation-FVG
 middle-candle tick-volume ratios, and a tick-volume panel under the price panel highlights both middle candles when
-rl_bars has tick_volume.
+rl_bars has tick_volume. AMENDMENT B: only the identifying FVG must pass the volume filter; the confirmation-FVG ratio
+is shown as information ("(info)").
 """
 from __future__ import annotations
 
@@ -33,8 +34,10 @@ STAGE_LABELS = ("OB", "identifying FVG", "touch", "confirmation FVG", "placement
                 "exit")
 FILLED = {"filled", "filled_late"}
 SIDES = (("L", "long"), ("S", "short"))
+INFO = " (info)"  # AMENDMENT B: the confirmation-FVG volume ratio has no threshold
+CFVG_RATIO_COLUMN = "cFVG vol ratio" + INFO
 TABLE_COLUMNS = ["setup", "category", "dir", "OB", "identifying FVG", "activation", "touch", "confirmation FVG",
-                 "idFVG vol ratio", "cFVG vol ratio", "placement", "fill", "exit", "intended entry", "fill price", "SL", "TP", "planned RR",
+                 "idFVG vol ratio", CFVG_RATIO_COLUMN, "placement", "fill", "exit", "intended entry", "fill price", "SL", "TP", "planned RR",
                  "realized R", "net after costs (USD)", "reason"]
 RUN_CONSTANTS = pathlib.Path(__file__).resolve().parents[1] / "run_constants.json"
 VOLUME_LOOKBACK_HOURS = 24  # EA default (R41); used only when a setup row has no logged ratio
@@ -264,7 +267,8 @@ def draw_setup(ax, row, bars: pd.DataFrame, period_seconds: int, net=None, categ
     if entry is not None:
         parts.append(f"entry {entry:.2f} vs fill {fp:.2f}" if fp is not None else f"entry {entry:.2f}, not filled")
     id_r, c_r = fvg_vol_ratios(row, bars, period_seconds)
-    vol_parts = [f"{name} vol {r:.2f}x" for name, r in (("idFVG", id_r), ("cFVG", c_r)) if r is not None]
+    vol_parts = [f"{name} vol {r:.2f}x{tag}" for name, r, tag in (("idFVG", id_r, ""), ("cFVG", c_r, INFO))
+                 if r is not None]
     if vol_parts:
         parts.append(", ".join(vol_parts))
     ax.set_title(" | ".join(parts), fontsize=9, color=INK, loc="left")
@@ -282,7 +286,7 @@ def draw_setup(ax, row, bars: pd.DataFrame, period_seconds: int, net=None, categ
     ax.set_ylabel("price", fontsize=7, color=MUTED)
     labels_ax = ax
     if vax is not None and np.isfinite(B.v[left:right + 1]).any():
-        _draw_volume(vax, B, left, right, ((idc1, VIOLET, "idFVG", id_r), (cc1, AQUA, "cFVG", c_r)))
+        _draw_volume(vax, B, left, right, ((idc1, VIOLET, "idFVG", id_r, ""), (cc1, AQUA, "cFVG", c_r, INFO)))
         drawn.append("tick volume")
         vax.set_xlim(left - 1, right + 6)
         vax.set_xticks(ticks)
@@ -294,11 +298,12 @@ def draw_setup(ax, row, bars: pd.DataFrame, period_seconds: int, net=None, categ
 
 
 def _draw_volume(vax, B, left, right, fvgs):
-    """Tick-volume bars; the middle candle of each FVG wears that FVG's box colour and is labelled with its ratio."""
+    """Tick-volume bars; the middle candle of each FVG wears that FVG's box colour and is labelled with its ratio
+    (plus ``tag``, e.g. " (info)" for the confirmation FVG, AMENDMENT B)."""
     colors = {}
-    for c1, color, name, ratio in fvgs:
+    for c1, color, name, ratio, tag in fvgs:
         if c1 is not None and left <= c1 + 1 <= right:
-            colors[c1 + 1] = (color, f"{name} {ratio:.2f}x" if ratio is not None else name)
+            colors[c1 + 1] = (color, f"{name} {ratio:.2f}x{tag}" if ratio is not None else name)
     for x in range(left, right + 1):
         v = B.v[x]
         if not np.isfinite(v):
@@ -376,7 +381,8 @@ def render(setups: pd.DataFrame, bars: pd.DataFrame, deals: pd.DataFrame, out_di
         "milliseconds. Net is profit + commission + swap; realized R = net / (|intended entry - SL| x volume x "
         f"contract size {size:g}). idFVG / cFVG vol ratio = tick volume of the FVG's middle candle / mean tick "
         "volume of the VolumeLookbackHours of bars before it, as logged by the EA (recomputed from the bars with "
-        f"{VOLUME_LOOKBACK_HOURS} h when not logged); the filter needs >= VolumeMultiplier (R41).",
+        f"{VOLUME_LOOKBACK_HOURS} h when not logged). The filter (>= VolumeMultiplier, R41) applies to the "
+        "identifying FVG only; the cFVG ratio is informational (AMENDMENT B).",
         "",
         "| " + " | ".join(TABLE_COLUMNS) + " |",
         "|" + "|".join("---" for _ in TABLE_COLUMNS) + "|",

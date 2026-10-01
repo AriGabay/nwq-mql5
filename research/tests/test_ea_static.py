@@ -53,7 +53,8 @@ REASON_CODES = [
     "skipped_volume", "skipped_margin", "skipped_cap", "skipped_duplicate", "expired_unfilled", "filled",
     "filled_late", "run_end_pending", "skipped_market_closed", "skipped_broker_reject",
 ]
-FUNNEL_EXTRA_KEYS = ["idfvg_rejected_volume", "cfvg_rejected_volume", "market_closed_retries"]
+FUNNEL_EXTRA_KEYS = ["idfvg_rejected_volume", "market_closed_retries"]
+FUNNEL_LINE_MAX = 180  # MT5's journal truncates long lines (AMENDMENT B)
 RESEARCH_BLOCK = re.compile(r"#ifdef RESEARCH_LOG\b(.*?)#endif", re.S)
 
 
@@ -190,7 +191,9 @@ def test_journal_lines_and_reason_codes(src):
         assert f'"{key}"' in src, key
     funnel = _function_body(_strip_comments(src), "PrintFunnel")
     for key in FUNNEL_EXTRA_KEYS:
-        assert re.search(r'KV\(\s*"' + key + r'"', funnel), key
+        assert re.search(r'(?:KV\(|FunnelAdd\(\s*line\s*,)\s*"' + key + r'"', funnel), key
+    assert "cfvg_rejected_volume" not in src and "gCntCfvgRejVol" not in src, \
+        "the confirmation FVG has no volume requirement (AMENDMENT B)"
     reasons = re.search(r"gReasons\[\]\s*=\s*\{(.*?)\}\s*;", src, re.S)
     assert reasons
     assert re.findall(r'"(\w+)"', reasons.group(1)) and \
@@ -229,11 +232,57 @@ def test_volume_filter_uses_tick_volume_and_lookback(src):
     assert "VolumeLookbackHours" in code and "VolumeMultiplier" in code
     vq = _function_body(code, "VolumeQualifies")
     assert re.search(r">=\s*VolumeMultiplier", vq), "ratio >= multiplier (not >)"
-    # applied to both the identifying and the confirmation FVG
+    # AMENDMENT B: the filter gates the identifying FVG only
     assert "VolumeQualifies" in _function_body(code, "NewCandidate")
-    assert "VolumeQualifies" in _function_body(code, "ProcessBar")
     research = "".join(RESEARCH_BLOCK.findall(src))
     assert "tick_volume" in _function_body(_strip_comments(research), "RL_WriteRunFiles")
+
+
+def test_confirmation_fvg_has_no_volume_gate(src):
+    code = _code(src)
+    bar = _function_body(code, "ProcessBar")
+    assert "VolumeQualifies" not in bar, "the confirmation FVG must not be gated by the volume filter (AMENDMENT B)"
+    assert not re.search(r"if\s*\(\s*!\s*\w*[Vv]ol\w*\s*\)", bar), "no volume-failing branch at confirmation"
+    assert re.search(r"Confirm\(\s*S\[bestL\]", bar) and re.search(r"Confirm\(\s*S\[bestS\]", bar)
+    # the middle-candle ratio is still computed for the cfvg_vol_ratio column (information only)
+    assert "VolumeRatio" in bar
+    vr = _function_body(code, "VolumeRatio")
+    assert "VolumeMultiplier" not in vr, "VolumeRatio only measures; the threshold lives in VolumeQualifies"
+    assert "VolumeRatio" in _function_body(code, "VolumeQualifies")
+
+
+def test_funnel_is_printed_on_several_short_lines(src):
+    code = _strip_comments(src)
+    m = re.search(r"#define\s+FUNNEL_LINE_MAX\s+(\d+)", code)
+    assert m and int(m.group(1)) <= FUNNEL_LINE_MAX
+    funnel = _function_body(code, "PrintFunnel")
+    add = _function_body(code, "FunnelAdd")
+    body = funnel + add
+    prints = re.findall(r"\bPrint\(([^;]*)\);", body)
+    assert len(prints) >= 2, "one Print per funnel line"
+    for arg in prints:
+        assert arg.strip() == "line", f"Print({arg}) must print the funnel line buffer"
+    inits = re.findall(r"\bline\s*=\s*([^;]+);", body)
+    assert inits and all(i.strip() == '"Funnel:"' for i in inits), "every funnel line starts with Funnel:"
+    assert "FUNNEL_LINE_MAX" in add and "StringLen" in add, "flush before a line would exceed the limit"
+    assert "KV(" not in re.sub(r"FunnelAdd\([^;]*\);", "", funnel), "every key goes through FunnelAdd"
+    # every funnel line, rendered with worst-case 7-digit counts, stays within the limit
+    keys = re.findall(r'FunnelAdd\(\s*line\s*,\s*"(\w+)"', funnel)
+    reasons = re.findall(r'"(\w+)"', re.search(r"gReasons\[\]\s*=\s*\{(.*?)\}\s*;", src, re.S).group(1))
+    if re.search(r"FunnelAdd\(\s*line\s*,\s*gReasons\[i\]", funnel):
+        keys += [r for r in reasons if r not in keys]
+    for key in ("activated", "touched", "confirmed", "placed", "filled", "filled_late", "warmup_dropped",
+                *FUNNEL_EXTRA_KEYS, *REASON_CODES):
+        assert key in keys, key
+    limit, lines, line = int(m.group(1)), [], "Funnel:"
+    for k in keys:
+        kv = f" {k}=1234567"
+        if len(line) + len(kv) > limit and line != "Funnel:":
+            lines.append(line)
+            line = "Funnel:"
+        line += kv
+    lines.append(line)
+    assert len(lines) >= 2 and all(len(x) <= FUNNEL_LINE_MAX for x in lines)
 
 
 def test_oninit_guards(src):

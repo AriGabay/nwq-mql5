@@ -49,7 +49,8 @@ def test_chart_draws_every_stage_marker_and_reason():
     title = ax.get_title(loc="left")
     assert "LONG" in title and "filled" in title and "+194.60" in title and "RR 2.00" in title
     assert "2003.80" in title  # planned vs actual fill
-    assert "idFVG vol 3.07x" in title and "cFVG vol 3.16x" in title  # AMENDMENT A1 ratios from the setup row
+    assert "idFVG vol 3.07x" in title and "cFVG vol 3.16x (info)" in title  # AMENDMENT A1 ratios from the setup row
+    assert "idFVG vol 3.07x (info)" not in title  # AMENDMENT B: only the cFVG ratio is informational
     plt.close(fig)
 
 
@@ -59,13 +60,14 @@ def test_table_has_the_fvg_volume_ratio_columns(tmp_path):
     text = pathlib.Path(out["table"]).read_text()
     header = next(line for line in text.splitlines() if line.startswith("| setup"))
     cols = [c.strip() for c in header.strip("|").split("|")]
-    assert "idFVG vol ratio" in cols and "cFVG vol ratio" in cols
+    assert "idFVG vol ratio" in cols and "cFVG vol ratio (info)" in cols
+    assert "identifying FVG only" in text  # AMENDMENT B: the filter note
     row1 = next(line for line in text.splitlines() if line.startswith("| 1 |"))
     cells = [c.strip() for c in row1.strip("|").split("|")]
-    assert cells[cols.index("idFVG vol ratio")] == "3.07" and cells[cols.index("cFVG vol ratio")] == "3.16"
+    assert cells[cols.index("idFVG vol ratio")] == "3.07" and cells[cols.index("cFVG vol ratio (info)")] == "3.16"
     row3 = next(line for line in text.splitlines() if line.startswith("| 3 |"))  # invalidated before any cFVG
     cells = [c.strip() for c in row3.strip("|").split("|")]
-    assert cells[cols.index("cFVG vol ratio")] == "-"
+    assert cells[cols.index("cFVG vol ratio (info)")] == "-"
 
 
 def test_volume_panel_highlights_both_middle_candles():
@@ -78,6 +80,8 @@ def test_volume_panel_highlights_both_middle_candles():
     assert heights[4] == 330 and heights[10] == 340  # identifying and confirmation FVG middle candles
     colors = {round(p.get_x() + p.get_width() / 2): p.get_facecolor() for p in vax.patches}
     assert colors[4] != colors[5] and colors[10] != colors[9]
+    labels = {a.get_text() for a in vax.texts}
+    assert "idFVG 3.07x" in labels and "cFVG 3.16x (info)" in labels
     plt.close(fig)
 
 

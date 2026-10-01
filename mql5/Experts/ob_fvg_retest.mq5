@@ -56,6 +56,7 @@ input string          ResearchRunTag    = "";    // tag for research CSV files (
 // R42: market-closed placement retries (TRADE_RETCODE_MARKET_CLOSED)
 #define MC_RETRY_MAX     120     // at most this many placement attempts per setup
 #define MC_RETRY_GAP_MSC 60000   // at most one attempt per 60 s of tick time
+#define FUNNEL_LINE_MAX  180     // MT5's journal truncates long lines: the funnel is split (AMENDMENT B)
 
 struct Piv
   {
@@ -94,7 +95,7 @@ struct Setup
    int      cC3;
    double   cLow;
    double   cHigh;
-   double   cVolRatio;    // middle-candle tick volume ratio (R41)
+   double   cVolRatio;    // middle-candle tick volume ratio, information only (-1 = not computable; AMENDMENT B)
    // order
    bool     priced;
    double   entry;
@@ -160,7 +161,7 @@ string   gReasons[] = {"expired_untouched", "invalidated_active", "invalidated_t
                        "skipped_broker_reject"};
 int      gReasonCnt[];
 int      gCntActivated = 0, gCntTouched = 0, gCntConfirmed = 0, gCntPlaced = 0, gCntWarmupDropped = 0;
-int      gCntIdfvgRejVol = 0, gCntCfvgRejVol = 0, gCntMcRetries = 0;   // R41 / R42 funnel keys
+int      gCntIdfvgRejVol = 0, gCntMcRetries = 0;   // R41 / R42 funnel keys
 
 //==================================================================
 // SMALL HELPERS
@@ -404,7 +405,7 @@ void RL_AddSetupRow(const Setup &s)
                 + "," + IntegerToString(s.reasonMsc)
                 + "," + (s.retestSeen ? "1" : "0")
                 + "," + DoubleToString(s.idVolRatio, 4)
-                + "," + (conf ? DoubleToString(s.cVolRatio, 4) : "")
+                + "," + ((conf && s.cVolRatio >= 0) ? DoubleToString(s.cVolRatio, 4) : "")
                 + "," + RL_L(s.mcFirstMsc, s.mcFirstMsc > 0)
                 + "," + IntegerToString(s.placeAttempts);
    int sz = ArraySize(rlSetupRows);
@@ -538,24 +539,36 @@ int ReasonCount(string code)
   }
 string KV(string key, int v) { return " " + key + "=" + IntegerToString(v); }
 
+// appends one key=value to the current funnel line; a line that would exceed FUNNEL_LINE_MAX characters is
+// printed first and a new "Funnel:" line started (MT5's journal truncates long lines; the parser merges them)
+void FunnelAdd(string &line, string key, int v)
+  {
+   string kv = KV(key, v);
+   if(StringLen(line) + StringLen(kv) > FUNNEL_LINE_MAX && line != "Funnel:")
+     {
+      Print(line);
+      line = "Funnel:";
+     }
+   line += kv;
+  }
+
 void PrintFunnel()
   {
    string line = "Funnel:";
-   line += KV("activated", gCntActivated);
-   line += KV("touched", gCntTouched);
-   line += KV("confirmed", gCntConfirmed);
-   line += KV("placed", gCntPlaced);
-   line += KV("filled", ReasonCount("filled"));
-   line += KV("filled_late", ReasonCount("filled_late"));
+   FunnelAdd(line, "activated", gCntActivated);
+   FunnelAdd(line, "touched", gCntTouched);
+   FunnelAdd(line, "confirmed", gCntConfirmed);
+   FunnelAdd(line, "placed", gCntPlaced);
+   FunnelAdd(line, "filled", ReasonCount("filled"));
+   FunnelAdd(line, "filled_late", ReasonCount("filled_late"));
    for(int i = 0; i < ArraySize(gReasons); i++)
      {
       if(gReasons[i] == "filled" || gReasons[i] == "filled_late") continue;   // already listed above
-      line += KV(gReasons[i], gReasonCnt[i]);
+      FunnelAdd(line, gReasons[i], gReasonCnt[i]);
      }
-   line += KV("warmup_dropped", gCntWarmupDropped);
-   line += KV("idfvg_rejected_volume", gCntIdfvgRejVol);
-   line += KV("cfvg_rejected_volume", gCntCfvgRejVol);
-   line += KV("market_closed_retries", gCntMcRetries);
+   FunnelAdd(line, "warmup_dropped", gCntWarmupDropped);
+   FunnelAdd(line, "idfvg_rejected_volume", gCntIdfvgRejVol);
+   FunnelAdd(line, "market_closed_retries", gCntMcRetries);
    Print(line);
   }
 
@@ -652,16 +665,25 @@ int AppendBar(const MqlRates &r)
    return n;
   }
 
-// R41: volume filter on an FVG's middle candle m. ratio = gV[m] / mean(gV[m-N .. m-1]), N = gVolN closed
-// bars counted (not wall time; warm-up bars count). Fewer than N bars before m -> does not qualify.
-bool VolumeQualifies(int m, double &ratio)
+// R41: middle-candle tick volume ratio of an FVG whose middle candle is m: gV[m] / mean(gV[m-N .. m-1]),
+// N = gVolN closed bars counted (not wall time; warm-up bars count). False (ratio 0) when fewer than N bars
+// precede m or the reference volume is zero.
+bool VolumeRatio(int m, double &ratio)
   {
    ratio = 0;
    int nb = gVolN;
    if(nb <= 0 || m < nb || m >= gBars) return false;
    long sum = gVCum[m] - gVCum[m - nb];               // bars m-nb .. m-1
-   if(sum <= 0) return false;                         // no reference volume: not qualifying
+   if(sum <= 0) return false;                         // no reference volume
    ratio = (double)gV[m] * (double)nb / (double)sum;
+   return true;
+  }
+
+// R41 filter, applied to the identifying FVG only (AMENDMENT B): ratio >= VolumeMultiplier; a ratio that cannot
+// be computed does not qualify
+bool VolumeQualifies(int m, double &ratio)
+  {
+   if(!VolumeRatio(m, ratio)) return false;
    return ratio >= VolumeMultiplier - 1e-9;           // >= (float noise tolerated), never >
   }
 
@@ -882,13 +904,14 @@ void ProcessBar(const MqlRates &r, bool live, bool canTrade)
       else if(k >= ObMaxAgeBars) Retire(S[i], "expired_untouched", closeMsc);
      }
 
-   // 4) confirmation FVG with this bar as candle 3 (R9, R16, R36); it must pass the volume filter (R41)
+   // 4) confirmation FVG with this bar as candle 3 (R9, R16, R36). No volume requirement (AMENDMENT B): the
+   //    middle-candle ratio is only recorded (cfvg_vol_ratio, -1 when it cannot be computed).
    if(n >= 2)
      {
       bool bullF = gL[n] > gH[n - 2];
       bool bearF = gH[n] < gL[n - 2];
-      double cvr = 0;
-      bool cVolOk = (bullF || bearF) ? VolumeQualifies(n - 1, cvr) : false;
+      double cvr = -1;
+      if((bullF || bearF) && !VolumeRatio(n - 1, cvr)) cvr = -1;
       int bestL = -1, bestS = -1;
       for(int i = 0; i < ArraySize(S); i++)
         {
@@ -900,17 +923,9 @@ void ProcessBar(const MqlRates &r, bool live, bool canTrade)
          if(S[i].dir == 1) { if(bestL < 0 || S[i].actSeq > S[bestL].actSeq) bestL = i; }
          else              { if(bestS < 0 || S[i].actSeq > S[bestS].actSeq) bestS = i; }
         }
-      // one confirmation FVG confirms only the most recently activated eligible OB (R16); a volume-failing
-      // FVG confirms nothing and the touched OBs keep waiting for the first passing FVG in their window
-      if(!cVolOk)
-        {
-         if(live && (bestL >= 0 || bestS >= 0)) gCntCfvgRejVol++;
-        }
-      else
-        {
-         if(bestL >= 0) Confirm(S[bestL], n, canTrade, closeMsc, cvr);
-         if(bestS >= 0) Confirm(S[bestS], n, canTrade, closeMsc, cvr);
-        }
+      // one confirmation FVG confirms only the most recently activated eligible OB (R16)
+      if(bestL >= 0) Confirm(S[bestL], n, canTrade, closeMsc, cvr);
+      if(bestS >= 0) Confirm(S[bestS], n, canTrade, closeMsc, cvr);
      }
    for(int i = 0; i < ArraySize(S); i++)
       if(S[i].state == ST_TOUCHED && n - S[i].touchBar >= FvgWindowBars)
