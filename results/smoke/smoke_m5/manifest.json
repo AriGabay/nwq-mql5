@@ -1,0 +1,22 @@
+{
+ "run_id": "smoke_m5",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "7e9d7be1c890d2a1b4eba2e41fef09eadca0f13cd33f84c774222b8da2793c18",
+ "ini_sha256": "3b633ab3262ec9051717ecfd9182783f251f13e6758bccb253b9bf32aff425de",
+ "meta": {
+  "kind": "research",
+  "role": "smoke",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 5,
+   "ResearchRunTag": "smoke_m5"
+  }
+ },
+ "started": "2026-10-01T16:21:46",
+ "status": "ok",
+ "seconds": 14.0,
+ "report": "smoke_m5.htm",
+ "exit_code": 0
+}

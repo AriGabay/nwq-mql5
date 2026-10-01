@@ -15,3 +15,7 @@ smoke_m15_bos,2026-10-01T16:09:46,U5 conformance of FVG+BOS mode,smoke,ob_fvg_re
 equiv_delivered_m15,2026-10-01T16:09:59,U5 delivered vs research build deal equivalence,equivalence,ob_fvg_retest.ex5,M15,2026.03.01,2026.03.31,10000,ok,0.0,0,0.0,
 pilot_m5,2026-10-01T16:11:03,R20 frequency pilot,pilot,ob_fvg_retest_research.ex5,M5,2025.12.01,2026.07.31,10000,ok,-90.3,1,1.89,
 pilot_m15,2026-10-01T16:11:36,R20 frequency pilot,pilot,ob_fvg_retest_research.ex5,M15,2025.12.01,2026.07.31,10000,ok,-182.41,2,3.33,
+smoke_m15,2026-10-01T16:21:46,U5 smoke,smoke,ob_fvg_retest_research.ex5,M15,2026.03.01,2026.03.31,10000,ok,0.0,0,0.0,
+smoke_m5,2026-10-01T16:22:00,U5 smoke,smoke,ob_fvg_retest_research.ex5,M5,2026.03.01,2026.03.31,10000,ok,-98.76,1,1.4,
+pilot_m5,2026-10-01T16:22:36,R20 frequency pilot,pilot,ob_fvg_retest_research.ex5,M5,2025.12.01,2026.07.31,10000,ok,225.41,10,5.04,
+pilot_m15,2026-10-01T16:23:09,R20 frequency pilot,pilot,ob_fvg_retest_research.ex5,M15,2025.12.01,2026.07.31,10000,ok,-152.91,5,3.85,
