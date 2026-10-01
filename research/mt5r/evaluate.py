@@ -77,6 +77,22 @@ def _frequency(n: int, days: int, per_month: float) -> dict:
     return {"fills": int(n), "days": int(days), "fills_per_month": _f(n / days * per_month if days else 0.0)}
 
 
+def trial_sharpe_variance(scored_grid_paths) -> dict:
+    """DSR cross-trial variance: per training grid, the sample variance of the Custom column (the EA's
+    OnTester daily Sharpe, one value per optimization pass) over passes with trades; averaged across grids."""
+    per_grid, passes = [], 0
+    for p in scored_grid_paths:
+        g = pd.read_csv(p)
+        x = g.loc[g["trades"] > 0, "custom"].astype(float)
+        x = x[np.isfinite(x)]
+        passes += len(x)
+        if len(x) >= 2:
+            per_grid.append(float(x.var(ddof=1)))
+    return {"var_sr": float(np.mean(per_grid)) if per_grid else float("nan"), "passes": passes,
+            "grids": len(per_grid), "source": "optimization Custom column (EA OnTester daily Sharpe) of the "
+                                              "training grids, passes with trades, variance averaged over grids"}
+
+
 def evaluate(proc: dict, base: dict, fold_rows: list, neighbors: dict, var_sr: float, holdout, prereg: dict) -> dict:
     """R29 criteria on the chained OOS (proc) and the holdout; thresholds come from the pre-registration.
 

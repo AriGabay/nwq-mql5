@@ -40,6 +40,7 @@ execution: code
 | R24, R30 | Holdout labelled non-independent; recommended `.set` unreachable | User-directed. |
 | R27 | EA measures the loss limits but does not enforce them | User-directed. |
 | R36-R40 | New | Separated FVG roles, stops-level source, fill-before-close rule, chart gate, per-trade reporting. |
+| R41, R42 | New, added at the R39 gate on 2026-10-01 | User decisions: restore the original volume-push requirement on both FVGs, and place after a market-closed refusal. Neither was chosen from pilot profit or loss. |
 
 All other IDs keep their meaning.
 
@@ -77,6 +78,8 @@ Real ticks for XAUUSD.s at Bybit-Live-4 start on 2025.11.24, about ten months of
 - **There is no independent period, so the best deliverable is a candidate plus a forward-test protocol.** Governs R30, R31. (session-settled: user-approved — chosen over issuing a recommended `.set` on non-independent evidence.)
 - **Risk model: deposit 10,000 USD, 1% risk per trade, at most 3 exposures, leverage 1:100, loss limits of 5% daily and 10% total.** Governs R14, R16, R27. (session-settled: user-approved — chosen over "1% with DD ≤ 20%" and over fixed 0.01 lots: the user wants prop-firm-style limits.)
 - **The loss limits are measured in research, not enforced by the EA.** Governs R27. (session-settled: user-approved — chosen over EA-side enforcement: this EA build is research-only.)
+- **A volume push is required on both FVGs: the middle candle's tick volume must be at least 2.0 times the average of the previous 96 M15 bars (24 hours of trading).** Governs R41. (session-settled: user-directed — chosen over no volume filter, over a filter on the identifying FVG only, and over an input that is off by default: the user's original requirement asked for a push with at least twice the 24-hour average volume; the multiplier is fixed at 2.0 rather than optimized, and the middle candle is chosen over the third candle or a three-candle sum.)
+- **After a market-closed refusal, the order is placed at the first moment it can be placed, while the setup is still valid.** Governs R42. (session-settled: user-directed — chosen over skipping the setup: the order belongs right after detection, and a closed market is a broker condition, not a strategy rule.)
 - **Broker placement limits come from the symbol at run time. There is no independent threshold.** Governs R37. (session-settled: user-directed — chosen over a fixed 0.20 USD rule: the user rejected thresholds without an explicit decision.)
 
 ---
@@ -150,6 +153,14 @@ Real ticks for XAUUSD.s at Bybit-Live-4 start on 2025.11.24, about ten months of
 
   A research-only logging build records daily equity, all deals, a per-stage funnel, and one row per setup. Each setup row holds the stage times and prices, its outcome or skip/cancel reason, and the signal-timeframe bars needed to chart it.
 - R18. Default input values are fixed in this plan (KTD12) before any data is examined. They form the baseline recorded in the original `.set`.
+- R41. An FVG qualifies only if its middle candle (candle 2) has a tick volume at least `VolumeMultiplier` (fixed at 2.0) times the average tick volume of the `VolumeLookbackHours` (24) hours of signal-timeframe bars before it. The lookback counts bars, not wall time: 96 bars on M15, 288 on M5. If fewer bars exist, the FVG does not qualify. The rule applies to both FVGs:
+  - An identifying FVG that fails it qualifies no OB.
+  - A confirmation FVG that fails it is not a confirmation FVG. The setup keeps waiting for the first qualifying one within its window (R9).
+- R42. If the broker refuses a placement because the market is closed, the setup stays confirmed and the EA retries on later ticks:
+  - at most once per 60 seconds, and at most 120 times;
+  - only while no bar has closed beyond the OB and fewer than `OrderExpiryBars` bars have passed since candle 3.
+
+  Each retry re-runs every placement check (R10, R14, R16, R37) with the original entry, SL and TP, and skips with the exact reason if a check fails. A setup never has two orders. If the window or the attempt cap runs out, the setup is skipped as `skipped_market_closed`. The setup row records the time of the first refusal and the number of attempts.
 - R36. The identifying FVG and the confirmation FVG are separate objects. The identifying FVG qualifies an OB and always completes before the touch, so it can never confirm an entry. Only a confirmation FVG (R9) can lead to an order.
 - R37. The minimum distance between an order's price, its stop, and the market is the broker's stops level, read from the symbol at each placement. The previous research's tester journal recorded "stops level 20 pts": 20 points × 0.01 = 0.20 USD. No other distance threshold exists.
 - R38. A fill that happens before a bar closes stays in the results, even if that bar later closes beyond the OB. From the fill on, only the stop loss and take profit manage the position. A fill that lands on the tick where a scheduled cancellation executes is also kept, and is counted separately.
@@ -371,7 +382,7 @@ Real ticks for XAUUSD.s at Bybit-Live-4 start on 2025.11.24, about ten months of
   - `expired_untouched`
   - `invalidated_active`, `invalidated_touched`, `invalidated_confirmed`, `invalidated_pending`
   - `cancelled_no_fvg`
-  - `skipped_price_past`, `skipped_too_close`, `skipped_sl_stops`, `skipped_volume`, `skipped_margin`, `skipped_cap`, `skipped_duplicate`
+  - `skipped_price_past`, `skipped_too_close`, `skipped_sl_stops`, `skipped_volume`, `skipped_margin`, `skipped_cap`, `skipped_duplicate`, `skipped_market_closed`, `skipped_broker_reject`
   - `expired_unfilled`
   - `filled`, `filled_late`
   - `warmup_dropped`, `run_end_pending`
@@ -379,7 +390,7 @@ Real ticks for XAUUSD.s at Bybit-Live-4 start on 2025.11.24, about ten months of
   The codes appear in the setup rows and the funnel line. Governs R17, R39.
 - KTD8. **Research logging.**
   - The `rl_days` and `rl_deals` CSV schemas and the `OnTester` daily-Sharpe return are kept byte-compatible, so `reports.py` and `evaluate.py` parse them unchanged.
-  - New files are `rl_setups_<tag>.csv`, with one row per setup (stage times, prices, reason code, order and position ids), and `rl_bars_<tag>.csv`, with closed signal-timeframe OHLC for charting.
+  - New files are `rl_setups_<tag>.csv`, with one row per setup (stage times, prices, reason code, order and position ids, both FVG volume ratios, first market-closed refusal and placement attempts), and `rl_bars_<tag>.csv`, with closed signal-timeframe OHLC and tick volume for charting and the R41 re-check.
   - Setup stage times are recorded in milliseconds: placement from the placing tick's `time_msc` or `ORDER_TIME_SETUP_MSC`, and fill from `DEAL_TIME_MSC`. Second-resolution times cannot order placement against candle 3's close.
   - The `OnInit` print keeps the substrings "Warm-up bars", "tick" and "stops level" that `journal.facts` parses.
   - A `Funnel:` summary line is printed in `OnDeinit`.
@@ -410,6 +421,8 @@ Real ticks for XAUUSD.s at Bybit-Live-4 start on 2025.11.24, about ten months of
   | `ImpulseWindowBars` | 2 | fixed |
   | `SwingStrength` | 3 | fixed |
   | `StopBufferPoints` | 10 (0.10 USD) | fixed |
+  | `VolumeMultiplier` | 2.0 | fixed (R41) |
+  | `VolumeLookbackHours` | 24 | fixed (R41) |
   | `RiskRR` | 2.0 | fixed |
   | `RiskPercent` | 1.0 | fixed |
   | `MaxExposures` | 3 | fixed |
@@ -417,7 +430,7 @@ Real ticks for XAUUSD.s at Bybit-Live-4 start on 2025.11.24, about ten months of
   - The grid is 216 passes per fold, in one arithmetic optimization.
   - Folds are 3-month train and 1-month OOS, rolling, with OOS Mar-Jul 2026 (5 folds). The final selection uses train 2026.05.01-07.31.
   - A pass is eligible when its train fills are at least 15 × train months (45) and its equity drawdown is at most 10%. Score is the recovery factor, smoothed over ordinal neighbours within the same categorical cell. If no pass is eligible, the defaults are used with status `no_eligible_pass`.
-  - DSR trials are 216 × 5 plus the pilot runs.
+  - DSR trials are 216 × 5 plus the pilot runs. The cross-trial Sharpe variance comes from the optimization's Custom column, which is the EA's `OnTester` daily Sharpe for each pass. It is the variance over passes with trades in each training grid, averaged across grids.
   - Thresholds:
 
     | Criterion | Threshold |

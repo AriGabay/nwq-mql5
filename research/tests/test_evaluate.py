@@ -148,3 +148,16 @@ def test_never_recommended_even_when_all_pass():
     out = run(stitched(60, profit=10.0), holdout=stitched(30, "2026-08-01", 60))
     assert out["recommended"] is False
     assert "R30" in out["recommended_note"]
+
+
+def test_trial_sharpe_variance_uses_custom_column_of_passes_with_trades(tmp_path):
+    import pandas as pd
+    from mt5r import evaluate
+    a = tmp_path / "f1.csv"
+    b = tmp_path / "f2.csv"
+    pd.DataFrame({"custom": [0.1, 0.3, 9.0], "trades": [5, 7, 0]}).to_csv(a, index=False)
+    pd.DataFrame({"custom": [0.0, 0.2, 0.4], "trades": [3, 3, 3]}).to_csv(b, index=False)
+    # fold 1: var([0.1, 0.3]) = 0.02 (the 0-trade pass is ignored); fold 2: var([0, .2, .4]) = 0.04; mean 0.03
+    out = evaluate.trial_sharpe_variance([a, b])
+    assert abs(out["var_sr"] - 0.03) < 1e-12
+    assert out["passes"] == 5 and out["source"].startswith("optimization Custom")

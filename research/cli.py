@@ -435,8 +435,8 @@ def cmd_robustness(args) -> None:
                      "daily_sharpe": stats.sharpe(evaluate.daily_pnl(x["days"]).to_numpy() / x["deposit"])})
     nb = rows[1:]
     share = float(np.mean([r["net"] > 0 for r in nb])) if nb else float("nan")
-    sharpes = [r["daily_sharpe"] for r in rows if np.isfinite(r["daily_sharpe"])]
-    var_sr = float(np.var(sharpes, ddof=1)) if len(sharpes) >= 2 else float("nan")
+    tv = evaluate.trial_sharpe_variance(sorted((RESULTS / "wfo").glob("*_selection/scored_grid.csv")))
+    var_sr = tv["var_sr"]
 
     hpath = RESULTS / "holdout" / "holdout_candidate"
     holdout = evaluate.stitch([evaluate.load_run("holdout_candidate", RESULTS / "holdout")]) if hpath.exists() else None
@@ -449,8 +449,7 @@ def cmd_robustness(args) -> None:
     summ = lambda s: metrics.summary(s["trades"], s["days"], s["initial"], bar_minutes=bm)
     evaluate.save({"acceptance": acc, "passed_all": acc["passed_all"], "recommended": False,
                    "fold_rows": fold_rows, "neighbors": {"profitable_share": share, "rows": rows},
-                   "var_sr": var_sr, "var_sr_source": "sample variance of daily Sharpe over the static candidate "
-                                                      "and neighbour runs on the OOS span",
+                   "var_sr": var_sr, "var_sr_source": tv["source"], "var_sr_passes": tv["passes"],
                    "cost_stress": {w: evaluate.cost_stress(s, A["spread_stress_k"], A["stop_slippage_points"])
                                    for w, s in (("procedure", proc), ("baseline", base))},
                    "shuffle_mc": {k: v for k, v in shuffle.items() if np.ndim(v) == 0},
