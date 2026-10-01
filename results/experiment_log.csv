@@ -23,3 +23,7 @@ audit_m1ohlc_m15,2026-10-01T16:32:50,volume audit: bar tick volume from broker M
 audit_m1ohlc_m5,2026-10-01T16:33:01,volume audit: bar tick volume from broker M1 history (Model=1),volume_audit,ob_fvg_retest_research.ex5,M5,2025.12.01,2026.07.31,,ok,,,,
 smoke_m15,2026-10-02T00:41:44,U5 smoke,smoke,ob_fvg_retest_research.ex5,M15,2026.03.01,2026.03.31,10000,ok,0.0,0,0.0,
 smoke_m5,2026-10-02T00:43:30,U5 smoke,smoke,ob_fvg_retest_research.ex5,M5,2026.03.01,2026.03.31,10000,ok,-98.76,1,1.4,
+smoke_m15,2026-10-02T01:09:18,U5 smoke,smoke,ob_fvg_retest_research.ex5,M15,2026.03.01,2026.03.31,10000,ok,0.0,0,0.0,
+smoke_m5,2026-10-02T01:09:42,U5 smoke,smoke,ob_fvg_retest_research.ex5,M5,2026.03.01,2026.03.31,10000,ok,0.0,0,0.0,
+pilot_m5,2026-10-02T01:14:22,R20 frequency pilot,pilot,ob_fvg_retest_research.ex5,M5,2025.12.01,2026.07.31,10000,ok,-76.37,7,4.05,
+pilot_m15,2026-10-02T01:15:01,R20 frequency pilot,pilot,ob_fvg_retest_research.ex5,M15,2025.12.01,2026.07.31,10000,ok,-189.64,5,4.55,

@@ -6,14 +6,14 @@
  "warmup_bars": 3000,
  "stops_level_pts": 20,
  "tick": 0.01,
- "final_balance": 9901.24,
+ "final_balance": 10000.0,
  "every_tick_generation_used": false,
  "funnel": {
-  "activated": 2,
-  "touched": 2,
-  "confirmed": 1,
-  "placed": 1,
-  "filled": 1,
+  "activated": 1,
+  "touched": 1,
+  "confirmed": 0,
+  "placed": 0,
+  "filled": 0,
   "filled_late": 0,
   "expired_untouched": 0,
   "invalidated_active": 0,
@@ -33,7 +33,9 @@
   "skipped_market_closed": 0,
   "skipped_broker_reject": 0,
   "warmup_dropped": 1,
-  "idfvg_rejected_volume": 904,
+  "idfvg_rejected_volume": 903,
+  "idfvg_volume_no_history": 0,
+  "idfvg_volume_empty_window": 2,
   "market_closed_retries": 0
  }
 }

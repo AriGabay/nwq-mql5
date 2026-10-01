@@ -1,13 +1,13 @@
 {
  "run_id": "smoke_m5",
- "setups": 2,
+ "setups": 1,
  "bars": 6072,
  "violations": 0,
  "violation_rows": [],
  "occurrences": {
   "touch_bar_close_beyond": 0,
   "cfvg_c1_is_touch_bar": 0,
-  "idfvg_c1_is_ob": 1,
+  "idfvg_c1_is_ob": 0,
   "cap_skip": 0,
   "too_close_skip": 0,
   "margin_skip": 0,
@@ -16,7 +16,7 @@
   "filled_late": 0,
   "invalidated_pending": 0,
   "fill_then_close_beyond_same_bar": 0,
-  "long": 1,
+  "long": 0,
   "short": 1,
   "bos_mode": 0,
   "market_closed_retry_placed": 0,
@@ -36,11 +36,11 @@
   "discarded_minutes": 0,
   "total_minute_bars": null,
   "funnel": {
-   "activated": 2,
-   "touched": 2,
-   "confirmed": 1,
-   "placed": 1,
-   "filled": 1,
+   "activated": 1,
+   "touched": 1,
+   "confirmed": 0,
+   "placed": 0,
+   "filled": 0,
    "filled_late": 0,
    "expired_untouched": 0,
    "invalidated_active": 0,
@@ -60,7 +60,9 @@
    "skipped_market_closed": 0,
    "skipped_broker_reject": 0,
    "warmup_dropped": 1,
-   "idfvg_rejected_volume": 904,
+   "idfvg_rejected_volume": 903,
+   "idfvg_volume_no_history": 0,
+   "idfvg_volume_empty_window": 2,
    "market_closed_retries": 0
   }
  }

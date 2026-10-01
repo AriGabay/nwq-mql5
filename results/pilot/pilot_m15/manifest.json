@@ -1,22 +1,22 @@
 {
- "run_id": "smoke_m15",
+ "run_id": "pilot_m15",
  "ex5": "ob_fvg_retest_research.ex5",
  "ex5_sha256": "b17492c90487c5102473a592a580d6cbaf2eb844020d7659039fb0c3c7d47e7f",
- "ini_sha256": "19cc139a751fd71dcba98dc6c2235b444cacf258b176864f18179ab195bd93cb",
+ "ini_sha256": "14e26d62a758b701576e25dd631f1fb149c63ca5e689a6b865fd80d57e51b053",
  "meta": {
   "kind": "research",
-  "role": "smoke",
+  "role": "pilot",
   "values": {
    "RiskPercent": 1.0,
    "MaxExposures": 3,
    "RiskRR": 2.0,
    "SignalTF": 15,
-   "ResearchRunTag": "smoke_m15"
+   "ResearchRunTag": "pilot_m15"
   }
  },
- "started": "2026-10-02T01:08:55",
+ "started": "2026-10-02T01:14:25",
  "status": "ok",
- "seconds": 23.0,
- "report": "smoke_m15.htm",
+ "seconds": 36.1,
+ "report": "pilot_m15.htm",
  "exit_code": 0
 }
