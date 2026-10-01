@@ -1,0 +1,21 @@
+{
+ "run_id": "equiv_delivered_m15",
+ "ex5": "ob_fvg_retest.ex5",
+ "ex5_sha256": "a0e150f8dd8acd3773dc862dca5681d81be013a1ae87ee2c14fbf016c287b5c0",
+ "ini_sha256": "bd33fe43662279b223768655f78c59442a0f440c0b8cf57b94e8a32b81cb80db",
+ "meta": {
+  "kind": "delivered",
+  "role": "equivalence",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15
+  }
+ },
+ "started": "2026-10-01T16:09:46",
+ "status": "ok",
+ "seconds": 13.4,
+ "report": "equiv_delivered_m15.htm",
+ "exit_code": 0
+}

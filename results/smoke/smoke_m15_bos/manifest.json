@@ -1,0 +1,23 @@
+{
+ "run_id": "smoke_m15_bos",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "0c1011d88dca51d6c69cc021c57a758c0e907882e8e32d1e739a5cb6992bab33",
+ "ini_sha256": "e7b0e48d8496e3e78cba6567e27009970c5f072034f10e6ae663a14561f98929",
+ "meta": {
+  "kind": "research",
+  "role": "smoke",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15,
+   "ObMode": 1,
+   "ResearchRunTag": "smoke_m15_bos"
+  }
+ },
+ "started": "2026-10-01T16:09:12",
+ "status": "ok",
+ "seconds": 33.5,
+ "report": "smoke_m15_bos.htm",
+ "exit_code": 0
+}
