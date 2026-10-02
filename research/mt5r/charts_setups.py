@@ -40,7 +40,7 @@ TABLE_COLUMNS = ["setup", "category", "dir", "OB", "identifying FVG", "activatio
                  "idFVG vol ratio", CFVG_RATIO_COLUMN, "placement", "fill", "exit", "intended entry", "fill price", "SL", "TP", "planned RR",
                  "realized R", "net after costs (USD)", "reason"]
 RUN_CONSTANTS = pathlib.Path(__file__).resolve().parents[1] / "run_constants.json"
-VOLUME_LOOKBACK_HOURS = 24  # EA default (R41); used only when a setup row has no logged ratio
+VOLUME_LOOKBACK_HOURS = 24  # window of the informational ratios (AMENDMENT D); used only when a row has none
 
 
 def has_tick_volume(bars: pd.DataFrame) -> bool:
@@ -380,9 +380,9 @@ def render(setups: pd.DataFrame, bars: pd.DataFrame, deals: pd.DataFrame, out_di
         "server time; for the two FVG columns this is candle 3. placement, fill and exit are tick times with "
         "milliseconds. Net is profit + commission + swap; realized R = net / (|intended entry - SL| x volume x "
         f"contract size {size:g}). idFVG / cFVG vol ratio = tick volume of the FVG's middle candle / mean tick "
-        "volume of the bars opening in the VolumeLookbackHours wall-clock hours before it, as logged by the EA (recomputed from the bars with "
-        f"{VOLUME_LOOKBACK_HOURS} h when not logged). The filter (>= VolumeMultiplier, R41) applies to the "
-        "identifying FVG only; the cFVG ratio is informational (AMENDMENT B).",
+        "volume of the bars opening in the 24 wall-clock hours before it, as logged by the EA (recomputed from the bars "
+        f"with {VOLUME_LOOKBACK_HOURS} h when not logged). There is no volume filter (AMENDMENT D): both ratios are "
+        "informational.",
         "",
         "| " + " | ".join(TABLE_COLUMNS) + " |",
         "|" + "|".join("---" for _ in TABLE_COLUMNS) + "|",

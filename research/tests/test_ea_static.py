@@ -22,8 +22,6 @@ CONTRACT_INPUTS = [
     ("int", "ImpulseWindowBars", "2"),
     ("int", "BosWindowBars", "6"),
     ("int", "SwingStrength", "3"),
-    ("double", "VolumeMultiplier", "2.0"),
-    ("int", "VolumeLookbackHours", "24"),
     ("int", "ObMaxAgeBars", "96"),
     ("int", "FvgWindowBars", "12"),
     ("int", "OrderExpiryBars", "12"),
@@ -53,8 +51,7 @@ REASON_CODES = [
     "skipped_volume", "skipped_margin", "skipped_cap", "skipped_duplicate", "expired_unfilled", "filled",
     "filled_late", "run_end_pending", "skipped_market_closed", "skipped_broker_reject",
 ]
-FUNNEL_EXTRA_KEYS = ["idfvg_rejected_volume", "idfvg_volume_no_history", "idfvg_volume_empty_window",
-                     "market_closed_retries"]  # AMENDMENT C: unjudged identifying FVGs counted apart
+FUNNEL_EXTRA_KEYS = ["market_closed_retries"]  # AMENDMENT D: no volume filter, so no volume funnel keys
 FUNNEL_LINE_MAX = 180  # MT5's journal truncates long lines (AMENDMENT B)
 RESEARCH_BLOCK = re.compile(r"#ifdef RESEARCH_LOG\b(.*?)#endif", re.S)
 
@@ -227,50 +224,34 @@ def test_market_closed_retry_has_cap_and_throttle(src):
         re.search(r'"skipped_market_closed"', bar)
 
 
-def test_volume_filter_uses_tick_volume_and_lookback(src):
+def test_no_volume_filter_anywhere(src):
+    """AMENDMENT D (2026-10-02): R41 is removed from identification and entry. No volume input, no threshold, no
+    volume branch in NewCandidate or ProcessBar, no volume funnel key; the 2.0x version lives in the archive."""
     code = _strip_comments(src)
-    assert "tick_volume" in _function_body(code, "ProcessBar") or "tick_volume" in _function_body(code, "AppendBar")
-    assert "VolumeLookbackHours" in code and "VolumeMultiplier" in code
-    vq = _function_body(code, "VolumeQualifies")
-    assert re.search(r">=\s*VolumeMultiplier", vq), "ratio >= multiplier (not >)"
-    # AMENDMENT B: the filter gates the identifying FVG only
-    assert "VolumeQualifies" in _function_body(code, "NewCandidate")
+    for gone in ("VolumeMultiplier", "VolumeLookbackHours", "VolumeQualifies", "CountVolumeReject",
+                 "idfvg_rejected_volume", "idfvg_volume_no_history", "idfvg_volume_empty_window",
+                 "gCntIdfvgRejVol", "gCntIdfvgVolNoHist", "gCntIdfvgVolEmpty"):
+        assert not re.search(r"\b" + gone + r"\b", code), gone
+    for fn in ("NewCandidate", "ProcessBar"):
+        body = _function_body(code, fn)
+        assert not re.search(r"if\s*\(\s*!\s*\w*[Vv]ol\w*", body), f"no volume-failing branch in {fn}"
+    nc = _function_body(code, "NewCandidate")
+    assert "MarkObUsed" in nc and not re.search(r"if\s*\(\s*\w*[Vv]ol\w*\s*\)\s*MarkObUsed", nc), \
+        "the OB candle is consumed regardless of volume"
+
+
+def test_volume_ratios_are_logged_for_information_only(src):
+    """Both FVG middle-candle ratios are still written to rl_setups (idfvg_vol_ratio, cfvg_vol_ratio) over the
+    AMENDMENT C wall-clock window of 24 h; they decide nothing."""
+    code = _strip_comments(src)
+    assert re.search(r"#define\s+VOL_INFO_LOOKBACK_SEC\s+\(?\s*24\s*\*\s*3600\s*\)?", code)
+    vr = _function_body(code, "VolumeRatio")
+    assert "gT[m]" in vr and "VOL_INFO_LOOKBACK_SEC" in vr, "window start = push bar open - 24 h"
+    assert re.search(r"gT\[0\]\s*>\s*start", vr) and re.search(r"gVCum\[m\]\s*-\s*gVCum\[j\]", vr)
+    assert "VolumeRatio" in _function_body(code, "NewCandidate") and "VolumeRatio" in _function_body(code, "ProcessBar")
+    assert "tick_volume" in _function_body(code, "AppendBar")
     research = "".join(RESEARCH_BLOCK.findall(src))
     assert "tick_volume" in _function_body(_strip_comments(research), "RL_WriteRunFiles")
-
-
-def test_volume_average_uses_a_wall_clock_window(src):
-    """AMENDMENT C: the average covers the bars that OPEN in [open(m) - VolumeLookbackHours h, open(m)): a time
-    window, not a bar count. The push bar is excluded, nothing from before the window is pulled in, closed hours add
-    no bars, and a history that starts after the window start is a separate outcome (not a volume failure)."""
-    code = _strip_comments(src)
-    assert not re.search(r"\bgVolN\b", code), "no fixed bar count for the lookback"
-    vr = _function_body(code, "VolumeRatio")
-    assert "gT[m]" in vr and "gVolSec" in vr, "window start = open time of the push bar - lookback seconds"
-    assert re.search(r"gT\[0\]\s*>\s*start", vr), "history shortage: first loaded bar after the window start"
-    assert "VOL_NO_HISTORY" in vr and "VOL_EMPTY" in vr
-    assert re.search(r"gVCum\[m\]\s*-\s*gVCum\[j\]", vr), "sum over bars j .. m-1 (push bar m excluded)"
-    assert re.search(r"gVolSec\s*=\s*\(long\)VolumeLookbackHours\s*\*\s*3600", code)
-    first = _function_body(code, "FirstBarAtOrAfter")
-    assert "gT[" in first and "<" in first, "binary search for the first bar opening at or after the window start"
-    nc = _function_body(code, "NewCandidate")
-    assert "CountVolumeReject" in nc
-    cnt = _function_body(code, "CountVolumeReject")
-    for k in ("VOL_NO_HISTORY", "VOL_EMPTY", "gCntIdfvgRejVol", "gCntIdfvgVolNoHist", "gCntIdfvgVolEmpty"):
-        assert k in cnt
-
-
-def test_confirmation_fvg_has_no_volume_gate(src):
-    code = _code(src)
-    bar = _function_body(code, "ProcessBar")
-    assert "VolumeQualifies" not in bar, "the confirmation FVG must not be gated by the volume filter (AMENDMENT B)"
-    assert not re.search(r"if\s*\(\s*!\s*\w*[Vv]ol\w*\s*\)", bar), "no volume-failing branch at confirmation"
-    assert re.search(r"Confirm\(\s*S\[bestL\]", bar) and re.search(r"Confirm\(\s*S\[bestS\]", bar)
-    # the middle-candle ratio is still computed for the cfvg_vol_ratio column (information only)
-    assert "VolumeRatio" in bar
-    vr = _function_body(code, "VolumeRatio")
-    assert "VolumeMultiplier" not in vr, "VolumeRatio only measures; the threshold lives in VolumeQualifies"
-    assert "VolumeRatio" in _function_body(code, "VolumeQualifies")
 
 
 def test_funnel_is_printed_on_several_short_lines(src):

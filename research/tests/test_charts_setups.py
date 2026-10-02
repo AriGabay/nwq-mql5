@@ -61,7 +61,7 @@ def test_table_has_the_fvg_volume_ratio_columns(tmp_path):
     header = next(line for line in text.splitlines() if line.startswith("| setup"))
     cols = [c.strip() for c in header.strip("|").split("|")]
     assert "idFVG vol ratio" in cols and "cFVG vol ratio (info)" in cols
-    assert "identifying FVG only" in text  # AMENDMENT B: the filter note
+    assert "no volume filter (AMENDMENT D)" in text  # both ratios informational
     row1 = next(line for line in text.splitlines() if line.startswith("| 1 |"))
     cells = [c.strip() for c in row1.strip("|").split("|")]
     assert cells[cols.index("idFVG vol ratio")] == "3.07" and cells[cols.index("cFVG vol ratio (info)")] == "3.16"

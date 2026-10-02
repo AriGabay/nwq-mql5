@@ -9,6 +9,9 @@ Window convention (KTD2): windows count k = 1 from the first bar after the refer
 while k <= N. The OB look-back (R5, KTD3) inspects ImpulseWindowBars bars counted from the identifying FVG's
 candle 1 inclusive (candle 1 is bar 1 of the look-back).
 
+Volume (AMENDMENT D, 2026-10-02): the current EA has NO volume filter; runs without a VolumeMultiplier input are
+checked with both logged ratios informational (consistency with the recomputation only). Runs of the archived R41
+versions carry VolumeMultiplier and keep the filter check below.
 Volume filter (AMENDMENT A1, R41; AMENDMENT B): an identifying FVG qualifies only when its middle candle m has
 tick_volume[m] / mean(tick_volume of the bars opening in [open(m) - VolumeLookbackHours h, open(m))) >= VolumeMultiplier
 (AMENDMENT C: a wall-clock window, not a bar count; the push bar is excluded, nothing before the window is used, and
@@ -58,7 +61,7 @@ OCCURRENCE_BY_REASON = {"cap_skip": "skipped_cap", "too_close_skip": "skipped_to
                         "skipped_broker_reject": "skipped_broker_reject"}
 DEFAULT_PARAMS = dict(ObMode=0, EntryMode=0, ImpulseWindowBars=2, BosWindowBars=6, SwingStrength=3, ObMaxAgeBars=96,
                       FvgWindowBars=12, OrderExpiryBars=12, StopBufferPoints=10, RiskRR=2.0, point=0.01,
-                      VolumeMultiplier=2.0, VolumeLookbackHours=24)
+                      VolumeLookbackHours=24)   # no VolumeMultiplier: no volume filter (AMENDMENT D)
 VOL_RATIO_RTOL = 1e-3      # logged vs recomputed ratio, relative
 VOL_RATIO_ROUND = 0.5e-4   # the EA logs ratios with 4 decimals
 
@@ -205,7 +208,7 @@ def vol_lookback_seconds(lookback_hours) -> int:
 
 
 def _vol_s(prm):
-    return vol_lookback_seconds(prm["VolumeLookbackHours"])
+    return vol_lookback_seconds(prm.get("VolumeLookbackHours", 24))
 
 
 def fvg_volume(bars: pd.DataFrame, c1_time, period_seconds: int, lookback_hours=24):
@@ -580,7 +583,9 @@ def _check_volume(r, B, prm, field, m, rule, add):
     logged middle-candle ratio must be >= VolumeMultiplier. Without one (the confirmation FVG, AMENDMENT B) the ratio
     is informational: no threshold, and an empty value is flagged only when the ratio is recomputable. Either way a
     logged ratio must agree with the recomputed one."""
-    k = float(prm["VolumeMultiplier"])
+    k = prm.get("VolumeMultiplier")
+    rule = rule if k is not None else None            # no VolumeMultiplier input: no filter (AMENDMENT D)
+    k = None if k is None else float(k)
     rec = B.vol_ratio(m, _vol_s(prm)) if m is not None else None
     logged = _flt(r, field)
     if rule is not None:
@@ -646,7 +651,7 @@ def occurrences(setups: pd.DataFrame, bars: pd.DataFrame, period_seconds: int, p
             "market_closed_retry_placed", "idfvg_volume_checked", "cfvg_volume_checked",
             "activation_bar_touch_ignored", "ob_search_skipped_doji", "duplicate_ob_candle"]
     keys += [k for k in OCCURRENCE_BY_REASON if k not in keys]
-    L, k_vol = _vol_s(prm), float(prm["VolumeMultiplier"])
+    L, k_vol = _vol_s(prm), prm.get("VolumeMultiplier")
     occ = dict.fromkeys(keys, 0)
     records = setups.to_dict("records")
     used_obs = {}
@@ -688,7 +693,8 @@ def occurrences(setups: pd.DataFrame, bars: pd.DataFrame, period_seconds: int, p
     for (d, ob_i), id_c3 in used_obs.items():
         sign = 1 if d == "L" else -1
         for c1 in range(ob_i, min(ob_i + int(prm["ImpulseWindowBars"]), B.n - 2)):
-            if (id_c3 is None or c1 + 2 > id_c3) and B.is_fvg(c1, sign) and B.vol_pass(c1 + 1, L, k_vol) is True \
+            if (id_c3 is None or c1 + 2 > id_c3) and B.is_fvg(c1, sign) \
+                    and (k_vol is None or B.vol_pass(c1 + 1, L, float(k_vol)) is True) \
                     and _ob_search(B, c1, sign, prm["ImpulseWindowBars"]) == ob_i:
                 occ["duplicate_ob_candle"] += 1
     return {k: int(v) for k, v in occ.items()}

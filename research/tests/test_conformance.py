@@ -187,6 +187,17 @@ def test_identifying_fvg_failing_volume_is_flagged(setups, bars):
     assert rules(cf.check(row, b, P, PARAMS)) == {"idfvg_volume"}
 
 
+def test_without_volume_multiplier_the_identifying_ratio_is_informational(setups, bars):
+    """AMENDMENT D: the EA has no VolumeMultiplier input; its runs carry none, so no volume threshold applies."""
+    b = bars.copy()
+    b.loc[4, "tick_volume"] = 200  # 1.86x: a violation under R41, nothing now
+    params = {k: v for k, v in PARAMS.items() if k != "VolumeMultiplier"}
+    row = long_only(setups, idfvg_vol_ratio=round(200 / 107.5, 4))
+    assert cf.check(row, b, P, params) == []
+    assert "vol_ratio_mismatch" in rules(cf.check(long_only(setups, idfvg_vol_ratio=1.5), b, P, params))
+    assert "VolumeMultiplier" not in cf.DEFAULT_PARAMS
+
+
 def test_logged_ratio_below_multiplier_is_flagged_without_enough_history(setups, bars):
     # Default 24 h look-back (96 bars) cannot be recomputed from 36 logged bars; the logged ratio still has to pass.
     params = {**PARAMS, "VolumeLookbackHours": 24}
