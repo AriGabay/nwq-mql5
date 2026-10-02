@@ -1,0 +1,6 @@
+{
+ "run_id": "optsmoke",
+ "passes": 2,
+ "integer_categorical_columns": true,
+ "merge_grids": "ok"
+}

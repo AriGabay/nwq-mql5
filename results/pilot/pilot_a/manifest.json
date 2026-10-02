@@ -1,0 +1,22 @@
+{
+ "run_id": "pilot_a",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "02a44b32bae4246d6e68f21f284851f985bd628dc7e5f51ace8ee4ada5fed666",
+ "ini_sha256": "31c29a67e85bf5285c898b7aa0917701768141d2a88535cc0f2ae0ee0a52fa5c",
+ "meta": {
+  "kind": "research",
+  "role": "pilot",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "StructureVariant": 0,
+   "ResearchRunTag": "pilot_a"
+  }
+ },
+ "started": "2026-10-03T01:23:49",
+ "status": "ok",
+ "seconds": 50.2,
+ "report": "pilot_a.htm",
+ "exit_code": 0
+}

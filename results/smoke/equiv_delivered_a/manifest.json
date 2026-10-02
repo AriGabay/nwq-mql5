@@ -1,0 +1,21 @@
+{
+ "run_id": "equiv_delivered_a",
+ "ex5": "ob_m1_structure.ex5",
+ "ex5_sha256": "5cba969a17f64e6bbbea5dc98e608d0e36c54807f4a9d72625a8d0a7c275d719",
+ "ini_sha256": "79e90dcaf35c639e8f74288a958953026d1e130c13adafb2472475c7aa97b4e4",
+ "meta": {
+  "kind": "delivered",
+  "role": "equivalence",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "StructureVariant": 0
+  }
+ },
+ "started": "2026-10-03T01:21:56",
+ "status": "ok",
+ "seconds": 21.7,
+ "report": "equiv_delivered_a.htm",
+ "exit_code": 0
+}

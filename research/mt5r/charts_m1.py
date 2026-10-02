@@ -372,9 +372,13 @@ def referenced_pivots(row, evs) -> set[int]:
     return {i for i in ids if i is not None}
 
 
+M1_AFTER_FILL_S = 3600   # the M1 panel ends at most an hour after a fill
+
+
 def windows(row, events: pd.DataFrame | None, pivots: pd.DataFrame | None) -> dict:
     """KTD12 windows in epoch seconds (server time): m5 = (OB candle open, exit or cancellation); m1 = (earlier of
-    touch - 30 min and the earliest peak of a pivot the setup's events reference, same end)."""
+    touch - 30 min and the earliest peak of a pivot the setup's events reference, same end, but at most one hour
+    after a fill)."""
     row = dict(row)
     evs = _events_by_setup(events).get(_int(row, "setup_id"), []) if events is not None else []
     end = _end_s(row, evs)
@@ -392,7 +396,11 @@ def windows(row, events: pd.DataFrame | None, pivots: pd.DataFrame | None) -> di
                if _int(e, "ref_time") is not None]   # peak of the broken L1 / H1
     if not starts:
         starts = [(end or _int(row, "ob_time")) - TOUCH_LOOKBACK_S]
-    return {"m5": (_int(row, "ob_time"), end), "m1": (min(starts), end)}
+    m1_end = end
+    fill_ms = _int(row, "fill_msc")
+    if fill_ms is not None and end is not None and end > fill_ms // 1000 + M1_AFTER_FILL_S:
+        m1_end = fill_ms // 1000 + M1_AFTER_FILL_S       # a long-held position: the exit stays on the M5 panel
+    return {"m5": (_int(row, "ob_time"), end), "m1": (min(starts), m1_end)}
 
 
 # --- drawing ---------------------------------------------------------------------------------------------------
@@ -487,7 +495,7 @@ def draw_setup(ax5, ax1, row, run: dict, net=None, category=None, related=None) 
     evs = _events_by_setup(run.get("events")).get(sid, [])
     pivots = run.get("pivots")
     w = windows(row, run.get("events"), pivots)
-    (m5_t0, end), (m1_t0, _) = w["m5"], w["m1"]
+    (m5_t0, end), (m1_t0, m1_end) = w["m5"], w["m1"]
     if end is None or m5_t0 is None:
         raise ValueError(f"setup {sid} has no OB time or no end")
     sign = 1 if side_of(row.get("dir")) == "L" else -1
@@ -499,7 +507,7 @@ def draw_setup(ax5, ax1, row, run: dict, net=None, category=None, related=None) 
     # ---------------- M5 panel ----------------
     P5 = _Panel(run["bars_m5"], M5_SECONDS, m5_t0 - M5_PAD * M5_SECONDS, end + M5_PAD * M5_SECONDS)
     x5_end = P5.x(end)
-    ax5.axvspan(P5.x(m1_t0), x5_end, color=SHADE, alpha=0.22, zorder=0, linewidth=0)
+    ax5.axvspan(P5.x(m1_t0), P5.x(m1_end), color=SHADE, alpha=0.22, zorder=0, linewidth=0)
     ax5.text(P5.x(m1_t0), 0.98, " M1 window", transform=ax5.get_xaxis_transform(), fontsize=7, color=MUTED,
              va="top", ha="left")
     drawn.append("M1 window")
@@ -535,8 +543,9 @@ def draw_setup(ax5, ax1, row, run: dict, net=None, category=None, related=None) 
 
     # ---------------- M1 panel ----------------
     m1_lo = (m1_t0 // M1_SECONDS) * M1_SECONDS - M1_PAD * M1_SECONDS
-    P1 = _Panel(run["bars_m1"], M1_SECONDS, m1_lo, end + M1_PAD * M1_SECONDS)
-    x1_end = P1.x(end)
+    P1 = _Panel(run["bars_m1"], M1_SECONDS, m1_lo, m1_end + M1_PAD * M1_SECONDS)
+    x1_end = P1.x(m1_end)
+    exit_on_m1 = exit_ms is not None and exit_ms // 1000 <= m1_end
     _candles(ax1, P1)
     if ob_lo is not None:
         ax1.axhspan(ob_lo, ob_hi, color=BLUE, alpha=0.07, zorder=0, linewidth=0)
@@ -712,7 +721,7 @@ def draw_setup(ax5, ax1, row, run: dict, net=None, category=None, related=None) 
     # fill, SL, TP, exit
     sl, tp = _flt(row, "sl"), _flt(row, "tp")
     if fill_x is not None and fill_px is not None:
-        x_stop = P1.x(exit_ms / 1000) if exit_ms is not None else x1_end
+        x_stop = P1.x(exit_ms / 1000) if exit_on_m1 else x1_end
         for val, color, name in ((sl, RED, "SL"), (tp, GREEN, "TP")):
             if val is None:
                 continue
@@ -724,13 +733,16 @@ def draw_setup(ax5, ax1, row, run: dict, net=None, category=None, related=None) 
                  linestyle="none", zorder=10)
         _label(ax1, fill_x, fill_px, f"fill {fill_px:.2f}", dy=8 * sign, dx=-6, ha="right")
         drawn.append("fill")
-    if exit_ms is not None and exit_px is not None:
+    if exit_on_m1 and exit_px is not None:
         x = P1.x(exit_ms / 1000)
         ax1.plot([x], [exit_px], marker="X", markersize=9, color=INK, markeredgecolor=SURFACE, linestyle="none",
                  zorder=10)
         kind = _str(row, "exit_kind") or ""
         _label(ax1, x, exit_px, f"exit ({kind})" if kind else "exit", dy=10, dx=-4, ha="right")
         drawn.append("exit")
+    elif exit_ms is not None:
+        ax1.text(x1_end, 0.02, f"exit {_fmt_s(exit_ms // 1000)} on the M5 panel ", transform=ax1.get_xaxis_transform(),
+                 fontsize=7, color=MUTED, ha="right", va="bottom")
     if reason in CANCEL_REASONS:
         ax1.axvline(x1_end, color=RED, linestyle=":", linewidth=1.2, zorder=4)
         ax1.text(x1_end, 0.98, reason + " ", transform=ax1.get_xaxis_transform(), fontsize=7, color=RED,
@@ -739,7 +751,8 @@ def draw_setup(ax5, ax1, row, run: dict, net=None, category=None, related=None) 
     _style(ax1, P1, "M1 price")
     ax1.set_xlabel("bar open time (server, MM-DD HH:MM)", fontsize=7, color=MUTED)
     ax1.set_title(f"M1 - from {_fmt_s(m1_t0)} (earlier of touch - 30 min and the earliest referenced pivot) to "
-                  f"{_fmt_s(end)}; pivots: o peak, square = close of confirmation bar", fontsize=8, color=MUTED,
+                  f"{_fmt_s(m1_end)}{' (1 h after the fill)' if m1_end != end else ''}; "
+                  "pivots: o peak, square = close of confirmation bar", fontsize=8, color=MUTED,
                   loc="left")
 
     parts = [f"#{sid} variant {variant_name(row.get('variant'))} {'LONG' if long_ else 'SHORT'}"]

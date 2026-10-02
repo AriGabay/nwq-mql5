@@ -1,0 +1,92 @@
+{
+ "window": [
+  "2025.12.01",
+  "2026.07.31"
+ ],
+ "days_per_month": 30.44,
+ "target_fills_per_month": 15,
+ "rule": "M5 zone / M1 confirmation fixed; frequency reported per variant, no rule change (R28)",
+ "runs": {
+  "A": {
+   "run_id": "pilot_a",
+   "fills": 1381,
+   "days": 243,
+   "fills_per_month": 172.9944,
+   "funnel": {
+    "identified": 6717,
+    "touched": 5985,
+    "structure_changes": 5488,
+    "fvg_fixed": 4611,
+    "ready": 4611,
+    "reactions": 2186,
+    "entries": 1877,
+    "filled": 1381,
+    "cancelled_second_break": 1641,
+    "cancelled_opposing_structure": 2962,
+    "skipped_stop_crossed": 0,
+    "skipped_stops_level": 0,
+    "skipped_volume": 133,
+    "skipped_margin": 0,
+    "skipped_cap": 363,
+    "skipped_broker_reject": 0,
+    "lost_competition": 309,
+    "warmup_dropped": 666,
+    "run_end_waiting": 1,
+    "run_end_untouched": 66,
+    "market_closed_retries": 0
+   },
+   "reasons": {
+    "cancelled_opposing_structure": 2962,
+    "cancelled_second_break": 1641,
+    "filled": 1381,
+    "warmup_dropped": 666,
+    "run_end_untouched": 66,
+    "run_end_waiting": 1
+   },
+   "conformance_violations": 0
+  },
+  "B": {
+   "run_id": "pilot_b",
+   "fills": 367,
+   "days": 243,
+   "fills_per_month": 45.9732,
+   "funnel": {
+    "identified": 6717,
+    "touched": 5985,
+    "structure_changes": 7450,
+    "fvg_fixed": 6207,
+    "ready": 2000,
+    "reactions": 482,
+    "entries": 397,
+    "filled": 367,
+    "cancelled_second_break": 1745,
+    "cancelled_opposing_structure": 3872,
+    "skipped_stop_crossed": 0,
+    "skipped_stops_level": 0,
+    "skipped_volume": 4,
+    "skipped_margin": 0,
+    "skipped_cap": 26,
+    "skipped_broker_reject": 0,
+    "lost_competition": 85,
+    "warmup_dropped": 666,
+    "run_end_waiting": 1,
+    "run_end_untouched": 66,
+    "market_closed_retries": 0
+   },
+   "reasons": {
+    "cancelled_opposing_structure": 3872,
+    "cancelled_second_break": 1745,
+    "warmup_dropped": 666,
+    "filled": 367,
+    "run_end_untouched": 66,
+    "run_end_waiting": 1
+   },
+   "conformance_violations": 0
+  }
+ },
+ "shortfall": {
+  "A": false,
+  "B": false
+ },
+ "conformance_note": "1 violation per run at the pilot run: a touch tick in the final M1 bar, which never closes and is not logged (checker artefact, setup 6714). Checker fixed; re-checked: 0."
+}

@@ -1,0 +1,111 @@
+{
+ "A": {
+  "setups": 6717,
+  "fills": 1381,
+  "reasons": {
+   "cancelled_opposing_structure": 2962,
+   "cancelled_second_break": 1641,
+   "filled": 1381,
+   "warmup_dropped": 666,
+   "run_end_untouched": 66,
+   "run_end_waiting": 1
+  },
+  "skip_events": {
+   "skipped_cap": 363,
+   "lost_competition": 309,
+   "skipped_volume": 133
+  },
+  "sl_anchor": {
+   "ob": 1256,
+   "pivot": 125
+  },
+  "structure_changes_before_entry": {
+   "median": 1.0,
+   "p90": 3.0,
+   "max": 10.0
+  },
+  "fvg_lapses_before_entry": {
+   "median": 0.0,
+   "p90": 1.0
+  },
+  "entry_distance_from_ob_edge_usd": {
+   "median": 6.73,
+   "p90": 20.92,
+   "max": 53.97
+  },
+  "stop_distance_usd": {
+   "p10": 6.27,
+   "median": 13.27,
+   "p90": 31.59,
+   "max": 61.93
+  },
+  "touch_to_fill_hours": {
+   "median": 0.39,
+   "p90": 0.98,
+   "max": 51.35
+  },
+  "ob_age_at_entry_bars": {
+   "median": 9.0,
+   "p90": 77.0,
+   "max": 44525.0
+  },
+  "second_break_cancels": 1641,
+  "second_break_same_bar_as_return": 866,
+  "fills_in_stacked_groups": 105,
+  "fills_per_month": 172.9944
+ },
+ "B": {
+  "setups": 6717,
+  "fills": 367,
+  "reasons": {
+   "cancelled_opposing_structure": 3872,
+   "cancelled_second_break": 1745,
+   "warmup_dropped": 666,
+   "filled": 367,
+   "run_end_untouched": 66,
+   "run_end_waiting": 1
+  },
+  "skip_events": {
+   "lost_competition": 85,
+   "skipped_cap": 26,
+   "skipped_volume": 4
+  },
+  "sl_anchor": {
+   "ob": 367
+  },
+  "structure_changes_before_entry": {
+   "median": 2.0,
+   "p90": 5.0,
+   "max": 11.0
+  },
+  "fvg_lapses_before_entry": {
+   "median": 0.0,
+   "p90": 2.0
+  },
+  "entry_distance_from_ob_edge_usd": {
+   "median": 8.95,
+   "p90": 28.46,
+   "max": 82.51
+  },
+  "stop_distance_usd": {
+   "p10": 7.18,
+   "median": 14.99,
+   "p90": 37.92,
+   "max": 87.37
+  },
+  "touch_to_fill_hours": {
+   "median": 0.62,
+   "p90": 1.57,
+   "max": 49.66
+  },
+  "ob_age_at_entry_bars": {
+   "median": 13.0,
+   "p90": 75.4,
+   "max": 5685.0
+  },
+  "second_break_cancels": 1745,
+  "second_break_same_bar_as_return": 904,
+  "fills_in_stacked_groups": 53,
+  "fills_per_month": 45.9732
+ }
+}

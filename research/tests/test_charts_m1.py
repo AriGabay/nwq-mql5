@@ -329,3 +329,18 @@ def test_m5_window_spans_ob_to_exit_and_m1_window_follows_ktd12(tmp_path):
     assert {"OB", "identifying FVG", "touch", "M1 window", "pivots", "reference level", "HH", "HL", "entry FVG",
             "reaction", "break", "return", "fill", "SL", "TP", "exit"} <= set(info["drawn"])
     plt.close(fig)
+
+
+def test_m1_window_stops_an_hour_after_the_fill_when_the_exit_is_later(tmp_path):
+    """A position held for hours makes the M1 panel unreadable; the M1 panel then ends one hour after the fill and
+    the exit stays on the M5 panel (seen on the U7 pilot charts)."""
+    run = load_scenario(tmp_path)
+    s, ev, pv = run["setups"], run["events"], run["pivots"]
+    win = s[s.setup_id == 1].iloc[0].copy()
+    fill_s = int(win["fill_msc"]) // 1000
+    win["exit_msc"] = (fill_s + 5 * 3600) * 1000                      # exit five hours after the fill
+    ev = ev.copy()
+    ev.loc[(ev.setup_id == 1) & (ev.kind == "exit"), "tick_msc"] = (fill_s + 5 * 3600) * 1000
+    w = cm.windows(win, ev, pv)
+    assert w["m5"][1] == fill_s + 5 * 3600
+    assert w["m1"][1] == fill_s + 3600
