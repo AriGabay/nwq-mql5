@@ -31,6 +31,8 @@ execution: code
 
 ## Product Contract
 
+**Product Contract preservation:** changed: R15, AE7 — "beyond the target" removed and the short-side stop check set to Ask. The target is measured from the fill itself (R19), so it can never already be crossed. A meaning-preserving correction found in planning.
+
 ### Summary
 
 A new EA marks Order Blocks with their identifying FVG on closed M5 bars, as the approved definition already does. The first touch of an OB starts M1 monitoring. Entry needs a causal M1 structure change in the trade direction, either a higher high alone (variant A) or a higher high plus a confirmed higher low (variant B). After that it needs a new M1 FVG from that move, then a retest of that FVG with a reaction candle. The order is a Market entry after the reaction candle closes, the stop sits beyond the farther structural level, and the target is fixed at 2R. The research compares A, B and a per-fold choice between them under one frozen protocol.
@@ -95,7 +97,7 @@ That points to entry timing carrying no directional information, not to costs or
   - The reference high is the latest pivot high in the sequence that is confirmed at that bar's close.
   - The move's origin is the bar with the lowest low from the reference high's peak to the HH bar, inclusive.
   - Shorts mirror this: an LL closes below the reference low, and the origin is the highest high.
-- R11. Variant A needs only R10. Variant B also needs a confirmed HL: the first pivot low peaking after the HH bar whose low is above the origin low. Shorts mirror this with an LH. The variant is an EA input.
+- R11. Variant A needs only R10. Variant B also needs a confirmed HL: the first pivot low peaking after the HH bar, which must be above the origin low. Shorts mirror this with an LH. The variant is an EA input.
 
 **Entry FVG**
 
@@ -113,7 +115,7 @@ That points to entry timing carrying no directional information, not to costs or
   - A reaction before those points is never used retroactively.
 - R15. Entry is a Market order on the first tradeable tick after the reaction candle closes, after re-checking that the setup is still valid and within limits.
   - There is no Limit order and no fill inside the reaction candle.
-  - A setup is skipped, with a reason code, when the price at that tick is already beyond the stop or the target, or when the order fails broker stop or freeze levels, the lot step or margin.
+  - A setup is skipped, with a reason code, when its stop would already be hit at that tick (long: Bid ≤ stop; short: Ask ≥ stop), or when the order fails broker stop or freeze levels, the lot step or margin.
 - R16. One reaction candle opens at most one new trade per direction.
   - Among competing qualifying setups, the one with the latest touch time wins. Ties go to the later OB candle, then the lower setup id.
   - The others stay active under R8 and R22, and need a new reaction candle to enter.
@@ -215,7 +217,7 @@ That points to entry timing carrying no directional information, not to costs or
 - AE4. **Covers R22.** Mixing moves is forbidden. A close below an old low L0 happens during one decline, and a lower high forms later in a different swing that never closes below its own preceding low. No cancellation.
 - AE5. **Covers R14, R11.** In variant B, a candle touches the FVG and closes green above it at 10:05. The HL is confirmed at 10:07. The 10:05 candle never triggers an entry; only a qualifying candle closing after 10:07 can.
 - AE6. **Covers R16.** Two long setups from overlapping OBs, touched at 09:10 and 09:40, both qualify on the same reaction candle. Only the 09:40 setup enters. The 09:10 setup needs a later reaction candle.
-- AE7. **Covers R15, R18.** A short's reaction candle closes at Friday 23:54, and the next tradeable tick is Monday 01:00, with Bid already above the stop. The setup is skipped with a reason code, and no order is sent.
+- AE7. **Covers R15, R18.** A short's reaction candle closes at Friday 23:54, and the next tradeable tick is Monday 01:00, with Ask already above the stop. The setup is skipped with a reason code, and no order is sent.
 
 ### Success Criteria
 
@@ -253,3 +255,401 @@ That points to entry timing carrying no directional information, not to costs or
 - The failed research and its diagnostics: `deliverables/report_he.md`, `results/diagnostics/wfo_diagnostics.json`.
 - The isolated runner and its guards: `research/mt5r/runner.py`, `research/mt5r/env.py`. Run constants: `research/run_constants.json`.
 - The user's four schematic images (M5 context, M1 confirmation variants, FVG reaction entry, setup cancellation). They illustrate order and rules only, not distances, durations or parameters.
+
+---
+
+## Planning Contract
+
+### Key Technical Decisions
+
+- KTD1. **A new EA source runs on the M1 chart and reads M5 through CopyRates.** `mql5/Experts/ob_m1_structure.mq5` plus a research wrapper (`#define RESEARCH_LOG` + `#include`), as before. The tester's chart period is M1, so OnTick sees every M1 close. Orders are CTrade Market `Buy`/`Sell` with SL. No Limit or pending order exists. Positions are managed only by SL and TP (R15, R19).
+- KTD2. **Fixed processing order on every tick, mirrored by the checker.**
+  1. Sync fills and exits.
+  2. Process a newly closed M1 bar.
+  3. Process a newly closed M5 bar, which only creates candidates.
+  4. Run tick-level touch and return checks.
+  5. Run R16 competition and send queued Market entries.
+  
+  Within one M1 close, each setup runs:
+  1. pivot sequence update;
+  2. break episode (R6) and second break (R8);
+  3. R22 completion or void;
+  4. R13 lapse;
+  5. R10 event;
+  6. R12 FVG decision;
+  7. R11 HL;
+  8. R14 reaction.
+  
+  Cancellations always beat an entry on the same bar.
+- KTD3. **One global causal M1 pivot sequence, not one tracker per setup.**
+  - Setups hold pivot ids. Every decision uses the sequence as it stood at that close.
+  - Compression (R9) never rewrites a recorded event; a replaced pivot keeps its id and gets `replaced_by`.
+  - An outside bar that is a strict pivot high and a strict pivot low appends first the type opposite to the current last element, so both survive, and is logged.
+- KTD4. **The touch bar's own close is the first post-touch close.** So the touch bar can be a break, an HH or an R22 close. A pivot that peaks on or before the touch bar is pre-touch, a comparison level only, because its extreme may precede the touch tick. Origins and FVG candle 1 may predate the touch; only closes and pivots used as events must be post-touch (R5).
+- KTD5. **One live structure change per setup.**
+  - A newer R10 event, a close above a newer pivot high than the current reference, replaces the live one and is logged `sc_superseded`.
+  - A reference pivot yields at most one R10 event per setup.
+  - The HL is the first pivot low peaking after the HH bar, if it is above the origin low. In variant B, a first pivot low not above the origin low is logged `hl_failed`, and the setup waits for a new R10 event. In variant A this never ends the structure change: R18 uses the HL if one exists by entry, otherwise the latest confirmed pivot low.
+  - When R12 picks an FVG whose candle 3 closed before bar k+1, bar k+1 may itself be the reaction.
+- KTD6. **The return and break rules apply literally, bar by bar.** A later bar that wicks back into the zone and closes beyond it again is a return followed by a second break, so R8 cancels. This is shown at the chart gate. Under R14, the reaction bar may be the bar containing the return tick or any later bar, since its close comes after the return. The checker verifies this at bar level.
+- KTD7. **Entry mechanics.**
+  - The order is sized from the request price (Ask long, Bid short) and the structural SL (R18, R20).
+  - It is sent with SL and a provisional TP, and `PositionModify` sets TP to fill ± 2R (R19).
+  - The request price, fill, both distances and the attempts are logged.
+  - A `TRADE_RETCODE_MARKET_CLOSED` refusal is retried on every later tick while the setup stays valid. M1 closes in between still run R8 and R22. There is no attempt cap, consistent with R4.
+  - A skip ends nothing: it consumes that reaction candle only, and the setup keeps waiting for a new reaction candle until R8, R22 or a fill ends it (R4). A skipped R16 winner consumes the candle with no fallback to the next competitor. This applies to every skip code, including the cap (R21) and a crossed stop (AE7).
+- KTD8. **Warm-up replays 30 calendar days of M5 and M1 closed bars with trading off.**
+  - OBs identified in warm-up and still untouched carry into the live run.
+  - A setup touched during warm-up ends as `warmup_dropped`, because warm-up has no ticks, only bars.
+  - Warm-up bars are logged with a flag, so the checker rebuilds pivots and OBs from the same first bar.
+  - The 30 days are pre-registered and identical in every run. With no age limit (R4), warm-up length decides which old OBs exist, so it is fixed rather than tuned.
+- KTD9. **Per-tick work stays bounded.** The highest untouched long OB high and the lowest untouched short OB low are cached, and the OB list is scanned only when Bid crosses a cached edge. Returns are checked only for setups in a break episode.
+- KTD10. **Logs are event-shaped.** The research build writes:
+  - `rl_setups`: one row of final facts per setup;
+  - `rl_events`: setup id, kind, bar time, tick msc, price, reference id;
+  - `rl_pivots`: id, type, peak time, confirmation time, level, replaced_by;
+  - `rl_bars_m1` and `rl_bars_m5`, with the warm-up flag;
+  - `rl_days` and `rl_deals`, unchanged formats.
+  
+  Curated results keep the M1 bars gzipped. Optimization passes log only the funnel and OnTester.
+- KTD11. **The checker is an independent replay.** `research/mt5r/conformance_m1.py` rebuilds every rule from the logged bars, replaying the pivot sequence bar by bar under KTD2-KTD6, and compares the result with the event log.
+  - Touch and return are verified at minute level: the claimed tick lies in a bar whose Bid range reaches the edge, and no earlier bar qualified.
+  - Synchronization is verified by checking each M5 bar against the aggregate of its M1 bars.
+  - The old single-timeframe checker stays with the archive.
+- KTD12. **Chart examples come from real tester runs.** Each variant gets seeded categories (seed 20260930), long and short:
+  - broken-and-returned;
+  - second-break cancel;
+  - opposing-structure cancel;
+  - return-and-break in one bar (KTD6);
+  - winner;
+  - loser;
+  - stacked entries from one structure, where the R16 losers entered on later candles.
+  
+  The M5 panel spans from the OB candle to the exit or cancellation. The M1 panel spans from the earlier of 30 minutes before the touch and the earliest pivot the setup's events reference, to the exit or cancellation. The M1 window is shaded on the M5 panel.
+- KTD13. **The pipeline gains a strategy profile instead of a fork.** `research/mt5r/pipeline.py` points EA_SRC, BUILDS and the grid at the new EA. `research/mt5r/env.py` EA_SOURCES points at the new sources. The old-EA-specific CLI, pipeline constants and tests are snapshotted into the archive (R1). Shared modules stay in place, not archived. They change only where U6, U9 and U10 list them: env, curate, journal, wfo and evaluate.
+- KTD14. **The pre-registration is planned now and written only after the gate (R29).**
+  - Grid: `StructureVariant` ∈ {A=0, B=1}, the only optimized input.
+  - Selection on train: at least 15 fills per month, maximum equity drawdown 10%, score = recovery factor, ties to A (the code default and baseline).
+  - DSR trials: 2 × 5 folds plus this strategy's pilot runs.
+  - Acceptance follows the previous KTD12 set: frequency, net above 0 and above baseline, bootstrap CI, positive folds, top-2 removal, loss limits with MC, cost stress, DSR. Three changes:
+    - stability (KTD15) replaces the grid-neighbour criterion;
+    - cost stress adds 10 points of slippage on every Market entry;
+    - August–September is reported apart and is not an acceptance criterion (R31).
+  - The final candidate is selected on May–July.
+- KTD15. **Stability runs perturb one frozen constant at a time on the candidate over March–July:** N ∈ {2, 4} and buffer ∈ {10, 40} points. They are reported as the share of profitable perturbations (criterion ≥ 0.60), never used for selection (R32).
+- KTD16. **Reason codes:**
+  - final reasons: `cancelled_second_break`, `cancelled_opposing_structure`, `filled`, `run_end_waiting`, `run_end_untouched`, `warmup_dropped`;
+  - skip events, which never end a setup (KTD7): `skipped_stop_crossed`, `skipped_stops_level`, `skipped_volume`, `skipped_margin`, `skipped_cap`, `skipped_broker_reject`, `lost_competition`.
+  
+  Lifecycle events: `touch`, `break`, `return`, `sc_hh`, `sc_superseded`, `fvg_fixed`, `fvg_none`, `fvg_lapsed`, `hl`, `hl_failed`, `reaction`, `entry_attempt`.
+
+### High-Level Technical Design
+
+Setup lifecycle (long; short mirrors). "Waiting" covers every state before FILLED, where R8 and R22 apply.
+
+```mermaid
+stateDiagram-v2
+    [*] --> OB_WAIT: M5 c3 closes, OB qualifies (R3)
+    OB_WAIT --> TRACK: Bid touches OB high (R5)
+    TRACK --> SC_PENDING_FVG: M1 close above reference high (R10)
+    SC_PENDING_FVG --> TRACK: no qualifying FVG at k+1 (R12)
+    SC_PENDING_FVG --> ARMED: FVG fixed (R12)
+    ARMED --> READY: variant A, or HL confirmed above origin (R11)
+    ARMED --> TRACK: variant B hl_failed (KTD5)
+    ARMED --> TRACK: FVG lapse (R13)
+    READY --> TRACK: FVG lapse (R13)
+    READY --> ENTRY_QUEUED: reaction candle, R16 winner (R14)
+    ENTRY_QUEUED --> FILLED: Market fill, TP reset (R15, R19)
+    ENTRY_QUEUED --> READY: skip, waits for a new reaction (KTD7)
+    FILLED --> DONE: SL or TP
+    TRACK --> CANCELLED: second break (R8) or opposing sequence (R22)
+    SC_PENDING_FVG --> CANCELLED: R8 / R22
+    ARMED --> CANCELLED: R8 / R22
+    READY --> CANCELLED: R8 / R22
+```
+
+`BROKEN` is an orthogonal flag (R6/R7): it is set by a far-edge close and cleared by the return tick. While it is set, no entry is allowed; a second far-edge close after one return cancels.
+
+Per-tick order (KTD2):
+
+```mermaid
+flowchart LR
+    A[Sync fills / exits] --> B[New M1 close: pivots, R6-R8, R22, R13, R10, R12, R11, R14]
+    B --> C[New M5 close: new candidates R3]
+    C --> D[Tick: touch R5 / return R7]
+    D --> E[R16 competition, Market entries R15]
+```
+
+### Assumptions
+
+- The M1 bars of XAUUSD.s are Bid-based (SYMBOL_CHART_MODE Bid), as the M15 bars were. U7 verifies this, and KTD11's minute-level touch check depends on it.
+- CopyRates returns M1 and M5 bars from before the test start for the 30-day warm-up (KTD8). U7 verifies this on the first smoke run.
+- Tester speed with Model 4 on an M1 chart stays within hours for an 8-month run. KTD9 bounds per-tick work.
+
+### Sequencing
+
+U1 → U2 → U3 → U4 and U5 (in parallel) → U6 → U7 → **chart gate (R27)** → U8 → U9 → U10. Nothing after the gate starts without the user's approval.
+
+---
+
+## Implementation Units
+
+### U1. Archive the OB-FVG retest research
+
+- **Goal:** Move the failed M15 research out of the active tree intact (R1).
+- **Requirements:** R1, R35.
+- **Dependencies:** none.
+- **Files:**
+  - `archive/2026-10-03-ob-fvg-retest-m15/` (new, with `README.md`) holding: `mql5/Experts/ob_fvg_retest.mq5`, `mql5/Experts/ob_fvg_retest_research.mq5`, `deliverables/`, `results/` (pilot, smoke, compile, wfo, final_selection, holdout, robustness, diagnostics, code_review, gate_review, v1_before_gate_changes, acceptance.json, set_validation.json, input_checks.json, fidelity.md), `research/preregistration.json`, `docs/plans/2026-09-30-2310-feat-ob-fvg-retest-ea-plan.md`, and a `research/` snapshot of the old-EA-specific code and tests;
+  - `research/tests/` (old-EA tests move to the snapshot);
+  - `results/experiment_log.*` (stays active and continuous; a copy goes to the archive).
+- **Approach:**
+  1. Tag `archive/ob-fvg-retest-m15` at the commit before the move.
+  2. `git mv` the evidence.
+  3. Copy the research snapshot.
+  4. Move local `runs/` folders under the archive's git-ignored `runs/`.
+  5. Write the README in the style of `archive/2026-09-30-new-test-sweepob/README.md`.
+  
+  Shared tooling stays (KTD13). `mql5/Experts/ob_fvg_retest copy.mq5` is the user's file and is not touched.
+- **Patterns to follow:** `archive/2026-09-30-new-test-sweepob/`, `archive/2026-10-02-ob-fvg-volume-2x/`.
+- **Test scenarios:**
+  - The archived EA's sha256 matches the source at the tag.
+  - After the move, `python -m pytest research/tests -q` passes on the shared-tooling tests that remain.
+- **Verification:**
+  - `git status` shows renames, not deletions.
+  - The README lists every moved path and the tag.
+
+### U2. EA signal engine (M5 zone, touch/break/return, M1 structure, entry FVG, reaction, cancellation)
+
+- **Goal:** Implement R3-R14 and R22-R23 as the KTD1-KTD6 state machine.
+- **Requirements:** R3-R14, R16-R17, R22-R23. Settled decisions via their governed Rs: R4, R7, R12, R16, R22.
+- **Dependencies:** U1.
+- **Files:**
+  - `mql5/Experts/ob_m1_structure.mq5` (new);
+  - `mql5/Experts/ob_m1_structure_research.mq5` (new);
+  - `research/tests/test_ea_m1_static.py` (new).
+- **Approach:**
+  - Inputs, all with explicit enum ints because `setfile.py` parses them: `StructureVariant` (A=0 default, B=1), `ImpulseWindowBars` 2, `SwingStrengthM1` 3, `StopBufferPoints` 20, `RiskRR` 2.0, `RiskPercent` 1.0, `MaxExposures` 3, `WarmupDays` 30, `MagicNumber`, `TradeComment`.
+  - OB identification reuses the approved logic of the archived `NewCandidate`, without the BOS branch.
+  - One global pivot sequence (KTD3).
+  - The per-setup state follows the High-Level Technical Design.
+  - The edge caches follow KTD9.
+- **Execution note:** Static source tests first, as in `research/tests/test_ea_static.py`. Behaviour is proven by the U4 checker on tester output in U7.
+- **Patterns to follow:** archived `ob_fvg_retest.mq5` (NewCandidate, IsPivotHigh/Low, research blocks, funnel printing).
+- **Test scenarios:**
+  - Every enum member has an explicit int.
+  - The input list and defaults match the KTD list above.
+  - There is no `BuyLimit`, `SellLimit` or pending order, and no volume, BOS or age input.
+  - Research code sits only in `#ifdef RESEARCH_LOG` blocks.
+  - OnInit calls a state reset before warm-up.
+  - The per-tick handler calls the steps in the KTD2 order.
+  - Every KTD16 code appears in the source.
+  - Pivot confirmation requires bar p+N closed: a static check that the confirmation index is `n - SwingStrengthM1`.
+- **Verification:**
+  - Both builds compile with 0 errors and 0 warnings in the isolated MetaEditor (U7).
+  - Static tests pass.
+
+### U3. EA execution, risk and research logging
+
+- **Goal:** Implement R15 and R17-R21 entries and the KTD10 logs.
+- **Requirements:** R2, R15, R17-R21, R24, R35.
+- **Dependencies:** U2.
+- **Files:**
+  - `mql5/Experts/ob_m1_structure.mq5`;
+  - `research/tests/test_ea_m1_static.py`.
+- **Approach:**
+  - Entry mechanics follow KTD7.
+  - Sizing reuses the archived R14 code: balance × 1% / (stop distance × tick value), rounded down, skip never clamp, margin check.
+  - The cap counts open positions (R21).
+  - R16 competition orders by touch time, then OB candle time, then setup id, and logs `lost_competition`.
+  - The logs follow KTD10. OnTester returns the daily Sharpe, as before.
+  - The funnel is printed on short lines, which `journal.py` merges.
+- **Test scenarios:**
+  - Static check: `trade.Buy` and `trade.Sell` appear only in the entry routine, and each call carries an SL.
+  - TP is modified after the fill from the deal price.
+  - No clamp to the minimum volume.
+  - The `rl_setups`, `rl_events`, `rl_pivots`, `rl_bars_m1` and `rl_bars_m5` headers equal the contract.
+  - The `rl_days` and `rl_deals` headers equal the archived EA's.
+  - There is no constant stops distance: the stops level is read at entry.
+- **Verification:** U7 shows identical deals for the delivered and research builds on one month.
+
+### U4. Independent M5/M1 conformance checker
+
+- **Goal:** Re-derive every rule from the logged bars and compare with the event log (R25, KTD11).
+- **Requirements:** R5-R16, R18-R19, R22, R25.
+- **Dependencies:** U3, for the log contract.
+- **Files:**
+  - `research/mt5r/conformance_m1.py` (new);
+  - `research/tests/test_conformance_m1.py` (new);
+  - `research/tests/fixtures/m1/` (new synthetic CSVs).
+- **Approach:**
+  - Replay M1 bars from the first logged bar, including warm-up, with the KTD2 per-bar order and the KTD3 pivot sequence.
+  - Compute each setup's expected trajectory and compare it with `rl_events` and `rl_setups`.
+  - Violations use one rule name per R.
+  - An `occurrences()` count shows which cases were exercised.
+- **Execution note:** Test-first on synthetic bars built for each Acceptance Example.
+- **Test scenarios:**
+  - Covers AE1. A break bar that is also the FVG middle candle qualifies the FVG at k+1, and the claimed FVG passes. An FVG with its middle candle at k+1 is flagged `fvg_not_in_move`.
+  - Covers AE2. A wick below the OB low with a close inside is not a break; a claimed break is flagged. A later Bid-range touch counts as a return without a close inside.
+  - Covers AE3. LH then a close below L1 → `cancelled_opposing_structure` expected. Close above H2 first → no cancellation expected, and a claimed cancellation is flagged.
+  - Covers AE4. A close below an old L0 plus an LH from another swing → no cancellation expected.
+  - Covers AE5. In variant B, a reaction before the HL confirmation bar is not an entry; an entry claimed there is flagged.
+  - Covers AE6. Two setups qualify on one reaction candle; the later touch must be the winner, and the other is `lost_competition`.
+  - Covers AE7. An entry whose stop was already crossed at the first tick must log `skipped_stop_crossed`, and the setup keeps waiting.
+  - Pivot causality: an event using a pivot before its confirmation bar closed is flagged.
+  - Return-and-break within one bar (KTD6) → `cancelled_second_break` expected.
+  - An M5 OHLC that is not the aggregate of its M1 bars is flagged `tf_sync`.
+  - A touch claimed in a bar whose low does not reach the OB high, or after an earlier qualifying bar, is flagged.
+  - A TP that is not fill ± 2 × |fill − SL| is flagged. An SL anchor that is not the R18 minimum minus the buffer is flagged.
+- **Verification:**
+  - All tests pass.
+  - On the U7 tester runs the checker reports 0 violations, or each one is diagnosed as a checker artefact and fixed.
+
+### U5. M5 + M1 charts from tester output
+
+- **Goal:** Gate charts with both timeframes and all stage times (R26, KTD12).
+- **Requirements:** R26, R27.
+- **Dependencies:** U3, for the log contract.
+- **Files:**
+  - `research/mt5r/charts_m1.py` (new);
+  - `research/tests/test_charts_m1.py` (new).
+- **Approach:**
+  - Two stacked panels on a shared time axis. The M5 panel shows the OB and the identifying FVG. The M1 panel shows pivots with peak and confirmation markers, the HH/LL and HL/LH, the entry FVG, the reaction candle, the entry, SL and TP, and break and return markers.
+  - Selection uses the KTD12 categories with seed 20260930. Missing categories are listed.
+  - A markdown table gives the stage times and prices per example.
+- **Patterns to follow:** `archive/.../research/mt5r/charts_setups.py` from the U1 snapshot (palette, `draw_setup` structure).
+- **Test scenarios:**
+  - Each category picks deterministically under the seed.
+  - A category with no candidates is listed as missing.
+  - The rendered PNG exists and the table has one row per example.
+  - The M5 window spans OB candle to exit, and the M1 window follows KTD12.
+- **Verification:** Charts render on U7 pilot output and are visually checked before they are sent to the user.
+
+### U6. Pipeline and CLI for the new EA (pre-gate commands)
+
+- **Goal:** Run install, smoke, conformance, pilot and charts for the new EA through the guarded runner (R28, R35, KTD13).
+- **Requirements:** R2, R25-R28, R35.
+- **Dependencies:** U1-U5.
+- **Files:**
+  - `research/mt5r/pipeline.py`, `research/mt5r/env.py`, `research/mt5r/curate.py` (gzip of M1 bars), `research/mt5r/journal.py` (new funnel keys);
+  - `research/cli.py`;
+  - `research/run_constants.json` (strategy block: chart period M1, zone period M5, warm-up days);
+  - `research/tests/test_pipeline.py`, `research/tests/test_cli_guards.py`.
+- **Approach:**
+  - `pilot` runs both variants over December–July on M1.
+  - `charts` renders from both pilot runs.
+  - `smoke` covers a one-month window for each variant.
+  - A build-equivalence check is included.
+  - The existing guards stay: live terminal, the trade-safety check, refusing the holdout window after pre-registration, and the EA hash.
+  - Post-gate commands (`freeze-rules`, `wfo`, `freeze`, the August–September check, `robustness`, `deliver`) are adapted in U8-U10, not here.
+- **Test scenarios:**
+  - The ini for a pilot run has `Period=M1` and the new expert.
+  - `pilot_summary` has no profit fields and reports fills per month per variant.
+  - `install` refuses while the live terminal runs.
+  - Curation gzips `rl_bars_m1`, and the checker reads it back.
+- **Verification:** `python -m pytest research/tests -q` passes.
+
+### U7. Build verification, pilot and gate charts → STOP
+
+- **Goal:** Real-tester evidence for the chart gate (R27, R28).
+- **Requirements:** R2, R25-R28.
+- **Dependencies:** U6. The live terminal is closed; if it is open, ask the user and never close it.
+- **Files:** `results/smoke/`, `results/pilot/`, `results/pilot/charts/` (generated).
+- **Approach:**
+  1. `install`, which compiles both builds.
+  2. A one-month smoke run per variant, with the checker.
+  3. Delivered vs research build: identical deals.
+  4. Verify the Bid chart mode and that warm-up bars exist before the start.
+  5. The pilot, both variants, December–July.
+  6. Charts.
+  7. Commit the evidence (account-id scan first).
+  8. Send the charts with N = 3 and the 20-point buffer and the KTD6 and stacking examples. **STOP for approval.**
+- **Test scenarios:** Test expectation: none — this is an execution unit; its proof is the checker's 0 violations and the identical-deals check.
+- **Verification:**
+  - Conformance reports 0 violations on smoke and pilot.
+  - The evidence is committed.
+  - The user has the charts.
+
+### U8. Freeze rules and pre-registration (after approval)
+
+- **Goal:** A commit-frozen protocol before any optimization (R29, KTD14).
+- **Requirements:** R29.
+- **Dependencies:** U7 and the user's approval.
+- **Files:** `research/mt5r/pipeline.py` (`build_prereg` for the variant grid), `research/cli.py`, `research/preregistration.json`, `research/tests/test_pipeline.py`.
+- **Approach:**
+  - The pre-registration records the rules' EA hash, the constants (N, buffer, ImpulseWindowBars, warm-up days), the grid, the folds, the selection, the acceptance criteria (KTD14, KTD15), the trial count, the August–September window label, and any gate changes with reasons.
+  - It is committed before the WFO.
+- **Test scenarios:**
+  - The pre-registration has a grid of exactly `StructureVariant` [0, 1].
+  - The DSR trials equal 10 plus the pilot runs.
+  - August–September is not in acceptance.
+  - `freeze-rules` refuses if the pre-registration exists.
+- **Verification:** The pre-registration commit precedes the first WFO log entry.
+
+### U9. WFO, candidate freeze and August–September check (after U8)
+
+- **Goal:** R30 and R31 evidence.
+- **Requirements:** R30, R31.
+- **Dependencies:** U8.
+- **Files:** `research/cli.py`, `research/mt5r/wfo.py` (two-choice grid), `results/wfo/`, `results/final_selection/`, `deliverables/*.set`, `results/aug_sep_check/`.
+- **Approach:**
+  - Per fold, a 2-pass optimization on train selects the variant.
+  - OOS runs cover the procedure, fixed A and fixed B, with chained whole-dollar deposits (`tester_deposit`).
+  - The final selection uses May–July. The candidate, baseline and both variant `.set` files are frozen and committed.
+  - August–September runs once for the candidate and both variants, labelled "בדיקה היסטורית לא עצמאית".
+- **Test scenarios:**
+  - Selection with equal scores picks A.
+  - Folds with no eligible pass fall back to A.
+  - The August–September command refuses a second completed run.
+- **Verification:** Input-load checks (`research/verify_inputs.py`) show 0 mismatches. The checker shows 0 violations on every OOS run.
+
+### U10. Robustness, deliverables, Hebrew report, code review (after U9)
+
+- **Goal:** R32-R34.
+- **Requirements:** R32, R33, R34.
+- **Dependencies:** U9.
+- **Files:** `research/cli.py`, `research/mt5r/evaluate.py` (stability criterion, entry slippage), `research/wfo_diagnostics.py` (adapted random-entry null), `deliverables/report_he.md`, `deliverables/forward_test_protocol.md`, `results/acceptance.json`.
+- **Approach:**
+  - Run the KTD15 stability set.
+  - Cost stress adds entry slippage.
+  - MC uses shuffle and block bootstrap.
+  - DSR uses the Custom-column variance.
+  - Diagnostics as in R32.
+  - The report covers A, B and the procedure separately, and August–September apart.
+  - Code review and fixes follow, with tester re-verification that the fixed EA trades the same.
+- **Test scenarios:**
+  - The entry-slippage stress lowers net by points × volume × contract size per entry.
+  - The stability share is computed over the 4 perturbations only.
+  - `recommended.set` is never written.
+- **Verification:** `acceptance.json` exists, the checker reports 0 violations on every KTD15 stability run (or each one is diagnosed as a checker artefact and fixed), the report is committed, and the review findings are applied or recorded.
+
+---
+
+## Verification Contract
+
+| Gate | Command / evidence | Applies to |
+|---|---|---|
+| Unit and static tests | `python -m pytest research/tests -q` | U1-U6, U8-U10 |
+| Compile | `python research/cli.py install`: 0 errors and 0 warnings on both builds | U2, U3, U7 |
+| Conformance | `python research/cli.py smoke`, then `pilot`: 0 checker violations | U7, U9, U10 |
+| Build equivalence | identical deals for the delivered and research builds, one month | U7 |
+| Input load | `python research/verify_inputs.py`: 0 mismatches | U9, U10 |
+| Secrets | account-id scan of new `results/` and `deliverables/` files before each commit: 0 hits | every commit |
+| Live safety | the runner refuses while the live terminal runs; nothing closes it | every tester step |
+
+## Definition of Done
+
+- **Pre-gate (this run):**
+  - U1-U7 done, and all tests pass.
+  - Both builds compile cleanly.
+  - Conformance reports 0 violations on smoke and pilot.
+  - Pilot fills per month are reported per variant.
+  - The charts and the N/buffer values are sent to the user, and work stops.
+  - Commits are local, and no abandoned experimental code remains in the diff.
+- **Post-gate (after approval):**
+  - U8-U10 done.
+  - The pre-registration is committed before the WFO.
+  - August–September ran once and was reported apart.
+  - The Hebrew report states the result or "no recommendation".
+  - Code review fixes are applied or recorded.
+  - There is no `recommended.set`.
