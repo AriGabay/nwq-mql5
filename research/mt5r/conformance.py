@@ -543,7 +543,8 @@ def _check_row(r, sid, B, prm, tol, used, ob_count, add):
 
     if cc3 is None or rank is None or rank < 4:
         return
-    beyond_p = _first_beyond(B, cc3 + 1, cc3 + n_exp, sign, ob_low, ob_high)
+    # KTD2 step 1: on the last window bar (k = OrderExpiryBars) the window count wins over a close beyond the OB
+    beyond_p = _first_beyond(B, cc3 + 1, cc3 + n_exp - 1, sign, ob_low, ob_high)
     window_done = cc3 + n_exp < B.n
     trig = beyond_p if beyond_p is not None else (cc3 + n_exp if window_done else None)
     trig_ms = B.close_ms(trig) if trig is not None else math.inf

@@ -254,3 +254,8 @@ def test_help_lists_subcommands():
     for name in ["install", "smoke", "optsmoke", "pilot", "charts", "conformance", "freeze-rules", "wfo", "freeze",
                  "holdout", "robustness", "deliver"]:
         assert name in out, name
+
+
+def test_chained_deposit_is_what_the_tester_uses():
+    """MT5 truncates a fractional Deposit (9873.96 ran as 9873.00): chain on the truncated value (code review)."""
+    assert cli.tester_deposit(9873.96) == 9873 and cli.tester_deposit(10000.0) == 10000

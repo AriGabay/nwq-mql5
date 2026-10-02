@@ -297,3 +297,26 @@ def test_oninit_guards(src):
     assert "CopyRates" in init
     for bad in (".BuyLimit(", ".SellLimit(", ".OrderDelete("):
         assert bad not in init, "OnInit must have no trading side effects"
+
+
+def test_oninit_starts_from_a_clean_state(src):
+    """MT5 calls OnDeinit then OnInit without reloading the EA on an input or symbol change, so globals keep their
+    values: OnInit must reset every piece of signal state before the warm-up replay (code review 2026-10-02)."""
+    code = _strip_comments(src)
+    init = _function_body(code, "OnInit")
+    assert "ResetState()" in init and init.index("ResetState()") < init.index("CopyRates")
+    reset = _function_body(code, "ResetState")
+    for name in ("gO", "gH", "gL", "gC", "gT", "gV", "gVCum", "gPH", "gPL", "gUsedOb", "S"):
+        assert re.search(r"ArrayResize\(\s*" + name + r"\s*,\s*0\s*\)", reset), name
+    for name in ("gBars", "gLastTime", "gActSeq", "gCntActivated", "gCntTouched", "gCntConfirmed", "gCntPlaced",
+                 "gCntWarmupDropped", "gCntMcRetries"):
+        assert re.search(name + r"\s*=\s*0\s*;", reset), name
+    assert re.search(r"gNextId\s*=\s*1\s*;", reset) and re.search(r"gOrphansDone\s*=\s*false\s*;", reset)
+
+
+def test_a_late_fill_never_sets_the_no_fill_retest_flag(src):
+    """retest_seen_no_fill describes unfilled orders: a fill on the cancellation tick (filled_late) must not set
+    it (code review 2026-10-02)."""
+    body = _function_body(_strip_comments(src), "PendingBarCheck")
+    line = next(l for l in body.splitlines() if "retestSeen = true" in l)
+    assert "!filledAfterClose" in line

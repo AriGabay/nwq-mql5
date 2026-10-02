@@ -60,3 +60,11 @@ final_grid,2026-10-02T11:52:36,final grid,train,ob_fvg_retest_research.ex5,M15,2
 final_selection,2026-10-02T11:52:36,KTD12 selection,selection,,,,,,selected,,,,"{""tag"": ""final"", ""train"": [""2026.05.01"", ""2026.07.31""], ""trade_floor"": 45, ""status"": ""selected"", ""params"": {""ObMode"": 1, ""EntryMode"": 1, ""ObMaxAgeBars"": 48, ""FvgWindowBars"": 18, ""OrderExpiryBars"": 6}, ""eligible_passes"": 43}"
 holdout_candidate,2026-10-02T11:55:57,R24 holdout (non-independent),holdout_candidate,ob_fvg_retest_research.ex5,M15,2026.08.01,2026.09.29,10000,ok,1017.18,53,8.28,
 holdout_baseline,2026-10-02T11:56:27,R24 holdout (non-independent),holdout_baseline,ob_fvg_retest_research.ex5,M15,2026.08.01,2026.09.29,10000,ok,1497.01,118,8.2,
+static_candidate,2026-10-02T11:59:19,R25 parameter stability,static_candidate,ob_fvg_retest_research.ex5,M15,2026.03.01,2026.07.31,10000,ok,-179.81,102,19.93,
+static_nb1,2026-10-02T11:59:54,R25 parameter stability,neighbor_static,ob_fvg_retest_research.ex5,M15,2026.03.01,2026.07.31,10000,ok,-351.71,109,18.49,
+static_nb2,2026-10-02T12:00:29,R25 parameter stability,neighbor_static,ob_fvg_retest_research.ex5,M15,2026.03.01,2026.07.31,10000,ok,-144.36,98,20.78,
+static_nb3,2026-10-02T12:01:05,R25 parameter stability,neighbor_static,ob_fvg_retest_research.ex5,M15,2026.03.01,2026.07.31,10000,ok,-245.2,119,17.84,
+validate_ob_fvg_retest_original,2026-10-02T12:02:22,R31 .set validation,set_validation,ob_fvg_retest.ex5,,,,,ok,,,,
+validate_ob_fvg_retest_candidate,2026-10-02T12:02:44,R31 .set validation,set_validation,ob_fvg_retest.ex5,,,,,ok,,,,
+fixcheck_research_m15,2026-10-02T12:07:55,post-research EA fixes: same deals as the frozen EA,code_review,ob_fvg_retest_research.ex5,M15,2026.03.01,2026.03.31,10000,ok,-313.77,58,11.9,
+fixcheck_delivered_m15,2026-10-02T12:08:19,post-research EA fixes: same deals as the frozen EA,code_review,ob_fvg_retest.ex5,M15,2026.03.01,2026.03.31,10000,ok,-313.77,58,11.9,

@@ -374,3 +374,17 @@ def test_run_end_pending_before_confirmation_passes(setups, bars):
                      **{k: float("nan") for k in ("fill_time_msc", "fill_price", "position_id", "exit_time_msc",
                                                   "exit_price", "exit_kind")})
     assert "reason_fields" in rules(cf.check(row2, bars[bars.time <= t(13)].reset_index(drop=True), P, PARAMS))
+
+
+def test_expiry_wins_over_a_close_beyond_on_the_last_window_bar(setups, bars):
+    """KTD2 step 1: at k = OrderExpiryBars the window count comes before the close-beyond check, as in the EA, so
+    an unfilled order whose last window bar closes beyond the OB is expired_unfilled (code review 2026-10-02)."""
+    row = long_only(setups, reason="expired_unfilled", fill_time_msc=pd.NA, fill_price=float("nan"),
+                    position_id=pd.NA, exit_time_msc=pd.NA, exit_price=float("nan"), exit_kind=pd.NA,
+                    reason_time_msc=t(14) * 1000 + 5, retest_seen_no_fill=1)
+    b = bars.copy()
+    b.loc[13, ["low", "close"]] = [1994.0, 1994.0]          # bar c3+2 = the last bar of a 2-bar window
+    prm = {**PARAMS, "OrderExpiryBars": 2}
+    assert cf.check(row, b, P, prm) == []
+    row.loc[0, "reason"] = "invalidated_pending"
+    assert "reason_inconsistent" in rules(cf.check(row, b, P, prm))

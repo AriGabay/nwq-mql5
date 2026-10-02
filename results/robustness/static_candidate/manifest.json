@@ -1,0 +1,27 @@
+{
+ "run_id": "static_candidate",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "70e3e3cfe36b587a6a13bd6176fd898a41c0e30cbf7aa17a1e234b4c2e9ee2d8",
+ "ini_sha256": "fe308128f1a22354321382428d9bb69b344fb32f470d8750976844111b508021",
+ "meta": {
+  "kind": "research",
+  "role": "static_candidate",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15,
+   "ObMode": 1,
+   "EntryMode": 1,
+   "ObMaxAgeBars": 48,
+   "FvgWindowBars": 18,
+   "OrderExpiryBars": 6,
+   "ResearchRunTag": "static_candidate"
+  }
+ },
+ "started": "2026-10-02T11:58:47",
+ "status": "ok",
+ "seconds": 31.9,
+ "report": "static_candidate.htm",
+ "exit_code": 0
+}

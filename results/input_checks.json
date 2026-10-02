@@ -1,5 +1,5 @@
 {
- "runs_checked": 10,
+ "runs_checked": 16,
  "runs_with_mismatches": 0,
  "rows": [
   {
@@ -109,6 +109,94 @@
     "ObMaxAgeBars": 96,
     "FvgWindowBars": 12,
     "OrderExpiryBars": 12
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "static_candidate",
+   "expected": {
+    "ObMode": 1,
+    "EntryMode": 1,
+    "ObMaxAgeBars": 48,
+    "FvgWindowBars": 18,
+    "OrderExpiryBars": 6
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "static_nb1",
+   "expected": {
+    "ObMode": 1,
+    "EntryMode": 1,
+    "ObMaxAgeBars": 96,
+    "FvgWindowBars": 18,
+    "OrderExpiryBars": 6
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "static_nb2",
+   "expected": {
+    "ObMode": 1,
+    "EntryMode": 1,
+    "ObMaxAgeBars": 48,
+    "FvgWindowBars": 12,
+    "OrderExpiryBars": 6
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "static_nb3",
+   "expected": {
+    "ObMode": 1,
+    "EntryMode": 1,
+    "ObMaxAgeBars": 48,
+    "FvgWindowBars": 18,
+    "OrderExpiryBars": 12
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "holdout_candidate",
+   "expected": {
+    "SignalTF": "15",
+    "ObMode": "1",
+    "EntryMode": "1",
+    "ImpulseWindowBars": "2",
+    "BosWindowBars": "6",
+    "SwingStrength": "3",
+    "ObMaxAgeBars": "48",
+    "FvgWindowBars": "18",
+    "OrderExpiryBars": "6",
+    "StopBufferPoints": "10",
+    "RiskRR": "2.0",
+    "RiskPercent": "1.0",
+    "MaxExposures": "3",
+    "WarmupBars": "3000",
+    "MagicNumber": "770101",
+    "TradeComment": "OBR"
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "holdout_baseline",
+   "expected": {
+    "SignalTF": "15",
+    "ObMode": "0",
+    "EntryMode": "0",
+    "ImpulseWindowBars": "2",
+    "BosWindowBars": "6",
+    "SwingStrength": "3",
+    "ObMaxAgeBars": "96",
+    "FvgWindowBars": "12",
+    "OrderExpiryBars": "12",
+    "StopBufferPoints": "10",
+    "RiskRR": "2.0",
+    "RiskPercent": "1.0",
+    "MaxExposures": "3",
+    "WarmupBars": "3000",
+    "MagicNumber": "770101",
+    "TradeComment": "OBR"
    },
    "mismatches": []
   }

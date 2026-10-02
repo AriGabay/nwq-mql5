@@ -849,7 +849,7 @@ void Confirm(Setup &s, int n, bool canTrade, long closeMsc, double volRatio)
 // filled on a tick after this bar closed, i.e. on the tick where the cancellation would execute.
 void PendingBarCheck(Setup &s, int n, long closeMsc, bool filledAfterClose)
   {
-   if((s.dir == 1 && gL[n] <= s.entry) || (s.dir == -1 && gH[n] >= s.entry)) s.retestSeen = true;
+   if(!filledAfterClose && ((s.dir == 1 && gL[n] <= s.entry) || (s.dir == -1 && gH[n] >= s.entry))) s.retestSeen = true;
    string due = "";
    if(n - s.cC3 >= OrderExpiryBars) due = "expired_unfilled";
    else if(CloseBeyond(s, n))       due = "invalidated_pending";
@@ -1235,8 +1235,21 @@ void SyncTrades(long nowMsc)
 //==================================================================
 // MT5 EVENTS
 //==================================================================
+// MT5 keeps globals across OnDeinit -> OnInit on an input or symbol change: start every init from a clean state
+void ResetState()
+  {
+   ArrayResize(gO, 0); ArrayResize(gH, 0); ArrayResize(gL, 0); ArrayResize(gC, 0);
+   ArrayResize(gT, 0); ArrayResize(gV, 0); ArrayResize(gVCum, 0);
+   ArrayResize(gPH, 0); ArrayResize(gPL, 0); ArrayResize(gUsedOb, 0); ArrayResize(S, 0);
+   gBars = 0; gLastTime = 0; gActSeq = 0;
+   gNextId = 1; gDirty = false; gOrphansDone = false;
+   gCntActivated = 0; gCntTouched = 0; gCntConfirmed = 0; gCntPlaced = 0; gCntWarmupDropped = 0;
+   gCntMcRetries = 0;
+  }
+
 int OnInit()
   {
+   ResetState();
    ArrayResize(gReasonCnt, ArraySize(gReasons));
    ArrayInitialize(gReasonCnt, 0);
 #ifdef RESEARCH_LOG

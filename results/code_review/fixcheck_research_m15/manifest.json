@@ -1,0 +1,22 @@
+{
+ "run_id": "fixcheck_research_m15",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "1a7d81a95931da7acef0836e8c64949dfdb64a42a51fb4125f1ca1e857be2317",
+ "ini_sha256": "fb4e812bdf73af9fa25551d08bcc7c2a9ebc28cc80bdb2223aa1a58bbc81b0bb",
+ "meta": {
+  "kind": "research",
+  "role": "code_review",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15,
+   "ResearchRunTag": "fixcheck_research_m15"
+  }
+ },
+ "started": "2026-10-02T12:07:34",
+ "status": "ok",
+ "seconds": 21.2,
+ "report": "fixcheck_research_m15.htm",
+ "exit_code": 0
+}

@@ -94,6 +94,11 @@ def holdout_pending(log: list, ea_sha256: str, set_shas: dict) -> list:
     return [w for w in ("candidate", "baseline") if w not in done]
 
 
+def tester_deposit(deposit: float) -> int:
+    """The deposit MT5 actually starts with: it truncates a fractional Deposit= to whole dollars."""
+    return int(deposit)
+
+
 def refuse_holdout_window(start: str, end: str) -> None:
     """After pre-registration no ad-hoc tester run may touch the frozen holdout window (R24)."""
     P = pipeline.prereg()
@@ -345,13 +350,14 @@ def cmd_wfo(args) -> None:
         for who, params in (("procedure", info["params"]), ("baseline", {})):
             run_id = f"f{k}_oos_{who}"
             res, rep = pipeline.run_single(cfg, run_id, "research", P["period"], *fold["test"],
-                                           deposit=deposits[who], overrides=params, role=f"oos_{who}",
+                                           deposit=tester_deposit(deposits[who]), overrides=params, role=f"oos_{who}",
                                            purpose=f"fold {k} OOS {who}", log_extra={"ea_sha256": ea_sha()})
             if rep is None:
                 raise SystemExit(f"{run_id}: {res.status}, no report")
             s = reports.summary(rep)
             curate.curate(run_id, "wfo")
-            rec["oos"][who] = {**s, "final_balance": round(deposits[who] + s["net_profit"], 2), "run_id": run_id,
+            rec["oos"][who] = {**s, "final_balance": round(tester_deposit(deposits[who]) + s["net_profit"], 2),
+                               "run_id": run_id,
                                "conformance_violations": conformance_report(run_id, "wfo")["violations"]}
         deposits = {w: rec["oos"][w]["final_balance"] for w in rec["oos"]}
         rec["next_deposits"] = deposits

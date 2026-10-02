@@ -1,0 +1,27 @@
+{
+ "run_id": "static_nb3",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "70e3e3cfe36b587a6a13bd6176fd898a41c0e30cbf7aa17a1e234b4c2e9ee2d8",
+ "ini_sha256": "eca96aac0db8d34ec7edbc716e3a32f88b5b68535f34581bf343ac669e79605b",
+ "meta": {
+  "kind": "research",
+  "role": "neighbor_static",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15,
+   "ObMode": 1,
+   "EntryMode": 1,
+   "ObMaxAgeBars": 48,
+   "FvgWindowBars": 18,
+   "OrderExpiryBars": 12,
+   "ResearchRunTag": "static_nb3"
+  }
+ },
+ "started": "2026-10-02T12:00:32",
+ "status": "ok",
+ "seconds": 32.6,
+ "report": "static_nb3.htm",
+ "exit_code": 0
+}

@@ -1,0 +1,19 @@
+{
+ "window": [
+  "2026.03.01",
+  "2026.03.31"
+ ],
+ "ea_sha256": "ac31d2a07de7f66880751a9db3e1ef7c41be22bbcd2ade1c93e1605494fdfeb3",
+ "builds": {
+  "research": {
+   "deals_now": 117,
+   "deals_frozen_ea": 117,
+   "identical": true
+  },
+  "delivered": {
+   "deals_now": 117,
+   "deals_frozen_ea": 117,
+   "identical": true
+  }
+ }
+}
