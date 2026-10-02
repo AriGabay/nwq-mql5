@@ -122,3 +122,12 @@ def test_process_list_failure_fails_closed(monkeypatch):
                         lambda *a, **k: type("R", (), {"returncode": 1, "stdout": "", "stderr": "denied"})())
     with pytest.raises(RuntimeError, match="process list"):
         runner.live_terminal_running()
+
+
+def test_archived_ini_bytes_match_the_manifest_hash(tmp_path):
+    """tester.ini is archived byte for byte: on Windows a text-mode write turned CRLF into CR CR LF."""
+    import hashlib
+    text = "[Tester]\r\nExpert=a.ex5\r\n"
+    runner.archive_ini(tmp_path, text)
+    raw = (tmp_path / "tester.ini").read_bytes()
+    assert raw == text.encode() and hashlib.sha256(raw).hexdigest() == hashlib.sha256(text.encode()).hexdigest()

@@ -108,6 +108,11 @@ def _sha(path: pathlib.Path) -> str:
     return textio.sha256(path) if path.exists() else None
 
 
+def archive_ini(run_dir: pathlib.Path, ini_text: str) -> None:
+    """Archive the ini byte for byte, so it hashes to the manifest's ini_sha256 (no newline translation)."""
+    (run_dir / "tester.ini").write_bytes(ini_text.encode())
+
+
 def run(cfg: envmod.Config, run_id: str, ini_text: str, expert_ex5: str, timeout: int = 7200,
         meta: dict = None) -> RunResult:
     """Execute one /config job. `expert_ex5` is the ex5 file name under MQL5/Experts."""
@@ -126,7 +131,7 @@ def run(cfg: envmod.Config, run_id: str, ini_text: str, expert_ex5: str, timeout
     run_dir.mkdir(parents=True)
     ini_rel = pathlib.Path("runs_ini") / f"{run_id}.ini"
     envmod.write_utf16(cfg.mt5_dir / ini_rel, ini_text)
-    (run_dir / "tester.ini").write_text(ini_text)
+    archive_ini(run_dir, ini_text)
     (cfg.mt5_dir / "reports").mkdir(exist_ok=True)
     for old in (cfg.mt5_dir / "reports").glob(f"{run_id}*"):
         old.unlink()
