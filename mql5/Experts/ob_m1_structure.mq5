@@ -1460,7 +1460,7 @@ void TryEntry(Setup &s, const MqlTick &tk)
    bool ok = (d == 1) ? trade.Buy(vol, _Symbol, tk.ask, sl, tpReq, cmt)
                       : trade.Sell(vol, _Symbol, tk.bid, sl, tpReq, cmt);
    uint rc = trade.ResultRetcode();
-   Ev(s.id, "entry_attempt", MinuteOf(msc), msc, px, EMPTY_VALUE, EMPTY_VALUE, 0, 0, IntegerToString(rc));
+   Ev(s.id, "entry_attempt", MinuteOf(msc), msc, px, tk.bid, tk.ask, 0, 0, IntegerToString(rc));
    if(!ok || (rc != TRADE_RETCODE_DONE && rc != TRADE_RETCODE_DONE_PARTIAL && rc != TRADE_RETCODE_PLACED))
      {
       if(rc == TRADE_RETCODE_MARKET_CLOSED)

@@ -62,7 +62,7 @@ EVENT_KINDS = {
     "hl_failed":        "variant B only: bar_time=confirmation bar, ref_id=pivot, price=level",
     "reaction":         "bar_time=reaction bar",
     "lost_competition": "bar_time=reaction bar, ref_id=winning setup id",
-    "entry_attempt":    "tick_msc, price=request price, detail=retcode",
+    "entry_attempt":    "tick_msc, price=request price, lo=Bid, hi=Ask at that tick, detail=retcode",
     "skipped_stop_crossed": "tick_msc, price, lo=sl",
     "skipped_stops_level":  "tick_msc, price, detail=stops level points",
     "skipped_volume":       "tick_msc, price, detail=computed lots",

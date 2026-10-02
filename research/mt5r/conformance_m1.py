@@ -724,7 +724,10 @@ class _Replay:
         for e in window:
             e["used"] = True
         first, outcome = window[0], window[-1]
-        self.occ["market_closed_retry"] += sum(1 for e in window if e["kind"] == "entry_attempt") > 1
+        attempts = [e for e in window if e["kind"] == "entry_attempt"]
+        self.occ["market_closed_retry"] += len(attempts) > 1
+        last = attempts[-1] if attempts else None    # the attempt that filled carries Bid (lo) and Ask (hi)
+        s.entry_spread = (last["hi"] - last["lo"]) if last and last["lo"] is not None and last["hi"] is not None             else None
         fb = B.bar_at_ms(first["tick_msc"])
         if i + 1 < B.n and fb != i + 1:
             self.add(s.sid, "entry_r15", f"first decision {first['kind']} at {first['tick_msc']} is not on the first "
@@ -808,12 +811,12 @@ class _Replay:
                 self.add(s.sid, "sl_r18", f"SL {sl} != {kind} anchor {anchor} - buffer {self.buf:.2f}")
         else:
             spread = sl - anchor - self.buf
-            proxy = None
-            if bar is not None and np.isfinite(self.B.spread[bar]):
-                proxy = self.B.spread[bar] * self.pt
-            if spread < -tol or (proxy is not None and abs(spread - proxy) > tol):
+            exact = getattr(s, "entry_spread", None)      # Ask - Bid logged on the entry attempt
+            if exact is None and bar is not None and np.isfinite(self.B.spread[bar]):
+                exact = self.B.spread[bar] * self.pt      # fallback for logs without Bid/Ask on the attempt
+            if spread < -tol or (exact is not None and abs(spread - exact) > tol):
                 self.add(s.sid, "sl_r18", f"SL {sl} != {kind} anchor {anchor} + buffer {self.buf:.2f} + spread "
-                                          f"(bar spread proxy {proxy})")
+                                          f"{exact}")
         # R19
         exp_tp = fill + s.sign * float(self.prm["RiskRR"]) * abs(fill - sl)
         if tp is None or abs(tp - exp_tp) > tol:

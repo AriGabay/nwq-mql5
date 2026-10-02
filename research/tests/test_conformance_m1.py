@@ -398,3 +398,26 @@ def test_sl_anchor_not_the_r18_minimum_is_flagged(base):
     ev[-1]["hi"] = 2022.3
     bad = with_events(bad, ev)
     assert "sl_r18" in rules(run_check(bad))
+
+
+def test_short_fill_sl_uses_the_spread_logged_on_the_entry_attempt():
+    """R18: a short stop adds the spread at entry. The entry_attempt event carries Bid (lo) and Ask (hi) of that
+    tick, so the checker uses the exact spread rather than the bar's spread column."""
+    t7 = lambda i: T7 + 60 * i  # noqa: E731
+    rows = AE7_ROWS[:-1] + [(2010.0, 2010.2, 2009.5, 2009.8)]     # Monday opens below the stop: no skip
+    ev = [dict(setup_id=1, kind="touch", bar_time=t7(24), tick_msc=t7(24) * 1000 + 40000, price=2009.9),
+          dict(setup_id=1, kind="sc_hh", bar_time=t7(33), price=2005.8, ref_id=7, ref_time=t7(31)),
+          dict(setup_id=1, kind="fvg_fixed", bar_time=t7(34), ref_time=t7(32), lo=2005.6, hi=2007.3),
+          dict(setup_id=1, kind="hl", bar_time=t7(38), price=2005.9, ref_id=10),
+          dict(setup_id=1, kind="reaction", bar_time=t7(38))]
+
+    def run(ask):
+        sent = [dict(setup_id=1, kind="entry_attempt", tick_msc=MONDAY * 1000, price=2010.0, lo=2010.0, hi=ask,
+                     detail="10009"),
+                dict(setup_id=1, kind="fill", tick_msc=MONDAY * 1000, price=2010.0, lo=2015.7, hi=1998.6)]
+        setup = {**SHORT, "reason": "filled", "sl": 2015.7, "sl_anchor": "ob", "sl_anchor_price": 2015.2,
+                 "buffer_pts": 20, "tp": 1998.6, "fill_msc": MONDAY * 1000, "fill_price": 2010.0}
+        return run_check(build(rows, AE7_PIVOTS, ev + sent, [setup], times=AE7_TIMES))
+
+    assert run(2010.3) == []                        # SL 2015.7 = anchor 2015.2 + 0.20 buffer + 0.30 spread
+    assert "sl_r18" in rules(run(2010.2))           # logged spread 0.20 does not explain SL 2015.7
