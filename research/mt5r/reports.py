@@ -122,7 +122,10 @@ def parse_opt_xml(path) -> pd.DataFrame:
         raise ValueError(f"optimization XML lacks columns {missing}")
     df = df.rename(columns=XML_COLS)
     for c in df.columns:
-        df[c] = pd.to_numeric(df[c], errors="ignore")
+        try:   # pandas 3 dropped to_numeric(errors="ignore"): a non-numeric column stays as text
+            df[c] = pd.to_numeric(df[c])
+        except (ValueError, TypeError):
+            pass
     return df
 
 

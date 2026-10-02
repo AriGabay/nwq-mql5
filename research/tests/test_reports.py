@@ -59,3 +59,22 @@ def test_journal_facts_and_redaction():
     assert f["discarded_minutes"] == 3590 and f["discarded_days"] == 2 and f["warmup_bars"] == 3000
     assert f["stops_level_pts"] == 20 and f["every_tick_generation_used"]
     assert journal.redact("'4416506': authorized from 85.64.1.2 at 4430.21") == "'<acct>': authorized from <ip> at 4430.21"
+
+
+def test_opt_xml_parses_numbers_and_keeps_text(tmp_path):
+    """Numeric columns become numbers (integer inputs stay integer); non-numeric text stays as is. pandas 3 has no
+    to_numeric(errors="ignore"), so the parser must not depend on it."""
+    head = ["Pass", "Result", "Profit", "Expected Payoff", "Profit Factor", "Recovery Factor", "Sharpe Ratio",
+            "Custom", "Equity DD %", "Trades", "ObMode", "Note"]
+    rows = [["0", "1.5", "-12.25", "-0.5", "0.9", "-0.3", "-1.1", "0.02", "3.4", "25", "1", "a"],
+            ["1", "2", "40", "1.6", "1.2", "0.8", "0.7", "0.05", "2.1", "25", "0", "b"]]
+    cell = lambda v: f"<Cell><Data>{v}</Data></Cell>"
+    body = "".join("<Row>" + "".join(cell(v) for v in r) + "</Row>" for r in [head] + rows)
+    p = tmp_path / "o.xml"
+    p.write_text('<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet>'
+                 f"<Table>{body}</Table></Worksheet></Workbook>")
+    import pandas as pd
+    df = reports.parse_opt_xml(p)
+    assert pd.api.types.is_integer_dtype(df["ObMode"]) and pd.api.types.is_integer_dtype(df["trades"])
+    assert df["profit"].tolist() == [-12.25, 40.0] and df["custom"].tolist() == [0.02, 0.05]
+    assert df["Note"].tolist() == ["a", "b"]
