@@ -49,7 +49,10 @@ def _ps_lines() -> list:
         cmd = ["powershell", "-NoProfile", "-NonInteractive", "-Command", PS_WINDOWS]
     else:
         cmd = ["ps", "-axo", "pid=,command="]
-    return subprocess.run(cmd, capture_output=True, text=True).stdout.splitlines()
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode != 0:   # fail closed: an unreadable process list must never read as "MT5 closed"
+        raise RuntimeError(f"process list unavailable (exit {r.returncode}); refusing to treat MT5 as closed")
+    return r.stdout.splitlines()
 
 
 def _exe(line: str) -> str:

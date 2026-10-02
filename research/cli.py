@@ -9,6 +9,7 @@ holdout also refuses unless the frozen .set files are committed, and runs at mos
 and .set hash (a run without a report may be repeated).
 """
 import argparse
+import hashlib
 import json
 import pathlib
 import shutil
@@ -59,29 +60,45 @@ def committed(path: str) -> bool:
 
 
 def prereg_committed() -> dict:
+    """The committed pre-registration, refused when the EA source differs from the one it registered (R21)."""
     if not committed(PREREG_REL):
         raise SystemExit("research/preregistration.json is missing or has uncommitted changes; refusing to run")
-    return pipeline.prereg()
+    P = pipeline.prereg()
+    if P.get("ea_source_sha256") != ea_sha():
+        raise SystemExit("the EA source differs from the pre-registered ea_source_sha256; refusing to run (R21)")
+    return P
 
 
 def sha(path) -> str:
     return textio.sha256(path)
 
 
+def sha_source(path) -> str:
+    """sha256 of a source file with CRLF read as LF, so a git checkout's line endings do not change it."""
+    return hashlib.sha256(pathlib.Path(path).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
 def ea_sha() -> str:
-    return sha(pipeline.EA_SRC)
+    return sha_source(pipeline.EA_SRC)
 
 
 def holdout_pending(log: list, ea_sha256: str, set_shas: dict) -> list:
-    """Holdout runs still allowed: those without a completed run (status ok with a report) for the same
-    EA source hash and .set hash. Failed, timed-out or infra_failure runs without a report do not count."""
+    """Holdout sides still allowed to run (R24: exactly once). Any logged holdout run that produced a report
+    counts as done, whatever its status and whatever EA or .set hash it ran with; only runs without a report
+    (infrastructure failures) may be repeated. ea_sha256 is kept for the caller's log."""
     done = set()
     for e in log:
         who = str(e.get("role", ""))[len("holdout_"):] if str(e.get("role", "")).startswith("holdout_") else None
-        if (who in set_shas and e.get("status") == "ok" and e.get("has_report")
-                and e.get("ea_sha256") == ea_sha256 and e.get("set_sha256") == set_shas[who]):
+        if who in set_shas and e.get("has_report"):
             done.add(who)
     return [w for w in ("candidate", "baseline") if w not in done]
+
+
+def refuse_holdout_window(start: str, end: str) -> None:
+    """After pre-registration no ad-hoc tester run may touch the frozen holdout window (R24)."""
+    P = pipeline.prereg()
+    if P and start <= P["holdout"][1] and end >= P["holdout"][0]:
+        raise SystemExit(f"{start}-{end} overlaps the frozen holdout {P['holdout'][0]}-{P['holdout'][1]} (R24)")
 
 
 # ------------------------------------------------------------------ shared helpers
@@ -170,6 +187,7 @@ def cmd_install(args) -> None:
 
 
 def cmd_smoke(args) -> None:
+    refuse_holdout_window(args.start, args.end)
     cfg = env.load_config()
     for period in args.period or ["M15", "M5"]:
         run_id = f"smoke_{period.lower()}"
@@ -188,6 +206,7 @@ def cmd_conformance(args) -> None:
 
 def cmd_optsmoke(args) -> None:
     """8-pass optimization over the categorical inputs only (U5 step 6)."""
+    refuse_holdout_window(args.start, args.end)
     cfg = env.load_config()
     run_id = f"optsmoke_{args.period.lower()}"
     ranges = {"ObMode": (0, 1, 1), "EntryMode": (0, 1, 3)}
@@ -384,8 +403,7 @@ def cmd_holdout(args) -> None:
     shas = {"candidate": sha(DELIV / CAND_SET), "baseline": sha(DELIV / BASE_SET)}
     todo = holdout_pending(explog.read(), ea, shas)
     if not todo:
-        raise SystemExit("a completed holdout run already exists for this EA source and these .set files; "
-                         "the holdout runs once (R24)")
+        raise SystemExit("a completed holdout run already exists; the holdout runs once (R24)")
     cfg = env.load_config()
     out_path = RESULTS / "holdout" / "holdout.json"
     out = json.loads(out_path.read_text()) if out_path.exists() else {}

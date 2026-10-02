@@ -31,6 +31,7 @@ def test_shutdown_refuses_overlapping_prefix(tmp_path, monkeypatch):
 
 def test_isolated_process_filter(monkeypatch):
     class R:
+        returncode = 0
         stdout = ("1 wine64-preloader C:\\Program Files\\MetaTrader 5\\terminal64.exe\n"
                   "2 wine64-preloader C:\\mt5r\\terminal64.exe /portable\n")
     monkeypatch.setattr(runner.subprocess, "run", lambda *a, **k: R())
@@ -39,6 +40,7 @@ def test_isolated_process_filter(monkeypatch):
 
 def test_live_terminal_detection(monkeypatch):
     class R:
+        returncode = 0
         stdout = "1 wine64-preloader C:\\Program Files\\MetaTrader 5\\terminal64.exe \n"
     monkeypatch.setattr(runner.subprocess, "run", lambda *a, **k: R())
     assert runner.live_terminal_running()
@@ -83,7 +85,7 @@ def test_native_shutdown_ends_only_isolated_pids(tmp_path, monkeypatch):
         if cmd[0] == "taskkill":
             killed.append(cmd[2])
             procs[:] = [p for p in procs if not p.startswith(cmd[2] + " ")]
-        return type("R", (), {"stdout": "\n".join(procs)})()
+        return type("R", (), {"returncode": 0, "stdout": "\n".join(procs)})()
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
     assert runner.isolated_processes(cfg) == [procs[1]]
     runner.shutdown_prefix(cfg)
@@ -104,10 +106,19 @@ def test_unreadable_mt5_process_blocks_but_is_never_killed(tmp_path, monkeypatch
     def fake_run(cmd, **k):
         if cmd[0] == "taskkill":
             killed.append(cmd[2])
-        return type("R", (), {"stdout": "\n".join(lines)})()
+        return type("R", (), {"returncode": 0, "stdout": "\n".join(lines)})()
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
     assert runner.live_terminal_running()
     assert runner.isolated_processes(cfg) == [lines[0]]
     with pytest.raises(RuntimeError, match="still alive"):
         runner.shutdown_prefix(cfg)
     assert killed == []
+
+
+def test_process_list_failure_fails_closed(monkeypatch):
+    """If the process list cannot be read, the live-terminal check must not report 'closed'."""
+    import pytest
+    monkeypatch.setattr(runner.subprocess, "run",
+                        lambda *a, **k: type("R", (), {"returncode": 1, "stdout": "", "stderr": "denied"})())
+    with pytest.raises(RuntimeError, match="process list"):
+        runner.live_terminal_running()

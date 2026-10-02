@@ -58,6 +58,7 @@ def frozen(tmp_path, monkeypatch):
     (tmp_path / cli.CAND_SET).write_text("ObMode=1")
     (tmp_path / cli.BASE_SET).write_text("ObMode=0")
     monkeypatch.setattr(cli, "ea_sha", lambda: "EA1")
+    monkeypatch.setattr(pipeline, "prereg", lambda: {"ea_source_sha256": "EA1", "holdout": ["2026.08.01", "2026.09.29"]})
     monkeypatch.setattr(env, "load_config", _boom)
     shas = {"candidate": cli.sha(tmp_path / cli.CAND_SET), "baseline": cli.sha(tmp_path / cli.BASE_SET)}
     return shas
@@ -94,18 +95,45 @@ def test_holdout_allows_rerun_after_infra_failure_without_report(monkeypatch, fr
 
 
 def test_holdout_pending_logic():
+    """R24: the holdout runs exactly once per side. Any run that produced a report counts, whatever its status
+    and whatever the EA or .set hash (an edited EA or a re-committed .set must not buy a second look)."""
     shas = {"candidate": "C", "baseline": "B"}
     done_c = _entry("candidate", "ok", True, set_sha="C")
     assert cli.holdout_pending([], "EA1", shas) == ["candidate", "baseline"]
     assert cli.holdout_pending([done_c], "EA1", shas) == ["baseline"]
-    # a completed run for another EA source or another .set does not block
-    assert cli.holdout_pending([_entry("candidate", "ok", True, ea="EA0", set_sha="C")], "EA1", shas) == [
-        "candidate", "baseline"]
-    assert cli.holdout_pending([_entry("candidate", "ok", True, set_sha="C0")], "EA1", shas) == [
-        "candidate", "baseline"]
-    # status ok without a report is not a completed run
+    assert cli.holdout_pending([_entry("candidate", "ok", True, ea="EA0", set_sha="C")], "EA1", shas) == ["baseline"]
+    assert cli.holdout_pending([_entry("candidate", "ok", True, set_sha="C0")], "EA1", shas) == ["baseline"]
+    assert cli.holdout_pending([_entry("candidate", "timeout", True, set_sha="C")], "EA1", shas) == ["baseline"]
+    # a run without a report is not a completed run
     assert cli.holdout_pending([_entry("candidate", "ok", False, set_sha="C")], "EA1", shas) == [
         "candidate", "baseline"]
+
+
+def test_protocol_steps_refuse_when_the_ea_differs_from_the_preregistered_source(monkeypatch):
+    monkeypatch.setattr(cli, "committed", lambda path: True)
+    monkeypatch.setattr(pipeline, "prereg", lambda: {"ea_source_sha256": "REGISTERED"})
+    monkeypatch.setattr(cli, "ea_sha", lambda: "EDITED")
+    monkeypatch.setattr(env, "load_config", _boom)
+    for cmd in ("cmd_wfo", "cmd_freeze", "cmd_holdout", "cmd_robustness", "cmd_deliver"):
+        with pytest.raises(SystemExit, match="EA source"):
+            getattr(cli, cmd)(argparse.Namespace())
+
+
+def test_ea_hash_ignores_line_endings(tmp_path, monkeypatch):
+    lf, crlf = tmp_path / "lf.mq5", tmp_path / "crlf.mq5"
+    lf.write_bytes(b"int a;\nint b;\n")
+    crlf.write_bytes(b"int a;\r\nint b;\r\n")
+    assert cli.sha_source(lf) == cli.sha_source(crlf) == cli.sha(lf)
+
+
+@pytest.mark.parametrize("cmd", ["cmd_smoke", "cmd_optsmoke"])
+def test_tester_steps_refuse_the_holdout_window_after_preregistration(monkeypatch, cmd):
+    monkeypatch.setattr(pipeline, "prereg", lambda: {"holdout": ["2026.08.01", "2026.09.29"]})
+    monkeypatch.setattr(env, "load_config", _boom)
+    with pytest.raises(SystemExit, match="holdout"):
+        getattr(cli, cmd)(argparse.Namespace(period="M15", start="2026.07.20", end="2026.08.05"))
+    with pytest.raises(Boom):    # a window before the holdout gets past the guard
+        getattr(cli, cmd)(argparse.Namespace(period="M15", start="2026.03.01", end="2026.03.31"))
 
 
 # ------------------------------------------------------------------ install / freeze-rules
