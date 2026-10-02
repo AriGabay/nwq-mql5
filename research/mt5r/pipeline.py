@@ -6,24 +6,23 @@ research/preregistration.json is created only at U7, so it is read lazily and ma
 import json
 import pathlib
 
-from . import explog, ini, reports, runner, setfile
+from . import explog, ini, m1_contract, reports, runner, setfile
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 RUN = json.loads((REPO / "research" / "run_constants.json").read_text())
 PREREG_PATH = REPO / "research" / "preregistration.json"
-EA_SRC = REPO / "mql5" / "Experts" / "ob_fvg_retest.mq5"
+EA_SRC = REPO / "mql5" / "Experts" / m1_contract.EA_SOURCE
 
 BUILDS = {
     # kind: (ex5 name, source for input specs, research inputs?)
-    "delivered": ("ob_fvg_retest.ex5", EA_SRC, False),
-    "research": ("ob_fvg_retest_research.ex5", EA_SRC, True),
+    "delivered": (m1_contract.EA_SOURCE.replace(".mq5", ".ex5"), EA_SRC, False),
+    "research": (m1_contract.EA_RESEARCH_SOURCE.replace(".mq5", ".ex5"), EA_SRC, True),
 }
 
-# KTD12, fixed before data: optimized inputs, their grid values, code defaults and categorical axes.
-KTD12_GRID = {"ObMode": [0, 1], "EntryMode": [0, 1, 2, 3], "ObMaxAgeBars": [48, 96, 144],
-              "FvgWindowBars": [6, 12, 18], "OrderExpiryBars": [6, 12, 18]}
-KTD12_DEFAULTS = {"ObMode": 0, "EntryMode": 0, "ObMaxAgeBars": 96, "FvgWindowBars": 12, "OrderExpiryBars": 12}
-KTD12_CATEGORICAL = ["ObMode", "EntryMode"]
+# KTD14, fixed before data: the structure variant is the only optimized input; A (0) is the default and baseline.
+GRID = {"StructureVariant": [0, 1]}
+DEFAULTS = {"StructureVariant": 0}
+CATEGORICAL = ["StructureVariant"]
 
 
 def prereg():
@@ -36,7 +35,7 @@ def prereg():
 
 def grid() -> dict:
     p = prereg()
-    return {k: list(v) for k, v in (p["grid"] if p else KTD12_GRID).items()}
+    return {k: list(v) for k, v in (p["grid"] if p else GRID).items()}
 
 
 def params() -> list:
@@ -45,12 +44,12 @@ def params() -> list:
 
 def defaults() -> dict:
     p = prereg()
-    return dict(p["defaults"] if p else KTD12_DEFAULTS)
+    return dict(p["defaults"] if p else DEFAULTS)
 
 
 def categorical() -> list:
     p = prereg()
-    return list(p["categorical"] if p else KTD12_CATEGORICAL)
+    return list(p["categorical"] if p else CATEGORICAL)
 
 
 def build_prereg(period: str, pilot_runs: int, ea_sha256: str, gate_changes: list) -> dict:
@@ -61,7 +60,7 @@ def build_prereg(period: str, pilot_runs: int, ea_sha256: str, gate_changes: lis
              {"fold": 4, "train": ["2026.03.01", "2026.05.31"], "test": ["2026.06.01", "2026.06.30"]},
              {"fold": 5, "train": ["2026.04.01", "2026.06.30"], "test": ["2026.07.01", "2026.07.31"]}]
     n_passes = 1
-    for v in KTD12_GRID.values():
+    for v in GRID.values():
         n_passes *= len(v)
     return {
         "protocol": "docs/plans/2026-09-30-2310-feat-ob-fvg-retest-ea-plan.md (R21, KTD12)",
@@ -71,12 +70,12 @@ def build_prereg(period: str, pilot_runs: int, ea_sha256: str, gate_changes: lis
         "baseline": "code defaults (R18) with SignalTF = period and the run_constants risk inputs",
         "folds": folds, "final_train": ["2026.05.01", "2026.07.31"],
         "holdout": list(RUN["windows"]["holdout_non_independent"]), "holdout_independent": False,
-        "grid": {k: list(v) for k, v in KTD12_GRID.items()},
-        "grid_ranges": {k: [v[0], v[1] - v[0] if len(v) > 1 else 1, v[-1]] for k, v in KTD12_GRID.items()},
-        "categorical": list(KTD12_CATEGORICAL),
+        "grid": {k: list(v) for k, v in GRID.items()},
+        "grid_ranges": {k: [v[0], v[1] - v[0] if len(v) > 1 else 1, v[-1]] for k, v in GRID.items()},
+        "categorical": list(CATEGORICAL),
         "categorical_treatment": "smoothing and neighbours use exact matches on categorical inputs; "
                                  "neighbours move one ordinal step on exactly one other input",
-        "defaults": dict(KTD12_DEFAULTS),
+        "defaults": dict(DEFAULTS),
         "passes_per_fold": n_passes,
         "selection": {"trade_floor_per_month": 15, "train_months": 3, "max_equity_dd_pct": 10.0,
                       "score": "recovery factor (net profit / max equity DD), ineligible passes score 0",
@@ -103,11 +102,11 @@ def specs(kind: str) -> list:
     return setfile.parse_inputs(src.read_text(), research=research)
 
 
-def base_values(kind: str, tf: int) -> dict:
-    """Fixed run inputs (run_constants risk + display inputs) and SignalTF; kind kept for callers."""
+def base_values(kind: str) -> dict:
+    """Fixed run inputs (run_constants risk + display inputs); kind kept for callers. The EA runs on the M1
+    chart and has no timeframe input: the chart period goes to the ini only."""
     vals = dict(RUN["display_inputs"])
     vals.update(RUN["risk_inputs"])
-    vals["SignalTF"] = tf
     return vals
 
 
@@ -140,7 +139,7 @@ def _ini(ex5, period, start, end, deposit, run_id, lines, **kw) -> str:
 
 def _prepare(run_id: str, kind: str, period: str, overrides: dict = None, ranges: dict = None):
     """Input values, [TesterInputs] lines and ex5 name for one run."""
-    vals = base_values(kind, ini.PERIODS[period])
+    vals = base_values(kind)
     vals.update(overrides or {})
     if kind == "research":
         vals["ResearchRunTag"] = run_id

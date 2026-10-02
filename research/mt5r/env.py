@@ -16,6 +16,7 @@ import subprocess
 
 import yaml
 
+from . import m1_contract
 from .textio import read_text, sha256, write_utf16  # noqa: F401  (write_utf16 re-exported)
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -263,7 +264,7 @@ def build(cfg: Config) -> dict:
 
 
 
-EA_SOURCES = ["ob_fvg_retest.mq5", "ob_fvg_retest_research.mq5"]
+EA_SOURCES = [m1_contract.EA_SOURCE, m1_contract.EA_RESEARCH_SOURCE]
 
 
 def install_sources(cfg: Config) -> list:

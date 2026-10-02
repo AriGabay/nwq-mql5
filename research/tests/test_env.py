@@ -118,15 +118,15 @@ def test_trade_safety_refuses_unsafe_config(tmp_path, common, assistant, msg):
 def test_install_sources_copies_both_builds_into_isolated_copy(tmp_path, monkeypatch):
     cfg = _cfg(tmp_path)
     repo = tmp_path / "repo"
-    for name, text in (("ob_fvg_retest.mq5", "// strategy"), ("ob_fvg_retest_research.mq5", "#define RESEARCH_LOG")):
+    for name, text in (("ob_m1_structure.mq5", "// strategy"), ("ob_m1_structure_research.mq5", "#define RESEARCH_LOG")):
         p = repo / "mql5" / "Experts" / name
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(text)
     monkeypatch.setattr(env, "REPO", repo)
     env.install_sources(cfg)
     dst = cfg.isolated_prefix / "drive_c" / "mt5r" / "MQL5" / "Experts"
-    assert sorted(p.name for p in dst.iterdir()) == ["ob_fvg_retest.mq5", "ob_fvg_retest_research.mq5"]
-    assert (dst / "ob_fvg_retest_research.mq5").read_text() == "#define RESEARCH_LOG"
+    assert sorted(p.name for p in dst.iterdir()) == ["ob_m1_structure.mq5", "ob_m1_structure_research.mq5"]
+    assert (dst / "ob_m1_structure_research.mq5").read_text() == "#define RESEARCH_LOG"
     assert not (cfg.live_mt5_dir / "MQL5").exists()
 
 

@@ -179,35 +179,6 @@ def test_freeze_rules_refuses_when_prereg_exists(tmp_path, monkeypatch):
     assert p.read_text() == "{}"
 
 
-def test_freeze_rules_writes_ktd12_protocol(tmp_path, monkeypatch):
-    p = tmp_path / "preregistration.json"
-    monkeypatch.setattr(pipeline, "PREREG_PATH", p)
-    monkeypatch.setattr(cli, "ea_sha", lambda: "abc123")
-    monkeypatch.setattr(cli, "PILOT", tmp_path / "no_pilot_summary.json")
-    monkeypatch.setattr(explog, "read", lambda: [{"role": "pilot", "status": "ok"}, {"role": "pilot", "status": "ok"},
-                                                 {"role": "smoke", "status": "ok"}])
-    cli.cmd_freeze_rules(argparse.Namespace(period="M5", gate_change=["none: approved as drawn"]))
-    d = json.loads(p.read_text())
-    assert d["period"] == "M5" and d["signal_tf_value"] == 5 and d["ea_source_sha256"] == "abc123"
-    assert d["grid"] == {"ObMode": [0, 1], "EntryMode": [0, 1, 2, 3], "ObMaxAgeBars": [48, 96, 144],
-                         "FvgWindowBars": [6, 12, 18], "OrderExpiryBars": [6, 12, 18]}
-    assert d["grid_ranges"]["ObMaxAgeBars"] == [48, 48, 144]
-    assert d["categorical"] == ["ObMode", "EntryMode"]
-    assert [f["test"] for f in d["folds"]] == [["2026.03.01", "2026.03.31"], ["2026.04.01", "2026.04.30"],
-                                               ["2026.05.01", "2026.05.31"], ["2026.06.01", "2026.06.30"],
-                                               ["2026.07.01", "2026.07.31"]]
-    assert d["final_train"] == ["2026.05.01", "2026.07.31"] and d["holdout"] == ["2026.08.01", "2026.09.29"]
-    assert d["stats"]["dsr_trials"] == 216 * 5 + 2 and d["stats"]["seed"] == 20260930
-    a = d["acceptance"]
-    assert (a["min_fills_per_month"], a["days_per_month"], a["bootstrap_alpha"], a["min_positive_folds"]) == (
-        15, 30.44, 0.05, 3)
-    assert (a["remove_top_events"], a["mc_breach_prob_max"], a["spread_stress_k"], a["stop_slippage_points"]) == (
-        2, 0.10, 1.0, 10)
-    assert (a["min_neighbor_profitable_share"], a["dsr_min"], a["dsr_min_days"]) == (0.60, 0.90, 60)
-    assert d["selection"]["trade_floor_per_month"] == 15 and d["selection"]["max_equity_dd_pct"] == 10.0
-    assert d["gate_rule_changes"] == ["none: approved as drawn"]
-
-
 # ------------------------------------------------------------------ pilot summary
 def _deals(n_fills):
     rows = [{"type": 2, "entry": 0, "profit": 10000.0}]

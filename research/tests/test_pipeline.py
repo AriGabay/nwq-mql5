@@ -3,21 +3,20 @@ import json
 import pathlib
 
 
-from mt5r import explog, pipeline, runner
+from mt5r import explog, m1_contract, pipeline, runner
 
 EA_SRC = """
-enum ENUM_OB_MODE    { OB_FVG = 0, OB_FVG_BOS = 1 };
-enum ENUM_ENTRY_MODE { ENTRY_FVG_EDGE = 0, ENTRY_FVG_MID = 1, ENTRY_OB_EDGE = 2, ENTRY_OB_MID = 3 };
-input ENUM_TIMEFRAMES SignalTF          = PERIOD_M15;
-input ENUM_OB_MODE    ObMode            = OB_FVG;
-input ENUM_ENTRY_MODE EntryMode         = ENTRY_FVG_EDGE;
-input int             ObMaxAgeBars      = 96;
-input int             FvgWindowBars     = 12;
-input int             OrderExpiryBars   = 12;
+enum ENUM_STRUCTURE_VARIANT { SV_HH_ONLY = 0, SV_HH_HL = 1 };
+input ENUM_STRUCTURE_VARIANT StructureVariant = SV_HH_ONLY;
+input int             ImpulseWindowBars = 2;
+input int             SwingStrengthM1   = 3;
+input int             StopBufferPoints  = 20;
 input double          RiskRR            = 2.0;
 input double          RiskPercent       = 1.0;
 input int             MaxExposures      = 3;
-input string          TradeComment      = "OBR";
+input int             WarmupDays        = 30;
+input long            MagicNumber       = 770201;
+input string          TradeComment      = "OBM1";
 #ifdef RESEARCH_LOG
 input string          ResearchRunTag    = "";
 #endif
@@ -36,41 +35,39 @@ def test_import_does_not_need_preregistration(monkeypatch):
     mod = importlib.reload(pipeline)
     assert mod.prereg() is None
     assert mod.RUN["symbol"] == "XAUUSD.s"
-    # KTD12 grid and defaults apply until the pre-registration exists
-    assert mod.grid() == {"ObMode": [0, 1], "EntryMode": [0, 1, 2, 3], "ObMaxAgeBars": [48, 96, 144],
-                          "FvgWindowBars": [6, 12, 18], "OrderExpiryBars": [6, 12, 18]}
-    assert mod.defaults() == {"ObMode": 0, "EntryMode": 0, "ObMaxAgeBars": 96, "FvgWindowBars": 12,
-                              "OrderExpiryBars": 12}
-    assert mod.categorical() == ["ObMode", "EntryMode"]
+    # KTD14: the structure variant is the only optimized input; A (0) is the default and baseline
+    assert mod.grid() == {"StructureVariant": [0, 1]}
+    assert mod.defaults() == {"StructureVariant": 0}
+    assert mod.categorical() == ["StructureVariant"]
 
 
 def test_grid_comes_from_preregistration_when_present(tmp_path, monkeypatch):
     p = tmp_path / "preregistration.json"
-    p.write_text(json.dumps({"grid": {"ObMode": [0, 1], "ObMaxAgeBars": [48, 96]},
-                             "defaults": {"ObMode": 0, "ObMaxAgeBars": 96}, "categorical": ["ObMode"]}))
+    p.write_text(json.dumps({"grid": {"StructureVariant": [0, 1]}, "defaults": {"StructureVariant": 0},
+                             "categorical": ["StructureVariant"]}))
     monkeypatch.setattr(pipeline, "PREREG_PATH", p)
-    assert pipeline.params() == ["ObMode", "ObMaxAgeBars"]
-    assert pipeline.defaults() == {"ObMode": 0, "ObMaxAgeBars": 96}
-    assert pipeline.categorical() == ["ObMode"]
+    assert pipeline.params() == ["StructureVariant"]
+    assert pipeline.defaults() == {"StructureVariant": 0}
+    assert pipeline.categorical() == ["StructureVariant"]
 
 
-def test_builds_point_at_new_ea():
-    assert pipeline.BUILDS["delivered"][0] == "ob_fvg_retest.ex5"
-    assert pipeline.BUILDS["research"][0] == "ob_fvg_retest_research.ex5"
+def test_builds_point_at_the_m1_structure_ea():
+    assert pipeline.BUILDS["delivered"][0] == "ob_m1_structure.ex5"
+    assert pipeline.BUILDS["research"][0] == "ob_m1_structure_research.ex5"
     for kind, research in (("delivered", False), ("research", True)):
-        assert pipeline.BUILDS[kind][1].name == "ob_fvg_retest.mq5"
+        assert pipeline.BUILDS[kind][1].name == m1_contract.EA_SOURCE
         assert pipeline.BUILDS[kind][2] is research
 
 
-def test_base_values_are_run_constants_plus_signal_tf():
-    assert pipeline.base_values("research", 5) == {"RiskPercent": 1.0, "MaxExposures": 3, "RiskRR": 2.0,
-                                                   "SignalTF": 5}
+def test_base_values_are_run_constants_only():
+    """The EA runs on the M1 chart and has no SignalTF input; the chart period goes to the ini only."""
+    assert pipeline.base_values("research") == {"RiskPercent": 1.0, "MaxExposures": 3, "RiskRR": 2.0}
 
 
-def test_run_single_builds_ini_from_run_constants(tmp_path, monkeypatch):
-    src = tmp_path / "ob_fvg_retest.mq5"
+def test_run_single_builds_an_m1_ini_from_run_constants(tmp_path, monkeypatch):
+    src = tmp_path / "ob_m1_structure.mq5"
     src.write_text(EA_SRC)
-    monkeypatch.setitem(pipeline.BUILDS, "research", ("ob_fvg_retest_research.ex5", src, True))
+    monkeypatch.setitem(pipeline.BUILDS, "research", ("ob_m1_structure_research.ex5", src, True))
     seen, logged = {}, []
 
     def fake_run(cfg, run_id, text, ex5, timeout=0, meta=None):
@@ -79,31 +76,32 @@ def test_run_single_builds_ini_from_run_constants(tmp_path, monkeypatch):
 
     monkeypatch.setattr(runner, "run", fake_run)
     monkeypatch.setattr(explog, "append", lambda e: logged.append(e))
-    res, rep = pipeline.run_single(None, "pilot_m5", "research", "M5", "2025.12.01", "2026.07.31",
-                                   role="pilot", log_extra={"ea_sha256": "abc"})
+    res, rep = pipeline.run_single(None, "pilot_a", "research", "M1", "2025.12.01", "2026.07.31",
+                                   overrides={"StructureVariant": 1}, role="pilot", log_extra={"ea_sha256": "abc"})
     assert rep is None and res.status == "failed"
     lines = seen["text"].split("\r\n")
-    for want in ["Expert=ob_fvg_retest_research.ex5", "Symbol=XAUUSD.s", "Period=M5", "Model=4",
+    for want in ["Expert=ob_m1_structure_research.ex5", "Symbol=XAUUSD.s", "Period=M1", "Model=4",
                  "FromDate=2025.12.01", "ToDate=2026.08.01", "Deposit=10000", "Currency=USD", "Leverage=1:100",
-                 "SignalTF=5||5||0||5||N", "RiskPercent=1.0||1.0||0||1.0||N", "MaxExposures=3||3||0||3||N",
-                 "ObMode=0||0||0||0||N", "ResearchRunTag=pilot_m5"]:
+                 "StructureVariant=1||1||0||1||N", "RiskPercent=1.0||1.0||0||1.0||N", "MaxExposures=3||3||0||3||N",
+                 "ResearchRunTag=pilot_a"]:
         assert want in lines, want
-    assert logged[0]["id"] == "pilot_m5" and logged[0]["status"] == "failed"
+    assert not any(l.startswith("SignalTF") for l in lines)
+    assert logged[0]["id"] == "pilot_a" and logged[0]["status"] == "failed"
     assert logged[0]["has_report"] is False and logged[0]["ea_sha256"] == "abc"
 
 
 def test_delivered_build_has_no_research_tag(tmp_path, monkeypatch):
-    src = tmp_path / "ob_fvg_retest.mq5"
+    src = tmp_path / "ob_m1_structure.mq5"
     src.write_text(EA_SRC)
-    monkeypatch.setitem(pipeline.BUILDS, "delivered", ("ob_fvg_retest.ex5", src, False))
-    vals, lines, ex5 = pipeline._prepare("x", "delivered", "M15", {"EntryMode": 2})
-    assert ex5 == "ob_fvg_retest.ex5"
-    assert "EntryMode=2||2||0||2||N" in lines
+    monkeypatch.setitem(pipeline.BUILDS, "delivered", ("ob_m1_structure.ex5", src, False))
+    vals, lines, ex5 = pipeline._prepare("x", "delivered", "M1", {"StructureVariant": 1})
+    assert ex5 == "ob_m1_structure.ex5"
+    assert "StructureVariant=1||1||0||1||N" in lines
     assert not any(l.startswith("ResearchRunTag") for l in lines)
 
 
 def test_check_inputs_loaded_float_tolerant():
-    rep = {"inputs": {"RiskPercent": "1", "EntryMode": "2"}}
-    assert pipeline.check_inputs_loaded(rep, {"RiskPercent": 1.0, "EntryMode": 2}) == []
-    assert pipeline.check_inputs_loaded(rep, {"EntryMode": 3, "Missing": 1}) == [("EntryMode", 3, "2"),
-                                                                                  ("Missing", 1, None)]
+    rep = {"inputs": {"RiskPercent": "1", "StructureVariant": "1"}}
+    assert pipeline.check_inputs_loaded(rep, {"RiskPercent": 1.0, "StructureVariant": 1}) == []
+    assert pipeline.check_inputs_loaded(rep, {"StructureVariant": 0, "Missing": 1}) == [
+        ("StructureVariant", 0, "1"), ("Missing", 1, None)]

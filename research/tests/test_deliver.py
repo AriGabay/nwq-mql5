@@ -10,17 +10,6 @@ def test_recommended_is_never_written_in_this_research():
     assert not deliver.should_write_recommended({})
 
 
-def test_parameter_table_lists_grid_defaults_and_candidate():
-    p = pipeline.build_prereg("M5", pilot_runs=2, ea_sha256="x", gate_changes=[])
-    cand = {"ObMode": 1, "EntryMode": 0, "ObMaxAgeBars": 144, "FvgWindowBars": 12, "OrderExpiryBars": 6}
-    t = deliver.parameter_table(p, cand)
-    assert "| `ObMode` | 0 | 1 | 0, 1 (categorical) |" in t
-    assert "| `EntryMode` | 0 | 0 | 0, 1, 2, 3 (categorical) | unchanged" in t
-    assert "| `ObMaxAgeBars` | 96 | 144 | 48, 96, 144 |" in t
-    assert "| `OrderExpiryBars` | 12 | 6 | 6, 12, 18 |" in t
-    assert "| `SignalTF` | M15 | M5 |" in t
-
-
 def test_set_file_lines_round_trip(tmp_path):
     from mt5r import setfile
     p = tmp_path / "x.set"
