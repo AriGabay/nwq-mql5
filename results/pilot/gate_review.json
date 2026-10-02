@@ -51,7 +51,15 @@
   },
   "second_break_cancels": 1641,
   "second_break_same_bar_as_return": 866,
-  "fills_in_stacked_groups": 105,
+  "repeat_entries_same_setup": 0,
+  "shared_structure": {
+   "groups": 52,
+   "fills": 105,
+   "groups_all_distinct_obs": 52,
+   "groups_same_reaction_bar": 0,
+   "groups_positions_open_together": 52,
+   "groups_with_overlapping_ob_zones": 29
+  },
   "fills_per_month": 172.9944
  },
  "B": {
@@ -105,7 +113,15 @@
   },
   "second_break_cancels": 1745,
   "second_break_same_bar_as_return": 904,
-  "fills_in_stacked_groups": 53,
+  "repeat_entries_same_setup": 0,
+  "shared_structure": {
+   "groups": 26,
+   "fills": 53,
+   "groups_all_distinct_obs": 26,
+   "groups_same_reaction_bar": 0,
+   "groups_positions_open_together": 26,
+   "groups_with_overlapping_ob_zones": 12
+  },
   "fills_per_month": 45.9732
  }
 }

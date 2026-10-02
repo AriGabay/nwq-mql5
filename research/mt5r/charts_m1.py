@@ -8,7 +8,11 @@ Each example is one figure with two stacked panels on a time axis:
     the M1 panel shaded;
   * M1, from the earlier of 30 minutes before the touch and the earliest pivot the setup's events reference, to the
     exit or cancellation (KTD12): pivots (peak + confirmation markers), reference level and HH/LL bar, origin,
-    HL/LH, entry FVG, reaction candle, break and return markers, fill, SL, TP, exit and cancellation.
+    HL/LH, entry FVG, reaction candle, break and return markers, fill, SL, TP, exit and cancellation;
+  * a timeline under the panels: every event of the setup numbered in the order it became known (tick time for tick
+    events, the close of the bar for bar events, the close of the confirmation bar for pivots), with the same number
+    placed on the M1 panel where that knowledge arrived. For ``shared_structure`` the other fills of the same
+    structure are drawn too (their OB band, touch, reaction and fill).
 Bars sit at integer positions inside each panel so weekend gaps do not stretch the chart; tick times map to a
 fraction of their bar. Tick labels and the table carry server time (the EA's epoch values printed as UTC).
 
@@ -51,13 +55,16 @@ M1_PAD, M5_PAD = 3, 3        # ... plus this many whole bars of margin on each s
 #   opposing_structure_cancel  reason cancelled_opposing_structure (R22)
 #   return_break_same_bar      cancelled_second_break whose last return tick lies in the M1 bar of the cancelling close
 #   winner / loser             filled; net > 0 / <= 0 from the deals (else exit kind tp / sl, else exit vs fill)
-#   stacked_entries            filled setups sharing one structure change (sc_hh bar) and entry FVG, of which this
-#                              one lost an R16 competition (lost_competition) and then filled on a later reaction
+#   shared_structure           filled setups of different OBs that entered on one structure change (same sc_hh bar
+#                              and entry FVG), each on its own reaction candle (R16, R17)
+#   far_from_ob                filled; the entry lies beyond the OB edge in the trade direction by at least the 95th
+#                              percentile of that distance among the fills of its variant and side
 CATEGORIES = ("broken_returned", "second_break_cancel", "opposing_structure_cancel", "return_break_same_bar",
-              "winner", "loser", "stacked_entries")
+              "winner", "loser", "shared_structure", "far_from_ob")
+FAR_PCTL = 95
 # Most specific first, so a setup that fits several categories goes to the rarer one when others are available.
-PICK_ORDER = ("return_break_same_bar", "stacked_entries", "second_break_cancel", "opposing_structure_cancel",
-              "broken_returned", "winner", "loser")
+PICK_ORDER = ("return_break_same_bar", "shared_structure", "far_from_ob", "second_break_cancel",
+              "opposing_structure_cancel", "broken_returned", "winner", "loser")
 SIDES = (("L", "long"), ("S", "short"))
 CANCEL_REASONS = ("cancelled_second_break", "cancelled_opposing_structure")
 PIVOT_REF_KINDS = ("sc_hh", "sc_superseded", "hl", "hl_failed", "cancelled_opposing_structure")
@@ -263,8 +270,29 @@ def _same_bar_return_break(row, evs) -> bool:
     return _int(rets[-1], "bar_time") == _int(cancel[-1], "bar_time")
 
 
+def entry_distance(row) -> float | None:
+    """Fill beyond the OB edge in the trade direction (long: fill - OB high; short: OB low - fill)."""
+    fp, hi, lo = _flt(row, "fill_price"), _flt(row, "ob_high"), _flt(row, "ob_low")
+    if fp is None or hi is None or lo is None:
+        return None
+    return fp - hi if side_of(row.get("dir")) == "L" else lo - fp
+
+
+def _far(recs) -> set[int]:
+    """Setup ids whose entry distance is at or above the FAR_PCTL percentile of their variant and side (and > 0)."""
+    out, pools = set(), {}
+    for r in recs:
+        dist = entry_distance(r) if _is_filled(r) else None
+        if dist is not None:
+            pools.setdefault((variant_name(r.get("variant")), side_of(r.get("dir"))), []).append((dist, r))
+    for pool in pools.values():
+        cut = float(np.percentile([d for d, _ in pool], FAR_PCTL))
+        out |= {_int(r, "setup_id") for d, r in pool if d >= cut and d > 0}
+    return out
+
+
 def _stacks(recs, by_sid) -> dict[int, list[int]]:
-    """setup id -> ids of the other fills of its structure, for fills that lost R16 earlier and entered later."""
+    """setup id -> ids of the other fills of its structure (same variant, side, sc_hh bar and entry FVG)."""
     groups: dict[tuple, list[dict]] = {}
     for r in recs:
         if not _is_filled(r):
@@ -281,10 +309,8 @@ def _stacks(recs, by_sid) -> dict[int, list[int]]:
             continue
         ids = sorted(_int(m, "setup_id") for m in members)
         for m in members:
-            sid, react = _int(m, "setup_id"), _int(m, "reaction_bar_time")
-            lost = [_int(e, "bar_time") for e in _of(by_sid.get(sid, []), "lost_competition")]
-            if react is not None and any(b is not None and b < react for b in lost):
-                out[sid] = [i for i in ids if i != sid]
+            sid = _int(m, "setup_id")
+            out[sid] = [i for i in ids if i != sid]
     return out
 
 
@@ -299,6 +325,7 @@ def select_examples(setups: pd.DataFrame, events: pd.DataFrame | None, deals: pd
     by_sid = _events_by_setup(events)
     recs = sorted(setups.to_dict("records"), key=lambda r: _int(r, "setup_id"))
     stacks = _stacks(recs, by_sid)
+    far = _far(recs)
     present = sorted({variant_name(r.get("variant")) for r in recs})
     variants = [variant_name(v) for v in variants] if variants is not None else present
 
@@ -312,8 +339,10 @@ def select_examples(setups: pd.DataFrame, events: pd.DataFrame | None, deals: pd
             return reason == "cancelled_opposing_structure"
         if cat == "return_break_same_bar":
             return _same_bar_return_break(r, evs)
-        if cat == "stacked_entries":
+        if cat == "shared_structure":
             return sid in stacks
+        if cat == "far_from_ob":
+            return sid in far
         if cat in ("winner", "loser") and _is_filled(r):
             return _outcome(r, nets)[1] == ("win" if cat == "winner" else "loss")
         return False
@@ -343,7 +372,7 @@ def select_examples(setups: pd.DataFrame, events: pd.DataFrame | None, deals: pd
     cols = list(setups.columns) + ["category", "net", "related"]
     out = pd.DataFrame([{**r, "category": c, "net": _outcome(r, nets)[0] if _is_filled(r) else None,
                          "related": ", ".join(f"#{i}" for i in stacks.get(_int(r, "setup_id"), []))
-                         if c == "stacked_entries" else ""}
+                         if c == "shared_structure" else ""}
                         for _, _, c, r in chosen], columns=cols)
     out.attrs["missing"] = missing
     return out
@@ -401,6 +430,120 @@ def windows(row, events: pd.DataFrame | None, pivots: pd.DataFrame | None) -> di
     if fill_ms is not None and end is not None and end > fill_ms // 1000 + M1_AFTER_FILL_S:
         m1_end = fill_ms // 1000 + M1_AFTER_FILL_S       # a long-held position: the exit stays on the M5 panel
     return {"m5": (_int(row, "ob_time"), end), "m1": (min(starts), m1_end)}
+
+
+# --- timeline --------------------------------------------------------------------------------------------------
+EVENT_TEXT = {**{k: k for k in mc.SKIP_EVENTS}, "touch": "touch (first tick in the OB)", "break": "break: M1 close beyond the OB far edge",
+              "return": "return: renewed touch after the break", "sc_hh": "structure change",
+              "sc_superseded": "structure change superseded by a newer reference",
+              "fvg_fixed": "entry FVG fixed", "fvg_none": "no entry FVG in the move", "fvg_lapsed": "entry FVG lapsed",
+              "hl": "HL/LH confirmed", "hl_failed": "HL/LH failed (variant B)", "reaction": "reaction candle closed",
+              "lost_competition": "reaction lost R16", "entry_attempt": "Market order sent", "fill": "fill",
+              "exit": "exit", "cancelled_second_break": "cancelled: second break",
+              "cancelled_opposing_structure": "cancelled: opposing structure"}
+
+
+def _pivot(pivots, pid):
+    if pivots is None or pid is None or not len(pivots):
+        return None
+    p = pivots[pd.to_numeric(pivots["pivot_id"]) == pid]
+    return None if len(p) == 0 else p.iloc[0].to_dict()
+
+
+def _hm(t_s):
+    return "-" if t_s is None else dt.datetime.fromtimestamp(int(t_s), dt.timezone.utc).strftime("%m-%d %H:%M")
+
+
+def timeline(row, evs, pivots, tag="") -> list[dict]:
+    """Events of one setup in the order they became known. Each item: known_ms (tick time, or the close of the bar
+    that decided it), when (printed), what, price, note, and the marker position (mark_s, mark_px) on the M1 panel.
+    Pivot-based events name the pivot's peak bar and the close of its confirmation bar (conf_time + 1 min)."""
+    row = dict(row)
+    long_ = side_of(row.get("dir")) == "L"
+    items = []
+
+    def add(known_ms, what, price=None, note="", mark_s=None, tick=False):
+        when = (_fmt_ms(known_ms)[5:] if tick else _hm(known_ms // 1000) + " close") if known_ms is not None else "-"
+        items.append(dict(known_ms=known_ms, when=when, what=(tag + what), price=price, note=note,
+                          mark_s=mark_s if mark_s is not None else (known_ms / 1000 if known_ms else None),
+                          mark_px=price))
+
+    def piv_note(pid, role):
+        p = _pivot(pivots, pid)
+        if p is None:
+            return f"{role} pivot #{pid}"
+        return (f"{role} {'high' if str(p.get('type')).upper().startswith('H') else 'low'} {_fmt_px(_flt(p, 'level'))}"
+                f" peaked {_hm(_int(p, 'peak_time'))}, confirmed at the {_hm(_int(p, 'conf_time'))} close")
+
+    c3 = _int(row, "idfvg_c3_time")
+    if c3 is not None and not tag:
+        add((c3 + M5_SECONDS) * 1000, "OB identified (M5 identifying FVG closed)", None,
+            f"OB candle {_hm(_int(row, 'ob_time'))}, zone {_fmt_px(_flt(row, 'ob_low'))}-{_fmt_px(_flt(row, 'ob_high'))}")
+    for e in evs:
+        k = _str(e, "kind")
+        if k not in EVENT_TEXT or k == "exit" or (tag and k not in ("touch", "reaction", "fill", "lost_competition")):
+            continue
+        ms_, bt, px = _int(e, "tick_msc"), _int(e, "bar_time"), _flt(e, "price")
+        tick = k in ("touch", "return", "entry_attempt", "fill", "exit") or k in mc.SKIP_EVENTS and ms_ is not None \
+            and k != "lost_competition"
+        known = ms_ if tick and ms_ is not None else ((bt + M1_SECONDS) * 1000 if bt is not None else ms_)
+        note, mark_px = "", px
+        if k in ("sc_hh", "sc_superseded"):
+            note = piv_note(_int(e, "ref_id"), "crossed reference")
+            if k == "sc_hh" and _int(e, "ref_time") is not None:
+                note += f"; origin bar {_hm(_int(e, 'ref_time'))}"
+        elif k == "fvg_fixed":
+            note = f"zone {_fmt_px(_flt(e, 'lo'))}-{_fmt_px(_flt(e, 'hi'))}, candle 1 {_hm(_int(e, 'ref_time'))}"
+            mark_px = _flt(e, "hi") if long_ else _flt(e, "lo")
+        elif k in ("hl", "hl_failed"):
+            note = piv_note(_int(e, "ref_id"), "HL" if long_ else "LH")
+        elif k == "cancelled_opposing_structure":
+            note = piv_note(_int(e, "ref_id"), "H2" if long_ else "L2") + \
+                f"; close beyond {'L1' if long_ else 'H1'} peaked {_hm(_int(e, 'ref_time'))}"
+        elif k == "lost_competition":
+            note = f"winner #{_int(e, 'ref_id')}"
+        elif k == "entry_attempt":
+            note = f"Bid {_fmt_px(_flt(e, 'lo'))} / Ask {_fmt_px(_flt(e, 'hi'))}"
+        elif k == "fill":
+            note = f"SL {_fmt_px(_flt(e, 'lo'))}, TP {_fmt_px(_flt(e, 'hi'))}"
+        elif k in mc.SKIP_EVENTS:
+            note = _str(e, "detail") or ""
+        add(known, EVENT_TEXT[k], px if k != "fvg_fixed" else None, note,
+            mark_s=(known / 1000 if known is not None else None), tick=tick)
+        items[-1]["mark_px"] = mark_px
+    if not tag and _int(row, "exit_msc") is not None:
+        add(_int(row, "exit_msc"), f"exit ({_str(row, 'exit_kind') or '?'})", _flt(row, "exit_price"), tick=True)
+    items.sort(key=lambda it: (it["known_ms"] is None, it["known_ms"] or 0))
+    return items
+
+
+def _draw_timeline(ax, items, x_of, ax1, P1):
+    """Numbered markers on the M1 panel and the timeline table on ``ax`` (axis off)."""
+    stack: dict[int, int] = {}
+    for n, it in enumerate(items, 1):
+        it["n"] = n
+        x = x_of(it["mark_s"]) if it["mark_s"] is not None else None
+        if x is None or it["mark_px"] is None:
+            continue
+        key = int(round(x))
+        k = stack.get(key, 0)
+        stack[key] = k + 1
+        ax1.annotate(str(n), (x, it["mark_px"]), xytext=(9, -11 - 9 * k), textcoords="offset points", fontsize=6.5,
+                     color=SURFACE, ha="center", va="center", zorder=12,
+                     bbox=dict(boxstyle="circle,pad=0.18", facecolor=VIOLET, edgecolor="none", alpha=0.9))
+    ax.axis("off")
+    head = f"{'#':>2}  {'known at (server)':<23}{'event':<50}{'price':>9}  note"
+    lines = [f"{it['n']:>2}  {it['when']:<23}{it['what'][:49]:<50}{_fmt_px(it['price']) if it['price'] is not None else '':>9}"
+             f"  {it['note']}" for it in items]
+    cols = 1 if len(lines) <= 26 else 2
+    per = -(-len(lines) // cols)
+    for c in range(cols):
+        chunk = [head] + lines[c * per:(c + 1) * per]
+        ax.text(0.0 + 0.5 * c, 1.0, "\n".join(chunk), transform=ax.transAxes, fontsize=6.3 if cols == 1 else 5.6,
+                family="monospace", va="top", ha="left", color=INK)
+    ax.set_title("Timeline: when each fact became known (tick time, or the close of the deciding M1 bar; violet "
+                 "numbers on the M1 panel)", fontsize=8, color=MUTED, loc="left")
+    return per
 
 
 # --- drawing ---------------------------------------------------------------------------------------------------
@@ -487,9 +630,10 @@ def _box(ax, x0, x1, lo, hi, color, alpha, label, drawn, below=False):
     drawn.append(label)
 
 
-def draw_setup(ax5, ax1, row, run: dict, net=None, category=None, related=None) -> dict:
-    """Draw one setup on the M5 axes ``ax5`` and the M1 axes ``ax1``. Returns the drawn labels, the KTD12 windows and
-    the first/last bar time of each panel."""
+def draw_setup(ax5, ax1, row, run: dict, net=None, category=None, related=None, ax_tl=None) -> dict:
+    """Draw one setup on the M5 axes ``ax5`` and the M1 axes ``ax1`` (and its timeline on ``ax_tl``). ``related``:
+    '#12, #14' - other fills of the same structure, drawn on the M1 panel. Returns the drawn labels, the KTD12 windows
+    and the first/last bar time of each panel."""
     row = dict(row)
     sid = _int(row, "setup_id")
     evs = _events_by_setup(run.get("events")).get(sid, [])
@@ -748,6 +892,38 @@ def draw_setup(ax5, ax1, row, run: dict, net=None, category=None, related=None) 
         ax1.text(x1_end, 0.98, reason + " ", transform=ax1.get_xaxis_transform(), fontsize=7, color=RED,
                  rotation=90, va="top", ha="right")
         drawn.append("cancellation")
+
+    # other fills of the same structure (shared_structure): their OB band, touch, reaction and fill
+    items = timeline(row, evs, pivots)
+    rel_ids = [int(x) for x in str(related or "").replace("#", " ").replace(",", " ").split()]
+    setups = run.get("setups")
+    all_evs = _events_by_setup(run.get("events")) if rel_ids else {}
+    for rid in rel_ids:
+        if setups is None:
+            break
+        rr = setups[pd.to_numeric(setups["setup_id"]) == rid]
+        if len(rr) == 0:
+            continue
+        rr = rr.iloc[0].to_dict()
+        lo, hi = _flt(rr, "ob_low"), _flt(rr, "ob_high")
+        if lo is not None and hi is not None:
+            ax1.axhspan(lo, hi, facecolor="none", edgecolor=VIOLET, hatch="///", alpha=0.35, linewidth=0.6, zorder=0)
+            ax1.text(P1.n - 1, hi if long_ else lo, f"#{rid} OB {lo:.2f}-{hi:.2f} ", fontsize=7, color=VIOLET,
+                     ha="right", va="bottom" if long_ else "top")
+        fms, fpx = _int(rr, "fill_msc"), _flt(rr, "fill_price")
+        if fms is not None and fpx is not None and P1.i(fms // 1000) is not None:
+            ax1.plot([P1.x(fms / 1000)], [fpx], marker="D", markersize=6, color=VIOLET, markeredgecolor=SURFACE,
+                     linestyle="none", zorder=10)
+            _label(ax1, P1.x(fms / 1000), fpx, f"#{rid} fill {fpx:.2f}", dy=-9 * sign, color=VIOLET)
+        rt = _int(rr, "reaction_bar_time")
+        if rt is not None and P1.i(rt) is not None:
+            ax1.axvspan(P1.i(rt) - 0.5, P1.i(rt) + 0.5, color=VIOLET, alpha=0.10, zorder=0, linewidth=0)
+        items += timeline(rr, all_evs.get(rid, []), pivots, tag=f"#{rid} ")
+        drawn.append("related fills")
+    items.sort(key=lambda it: (it["known_ms"] is None, it["known_ms"] or 0))
+    if ax_tl is not None:
+        _draw_timeline(ax_tl, items, lambda s_: P1.x(s_) if P1.i(s_) is not None else None, ax1, P1)
+        drawn.append("timeline")
     _style(ax1, P1, "M1 price")
     ax1.set_xlabel("bar open time (server, MM-DD HH:MM)", fontsize=7, color=MUTED)
     ax1.set_title(f"M1 - from {_fmt_s(m1_t0)} (earlier of touch - 30 min and the earliest referenced pivot) to "
@@ -764,9 +940,12 @@ def draw_setup(ax5, ax1, row, run: dict, net=None, category=None, related=None) 
     parts.append(f"breaks {_breaks(row, evs)}, returns {_returns(row, evs)}")
     if _str(row, "sl_anchor"):
         parts.append(f"SL anchor {_str(row, 'sl_anchor')}")
+    dist = entry_distance(row)
+    if dist is not None:
+        parts.append(f"entry {dist:+.2f} beyond the OB edge, stop {abs(_flt(row, 'fill_price') - _flt(row, 'sl')):.2f}")
     title = " | ".join(parts)
     return {"drawn": drawn, "windows": w, "title": title, "m5_bars": (int(P5.t[0]), int(P5.t[-1])),
-            "m1_bars": (int(P1.t[0]), int(P1.t[-1]))}
+            "m1_bars": (int(P1.t[0]), int(P1.t[-1])), "timeline": items}
 
 
 # --- table and rendering ---------------------------------------------------------------------------------------
@@ -825,11 +1004,14 @@ def render(run: dict, out_dir, seed: int = SEED, n_per_category: int = 1, varian
     by_sid = _events_by_setup(run.get("events"))
     charts, rows = [], []
     for row in sel.to_dict("records"):
-        fig, (ax5, ax1) = plt.subplots(2, 1, figsize=(13, 9.5), facecolor=SURFACE,
-                                       gridspec_kw={"height_ratios": [2, 3]})
+        sid = _int(row, "setup_id")
+        n_ev = len(timeline(row, by_sid.get(sid, []), run.get("pivots"))) + 4 * len(str(row.get("related") or "").split())
+        tl_h = 0.55 + 0.13 * min(n_ev + 1, 27)
+        fig, (ax5, ax1, axt) = plt.subplots(3, 1, figsize=(14, 9.5 + tl_h), facecolor=SURFACE,
+                                            gridspec_kw={"height_ratios": [2, 3, tl_h / 1.6]})
         try:
             info = draw_setup(ax5, ax1, row, run, net=row.get("net"), category=row["category"],
-                              related=row.get("related") or None)
+                              related=row.get("related") or None, ax_tl=axt)
             fig.suptitle(info["title"], fontsize=10, color=INK, x=0.01, ha="left")
             fig.tight_layout()
             v, d = variant_name(row.get("variant")), dict(SIDES)[side_of(row.get("dir"))]
@@ -848,7 +1030,9 @@ def render(run: dict, out_dir, seed: int = SEED, n_per_category: int = 1, varian
         "",
         "Times are server time. Bar columns show the bar open time; touch, fill and exit are tick times with "
         "milliseconds. Net is profit + commission + swap of the position from the deals. Prices are Bid unless "
-        "noted; 'ref level' is the pivot level the structure-changing close crossed.",
+        "noted; 'ref level' is the pivot level the structure-changing close crossed. Each chart carries a timeline "
+        "of when every fact became known (tick time, or the close of the deciding M1 bar; a pivot is known at the "
+        "close of its confirmation bar).",
         "",
         "| " + " | ".join(TABLE_COLUMNS) + " |",
         "|" + "|".join("---" for _ in TABLE_COLUMNS) + "|",

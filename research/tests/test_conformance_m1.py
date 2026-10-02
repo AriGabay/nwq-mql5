@@ -445,3 +445,66 @@ def test_touch_on_the_final_unlogged_bar_is_not_flagged(base):
     row2 = row.copy()
     row2["touch_msc"] = (last - 120) * 1000 + 5000       # inside a logged bar that does not reach the OB
     assert "touch_r5" in rules(run_check({**run, "setups": row2}))
+
+
+# --- R20, R21, SL/TP execution and the coverage report -----------------------------------------------------------
+BASE_DEALS = pd.DataFrame([dict(time="2026.03.02 00:00:00", ticket=1, position_id=0, type=2, entry=0, volume=0.0,
+                                price=0.0, profit=10000.0, commission=0.0, swap=0.0, magic=0, comment=""),
+                           dict(time="2026.03.02 09:39:00", ticket=2, position_id=2, type=0, entry=0, volume=0.08,
+                                price=2016.7, profit=0.0, commission=0.0, swap=0.0, magic=770201, comment="")])
+EXIT_TAIL = [(2018.0, 2019.0, 2017.9, 2018.9),    # 40
+             (2018.9, 2041.0, 2018.8, 2040.5),    # 41 reaches TP 2040.90
+             (2040.5, 2041.5, 2040.4, 2041.2)]    # 42
+
+
+def full(run, params=PARAMS, deals=BASE_DEALS):
+    return cf.full(run["setups"], run["events"], run["pivots"], run["bars_m1"], run["bars_m5"], params, deals)
+
+
+def with_tail(run, tail, gap_from=None):
+    """The base run with extra M1 bars after the fill bar 39 (no new pivots); bars from index gap_from on open an
+    hour later, so that bar opens a session after a quote gap."""
+    m1 = run["bars_m1"]
+    rows = [dict(time=t(40 + k) + (3600 if gap_from is not None and 40 + k >= gap_from else 0), open=o, high=h,
+                 low=lo, close=c, tick_volume=100, spread=20, warmup=0) for k, (o, h, lo, c) in enumerate(tail)]
+    return {**run, "bars_m1": pd.concat([m1, pd.DataFrame(rows)], ignore_index=True)}
+
+
+def test_r20_size_is_one_percent_of_balance_over_the_stop_distance(base):
+    res = full(base)
+    assert res["violations"] == []
+    assert res["coverage"]["rules"]["risk_r20"] == {"checked": 1, "failed": 0, "passed": 1}
+    assert res["coverage"]["rules"]["cap_r21"]["checked"] == 1
+    assert "entry_price_ask" in res["coverage"]["unverifiable"]          # a long's request price is an Ask
+    assert "risk_r20" in rules(full(with_setup(base, volume=0.09))["violations"])
+    nodeals = full(base, deals=None)
+    assert "risk_without_deals" in nodeals["coverage"]["unverifiable"] and "risk_r20" not in nodeals["coverage"]["rules"]
+
+
+def test_r21_fill_needs_a_free_slot(base):
+    assert "cap_r21" in rules(full(base, params={**PARAMS, "MaxExposures": 0})["violations"])
+
+
+def test_exit_bar_must_reach_the_level_and_no_earlier_bar_may(base):
+    run = with_tail(base, EXIT_TAIL)
+    tp = dict(exit_msc=t(41) * 1000 + 5000, exit_kind="tp", exit_price=2040.9)
+    assert full(with_setup(run, **tp))["violations"] == []
+    assert "exit_sltp" in rules(full(with_setup(run, **{**tp, "exit_kind": "sl", "exit_price": 2004.6}))["violations"])
+    late = dict(exit_msc=t(42) * 1000 + 5000, exit_kind="tp", exit_price=2040.9)
+    v = full(with_setup(run, **late))["violations"]
+    assert any(x["rule"] == "exit_sltp" and "already reaches" in x["detail"] for x in v)
+
+
+def test_a_level_reached_only_in_a_session_open_bar_is_unverifiable_not_a_violation(base):
+    run = with_tail(base, EXIT_TAIL, gap_from=41)              # bar 41 opens after a one-hour quote gap
+    late = dict(exit_msc=(t(42) + 3600) * 1000 + 5000, exit_kind="tp", exit_price=2040.9)
+    res = full(with_setup(run, **late))
+    assert res["violations"] == []
+    assert res["coverage"]["unverifiable"]["level_in_session_open_bar"]["cases"] == 1
+
+
+def test_coverage_lists_tick_level_claims_as_unverifiable(base):
+    cov = full(base)["coverage"]
+    assert cov["unverifiable"]["tick_within_minute"]["cases"] >= 1          # the touch tick inside its minute
+    assert all(r["failed"] == 0 for r in cov["rules"].values())
+    assert set(cov["rules"]) <= set(cf.RULES) and set(cov["unverifiable"]) <= set(cf.UNVERIFIABLE)

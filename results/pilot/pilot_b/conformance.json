@@ -5,6 +5,179 @@
  "bars_m5": 52665,
  "violations": 0,
  "violation_rows": [],
+ "coverage": {
+  "rules": {
+   "ob_r3": {
+    "checked": 13434,
+    "failed": 0,
+    "passed": 13434
+   },
+   "touch_r5": {
+    "checked": 6717,
+    "failed": 0,
+    "passed": 6717
+   },
+   "break_r6": {
+    "checked": 2685,
+    "failed": 0,
+    "passed": 2685
+   },
+   "return_r7": {
+    "checked": 2010,
+    "failed": 0,
+    "passed": 2010
+   },
+   "second_break_r8": {
+    "checked": 3490,
+    "failed": 0,
+    "passed": 3490
+   },
+   "pivot_causality_r9": {
+    "checked": 109979,
+    "failed": 0,
+    "passed": 109979
+   },
+   "sc_r10": {
+    "checked": 9396,
+    "failed": 0,
+    "passed": 9396
+   },
+   "hl_r11": {
+    "checked": 2010,
+    "failed": 0,
+    "passed": 2010
+   },
+   "fvg_r12": {
+    "checked": 13637,
+    "failed": 0,
+    "passed": 13637
+   },
+   "fvg_lapse_r13": {
+    "checked": 3387,
+    "failed": 0,
+    "passed": 3387
+   },
+   "reaction_r14": {
+    "checked": 482,
+    "failed": 0,
+    "passed": 482
+   },
+   "entry_r15": {
+    "checked": 764,
+    "failed": 0,
+    "passed": 764
+   },
+   "competition_r16": {
+    "checked": 85,
+    "failed": 0,
+    "passed": 85
+   },
+   "one_trade_r17": {
+    "checked": 6717,
+    "failed": 0,
+    "passed": 6717
+   },
+   "sl_r18": {
+    "checked": 367,
+    "failed": 0,
+    "passed": 367
+   },
+   "tp_r19": {
+    "checked": 367,
+    "failed": 0,
+    "passed": 367
+   },
+   "exit_sltp": {
+    "checked": 366,
+    "failed": 0,
+    "passed": 366
+   },
+   "risk_r20": {
+    "checked": 371,
+    "failed": 0,
+    "passed": 371
+   },
+   "cap_r21": {
+    "checked": 393,
+    "failed": 0,
+    "passed": 393
+   },
+   "cancel_r22": {
+    "checked": 7744,
+    "failed": 0,
+    "passed": 7744
+   },
+   "tf_sync": {
+    "checked": 52665,
+    "failed": 0,
+    "passed": 52665
+   }
+  },
+  "unverifiable": {
+   "entry_price_ask": {
+    "cases": 205,
+    "why": "long request/fill price is an Ask (not in the bars); the volume check uses the logged price",
+    "example_setups": [
+     682,
+     695,
+     760,
+     839,
+     865
+    ]
+   },
+   "short_entry_ask": {
+    "cases": 164,
+    "why": "short SL spread: Ask - Bid at the entry tick is the EA's own log (bars carry Bid only); the checker verifies SL = anchor + buffer + that logged spread and the Bid against the bar open",
+    "example_setups": [
+     744,
+     813,
+     797,
+     850,
+     883
+    ]
+   },
+   "touch_after_last_logged_bar": {
+    "cases": 1,
+    "why": "touch tick inside the final M1 bar, which never closes and is never logged",
+    "example_setups": [
+     6714
+    ]
+   },
+   "tick_within_minute": {
+    "cases": 7994,
+    "why": "touch/return: the minute and a Bid inside that bar at the zone edge are verified; which tick of the minute (tick_msc) is the EA's claim - the bars carry minute OHLC only",
+    "example_setups": [
+     302,
+     685,
+     300,
+     684,
+     687
+    ]
+   },
+   "short_exit_ask": {
+    "cases": 163,
+    "why": "short exits trigger on Ask: only the necessary Bid conditions are checked (no earlier bar whose Bid high reaches the SL; exit-bar Bid low at/below the TP)",
+    "example_setups": [
+     744,
+     813,
+     797,
+     850,
+     883
+    ]
+   },
+   "level_in_session_open_bar": {
+    "cases": 9,
+    "why": "SL/TP level reached only inside the first M1 bar after a quote gap (daily break, weekend): the tester executes no order or stop in that minute (pilot: 0 fills and 0 exits in those bars, ticks present); the exit came later and is not re-derivable",
+    "example_setups": [
+     919,
+     1057,
+     3897,
+     4191,
+     4263
+    ]
+   }
+  }
+ },
  "occurrences": {
   "long": 3429,
   "short": 3288,

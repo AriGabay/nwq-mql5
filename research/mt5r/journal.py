@@ -22,11 +22,16 @@ def redact(line: str) -> str:
 def facts(text: str) -> dict:
     out = {"discarded_days": 0, "discarded_minutes": 0, "total_minute_bars": None, "real_ticks_begin": None,
            "warmup_bars": None, "stops_level_pts": None, "tick": None, "final_balance": None,
-           "every_tick_generation_used": False, "funnel": {}}
+           "every_tick_generation_used": False, "ticks": None, "bars_generated": None, "funnel": {}}
     m = re.search(r"real ticks discarded for (\d+) minutes of (\d+) total minute bars", text)
     if m:
         out["discarded_minutes"], out["total_minute_bars"] = int(m.group(1)), int(m.group(2))
         out["every_tick_generation_used"] = "every tick generation used" in text
+    m = re.search(r"(\d+) ticks, (\d+) bars generated", text)
+    if m:
+        out["ticks"], out["bars_generated"] = int(m.group(1)), int(m.group(2))
+        if out["total_minute_bars"] is None:     # no discard line when every minute had real ticks
+            out["total_minute_bars"] = out["bars_generated"]
     m = re.search(r"real ticks discarded for (\d+) whole days", text)
     if m:
         out["discarded_days"] = int(m.group(1))

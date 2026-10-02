@@ -62,10 +62,33 @@ from . import m1_contract as mc
 M1_S, M5_S = 60, 300
 EPS = 1e-6
 DEFAULT_PARAMS = dict(StructureVariant=0, ImpulseWindowBars=2, SwingStrengthM1=3, StopBufferPoints=20, RiskRR=2.0,
-                      point=0.01)
+                      point=0.01, RiskPercent=1.0, MaxExposures=3, contract_size=100, lot_step=0.01, lot_min=0.01)
 RULES = ["ob_r3", "touch_r5", "break_r6", "return_r7", "second_break_r8", "pivot_causality_r9", "sc_r10", "hl_r11",
          "fvg_r12", "fvg_lapse_r13", "reaction_r14", "entry_r15", "competition_r16", "one_trade_r17", "sl_r18",
-         "tp_r19", "cancel_r22", "tf_sync", "fields"]
+         "tp_r19", "exit_sltp", "risk_r20", "cap_r21", "cancel_r22", "tf_sync", "fields"]
+# What the logs cannot prove (coverage report): each key counts cases the checker could not verify, or verified only
+# in part, and why. A case listed here is NOT evidence of conformance.
+UNVERIFIABLE = {
+    "tick_within_minute": "touch/return: the minute and a Bid inside that bar at the zone edge are verified; which "
+                          "tick of the minute (tick_msc) is the EA's claim - the bars carry minute OHLC only",
+    "touch_after_last_logged_bar": "touch tick inside the final M1 bar, which never closes and is never logged",
+    "short_entry_ask": "short SL spread: Ask - Bid at the entry tick is the EA's own log (bars carry Bid only); the "
+                       "checker verifies SL = anchor + buffer + that logged spread and the Bid against the bar open",
+    "short_sl_spread_proxy": "short fill without a logged Bid/Ask: the bar spread column is only a proxy",
+    "short_exit_ask": "short exits trigger on Ask: only the necessary Bid conditions are checked (no earlier bar whose "
+                      "Bid high reaches the SL; exit-bar Bid low at/below the TP)",
+    "entry_price_ask": "long request/fill price is an Ask (not in the bars); the volume check uses the logged price",
+    "skipped_stops_level": "broker stops/freeze level at that tick is not logged per tick",
+    "skipped_margin": "free margin and the margin requirement at that tick are not logged",
+    "skipped_broker_reject": "the server reply cannot be re-derived from bars",
+    "market_closed_retry": "the market-closed reply and the retry ticks cannot be re-derived from bars",
+    "risk_without_deals": "no rl_deals: the balance at entry, hence R20, cannot be rebuilt",
+    "exit_same_bar_as_fill": "fill and exit in one M1 bar: tick order inside the bar is not in the logs",
+    "exit_after_last_logged_bar": "exit tick inside the final M1 bar, which is never logged",
+    "level_in_session_open_bar": "SL/TP level reached only inside the first M1 bar after a quote gap (daily break, "
+                                 "weekend): the tester executes no order or stop in that minute (pilot: 0 fills and "
+                                 "0 exits in those bars, ticks present); the exit came later and is not re-derivable",
+}
 RULE_BY_KIND = {"touch": "touch_r5", "break": "break_r6", "return": "return_r7",
                 "cancelled_second_break": "second_break_r8", "sc_hh": "sc_r10", "sc_superseded": "sc_r10",
                 "fvg_fixed": "fvg_r12", "fvg_none": "fvg_r12", "fvg_lapsed": "fvg_lapse_r13", "hl": "hl_r11",
@@ -168,6 +191,11 @@ def read_run(folder, tag) -> dict:
                 break
         else:
             raise FileNotFoundError(folder / f"rl_{name}_{tag}.csv[.gz]")
+    for suffix in (".csv", ".csv.gz"):                 # optional: R20 needs the balance history
+        p = folder / f"rl_deals_{tag}{suffix}"
+        if p.exists():
+            out["deals"] = pd.read_csv(p)
+            break
     return out
 
 
@@ -219,6 +247,8 @@ class _Bars:
         self.n = len(self.t)
         self._idx = {x: i for i, x in enumerate(self.t)}
         self.l_np, self.h_np = np.asarray(self.l), np.asarray(self.h)
+        # first bar after a quote gap > 5 min (daily break, weekend): quotes arrive, nothing executes
+        self.gap_open = [i > 0 and self.t[i] - self.t[i - 1] > 300 for i in range(self.n)]
 
     def i(self, time):
         return None if time is None else self._idx.get(int(time))
@@ -340,7 +370,7 @@ class _Sim:
 
 # --- the replay ------------------------------------------------------------------------------------------------
 class _Replay:
-    def __init__(self, setups, events, pivots, bars_m1, bars_m5, params):
+    def __init__(self, setups, events, pivots, bars_m1, bars_m5, params, deals=None):
         self.prm = {**DEFAULT_PARAMS, **(params or {})}
         self.N = int(self.prm["SwingStrengthM1"])
         self.pt = float(self.prm["point"])
@@ -350,9 +380,32 @@ class _Replay:
         self.out: list[dict] = []
         self.occ = dict.fromkeys(OCC_KEYS, 0)
         self.frames = dict(setups=setups, events=events, pivots=pivots, bars_m1=bars_m1, bars_m5=bars_m5)
+        self.deals = deals
+        self.checked = Counter()
+        self.unv = Counter()
+        self.unv_ex: dict[str, list] = {}
 
     def add(self, sid, rule, detail):
         self.out.append({"setup_id": sid, "rule": rule, "detail": detail})
+
+    def chk(self, rule, n=1):
+        """Count one evaluated check of a rule (coverage report); violations are counted separately."""
+        self.checked[rule] += n
+
+    def nochk(self, key, sid=None):
+        """Count one case the logs cannot prove (UNVERIFIABLE[key])."""
+        self.unv[key] += 1
+        ex = self.unv_ex.setdefault(key, [])
+        if sid is not None and len(ex) < 5 and sid not in ex:
+            ex.append(sid)
+
+    def coverage(self) -> dict:
+        failed = Counter(v["rule"] for v in self.out)
+        rules = {r: {"checked": int(self.checked[r]), "failed": int(failed[r]),
+                     "passed": int(max(self.checked[r] - failed[r], 0))} for r in RULES if self.checked[r] or failed[r]}
+        unv = {k: {"cases": int(n), "why": UNVERIFIABLE[k], "example_setups": self.unv_ex.get(k, [])}
+               for k, n in self.unv.items() if n}
+        return {"rules": rules, "unverifiable": unv}
 
     # ------------------------------------------------------------------
     def run(self):
@@ -374,11 +427,13 @@ class _Replay:
         self.B5 = _Bars(f["bars_m5"], M5_S)
         self._tf_sync()
         self._prepare()
+        self._prepare_money()
         self._candidates()
         self._simulate()
         self._check_pivots()
         for s in self.sims:
             self._compare(s)
+            self._check_exit(s)
         self._unconsumed()
         return self
 
@@ -395,6 +450,7 @@ class _Replay:
             if a >= b:
                 self.add(None, "tf_sync", f"M5 bar {T} has no M1 bars")
                 continue
+            self.chk("tf_sync")
             agg = (B.o[a], max(B.h[a:b]), min(B.l[a:b]), B.c[b - 1])
             got = (B5.o[j], B5.h[j], B5.l[j], B5.c[j])
             if any(abs(x - y) > EPS for x, y in zip(agg, got)):
@@ -473,6 +529,7 @@ class _Replay:
         seen = Counter((s.sign, s.ob_time) for s in self.sims)
         for s in self.sims:
             key = (s.sign, s.ob_time)
+            self.chk("ob_r3")
             if seen[key] > 1:
                 self.add(s.sid, "ob_r3", f"OB candle {s.ob_time} carries {seen[key]} setups (each candle once)")
             c = cands.get(key)
@@ -495,6 +552,7 @@ class _Replay:
                 self.add(s.sid, "fields", f"identified_in_warmup={w} but candle 3 warm-up flag={B5.warm[c['c3']]}")
         have = set(seen)
         for (sign, ob_t), c in cands.items():
+            self.chk("ob_r3")
             if (sign, ob_t) not in have:
                 self.add(None, "ob_r3", f"{'long' if sign > 0 else 'short'} candidate OB {ob_t} (identifying FVG "
                                         f"{B5.t[c['c1']]}..{B5.t[c['c3']]}) has no rl_setups row")
@@ -556,6 +614,8 @@ class _Replay:
                 tm = _int(s.row.get("touch_msc"))
                 after_log = self.B.n and tm is not None and tm >= self.B.close_ms(self.B.n - 1)
                 s.reason = "run_end_waiting" if after_log else "run_end_untouched"
+                if after_log:
+                    self.nochk("touch_after_last_logged_bar", s.sid)
             elif s.status == "active":
                 s.reason = "run_end_waiting"
             if s.reason in ("run_end_untouched", "run_end_waiting"):
@@ -718,6 +778,7 @@ class _Replay:
                and e["tick_msc"] is not None and e["tick_msc"] >= B.close_ms(i)]
         evs.sort(key=lambda e: (e["tick_msc"], e["seq"] or 0))
         out_i = next((k for k, e in enumerate(evs) if e["kind"] in OUTCOME_KINDS), None)
+        self.chk("entry_r15")
         if out_i is None:
             if i + 1 < B.n:
                 self.add(s.sid, "entry_r15", f"reaction at {B.t[i]} won R16 but no entry decision (fill or skip) "
@@ -729,7 +790,10 @@ class _Replay:
         first, outcome = window[0], window[-1]
         attempts = [e for e in window if e["kind"] == "entry_attempt"]
         self.occ["market_closed_retry"] += len(attempts) > 1
+        if len(attempts) > 1:
+            self.nochk("market_closed_retry", s.sid)
         last = attempts[-1] if attempts else None    # the attempt that filled carries Bid (lo) and Ask (hi)
+        s.req_px = last["price"] if last else None
         s.entry_spread = (last["hi"] - last["lo"]) if last and last["lo"] is not None and last["hi"] is not None             else None
         fb = B.bar_at_ms(first["tick_msc"])
         if i + 1 < B.n and fb != i + 1:
@@ -745,6 +809,9 @@ class _Replay:
                                              f"skipped_stop_crossed expected, logged {first['kind']} (AE7)")
             if not crossed and first["kind"] == "skipped_stop_crossed":
                 self.add(s.sid, "entry_r15", f"skipped_stop_crossed but Bid {bid} does not cross the stop")
+            if first["kind"] == "entry_attempt" and first["lo"] is not None and abs(first["lo"] - bid) > self.tol:
+                self.add(s.sid, "entry_r15", f"first attempt Bid {first['lo']} != open {bid} of bar {B.t[i + 1]}: "
+                                             "not the first tick after the reaction close")
         for e in window:
             if e["kind"] == "skipped_stop_crossed":
                 self._check_skip_sl(s, e, kind, anchor, B.o[i + 1] if e is first and fb == i + 1 else None)
@@ -756,6 +823,7 @@ class _Replay:
             s.queued = None
 
     def _check_skip_sl(self, s, e, kind, anchor, bid):
+        self.chk("sl_r18")
         sl, price = e["lo"], e["price"]
         if sl is None or price is None:
             self.add(s.sid, "fields", "skipped_stop_crossed lacks price or lo=sl")
@@ -777,6 +845,16 @@ class _Replay:
         e = q["ev"]
         if e["kind"] != "fill":
             self.occ[e["kind"]] += 1
+            if e["kind"] == "skipped_cap":
+                self._check_cap(s, e["tick_msc"], int(e["detail"]) if (e["detail"] or "").isdigit() else -1)
+            elif e["kind"] == "skipped_volume":
+                try:
+                    lots = float(e["detail"])
+                except (TypeError, ValueError):
+                    lots = None
+                self._check_risk(s, e["tick_msc"], e["price"], e["lo"], lots, skip=True)
+            elif e["kind"] in UNVERIFIABLE:
+                self.nochk(e["kind"], s.sid)
             return
         if s.broken:
             self.add(s.sid, "entry_r15", "fill while the OB is in a break episode (R7)")
@@ -800,7 +878,14 @@ class _Replay:
         if fill is None or sl is None:
             self.add(s.sid, "fields", "fill without price or SL")
             return
+        # R21 and R20 at the fill
+        self._check_cap(s, e["tick_msc"], None)
+        px = getattr(s, "req_px", None)
+        self._check_risk(s, e["tick_msc"], px if px is not None else _flt(r.get("request_price")), sl,
+                         _flt(r.get("volume")), skip=False)
         # R18
+        self.chk("sl_r18")
+        self.chk("tp_r19")
         row_kind, row_anchor = _str(r.get("sl_anchor")), _flt(r.get("sl_anchor_price"))
         row_buf = _flt(r.get("buffer_pts"))
         if row_kind != kind:
@@ -815,6 +900,7 @@ class _Replay:
         else:
             spread = sl - anchor - self.buf
             exact = getattr(s, "entry_spread", None)      # Ask - Bid logged on the entry attempt
+            self.nochk("short_entry_ask" if exact is not None else "short_sl_spread_proxy", s.sid)
             if exact is None and bar is not None and np.isfinite(self.B.spread[bar]):
                 exact = self.B.spread[bar] * self.pt      # fallback for logs without Bid/Ask on the attempt
             if spread < -tol or (exact is not None and abs(spread - exact) > tol):
@@ -834,6 +920,7 @@ class _Replay:
         for pid, p in self.logged_piv.items():
             key = (p["typ"], p["peak_time"])
             logged_key[pid] = key
+            self.chk("pivot_causality_r9")
             x = replay.get(key)
             if x is None:
                 self.add(None, "pivot_causality_r9", f"pivot {pid} ({p['typ']} {p['peak_time']}) is not a strict "
@@ -850,6 +937,7 @@ class _Replay:
         for x in seq.raw:
             if not x.entered:
                 continue
+            self.chk("pivot_causality_r9")
             key = (x.typ, B.t[x.peak])
             pid = self.key_to_pid.get(key)
             if pid is None:
@@ -861,6 +949,126 @@ class _Replay:
             got_rb = None if rb is None else logged_key.get(rb, ("?", rb))
             if got_rb != exp_rb:
                 self.add(None, "pivot_causality_r9", f"pivot {pid} replaced_by {rb}, compression gives {exp_rb}")
+
+    # ------------------------------------------------------------------
+    def _prepare_money(self):
+        """Positions from rl_setups (R21) and, with rl_deals, the balance at any ms (R20): the balance deals plus the
+        net result of every position whose exit came strictly before."""
+        self.positions = []
+        for r in self.setups.to_dict("records"):
+            f = _int(r.get("fill_msc"))
+            if f is not None:
+                x = _int(r.get("exit_msc"))
+                self.positions.append((f, x if x is not None else 2 ** 62, _int(r.get("setup_id")),
+                                       _int(r.get("position_id"))))
+        self.money, self.deal_volume = None, {}
+        d = self.deals
+        if d is None or len(d) == 0:
+            return
+        d = d.copy()
+        for c in ("type", "entry", "position_id", "volume", "profit", "commission", "swap"):
+            d[c] = pd.to_numeric(d[c], errors="coerce")
+        net = (d["profit"] + d["commission"] + d["swap"]).fillna(0)
+        deposit = float(net[d["type"] == 2].sum())
+        trade = d["type"].isin([0, 1])
+        by_pos = net[trade].groupby(d.loc[trade, "position_id"]).sum().to_dict()
+        ins = d[trade & (d["entry"] == 0)]
+        self.deal_volume = dict(zip(ins["position_id"].astype(int), ins["volume"].astype(float)))
+        closed = sorted((x, by_pos.get(pid, 0.0)) for f, x, _, pid in self.positions
+                        if pid is not None and x < 2 ** 62)
+        self.money = (deposit, [c[0] for c in closed], np.cumsum([c[1] for c in closed]).tolist())
+
+    def _balance(self, ms) -> float:
+        deposit, times, cum = self.money
+        k = bisect.bisect_left(times, ms)          # exits strictly before ms
+        return deposit + (cum[k - 1] if k else 0.0)
+
+    def _check_cap(self, s, ms, logged_open):
+        """R21: a fill needs fewer than MaxExposures open positions; skipped_cap (logged_open not None) needs at
+        least that many, and the logged count must match."""
+        if ms is None:
+            return
+        self.chk("cap_r21")
+        n = sum(1 for f, x, sid, _ in self.positions if sid != s.sid and f < ms < x)
+        cap = int(self.prm["MaxExposures"])
+        if logged_open is None and n >= cap:
+            self.add(s.sid, "cap_r21", f"fill at {ms} with {n} positions already open (cap {cap})")
+        elif logged_open is not None and (n < cap or n != logged_open):
+            self.add(s.sid, "cap_r21", f"skipped_cap at {ms} logs {logged_open} open, positions give {n} (cap {cap})")
+
+    def _check_risk(self, s, ms, px, sl, lots, skip):
+        """R20: lots = floor(balance x RiskPercent / (|price - SL| x contract) / step) x step. A short's SL already
+        holds the entry spread (R18), so |Bid - SL| includes it."""
+        if self.money is None:
+            self.nochk("risk_without_deals", s.sid)
+            return
+        if ms is None or px is None or sl is None:
+            return
+        self.chk("risk_r20")
+        if s.sign > 0:
+            self.nochk("entry_price_ask", s.sid)
+        step = float(self.prm["lot_step"])
+        bal = self._balance(ms)
+        dist = abs(px - sl)
+        if dist <= 0:
+            self.add(s.sid, "risk_r20", f"zero stop distance at {ms}")
+            return
+        raw = bal * float(self.prm["RiskPercent"]) / 100.0 / (dist * float(self.prm["contract_size"])) / step
+        ok = {round(float(np.floor(raw + 1e-9)) * step, 8)}
+        if abs(raw - round(raw)) < 1e-6:                 # a boundary case: either rounding is acceptable
+            ok |= {round((round(raw) - 1) * step, 8), round(round(raw) * step, 8)}
+        if lots is None or not any(abs(lots - v) <= step / 2 for v in ok):
+            self.add(s.sid, "risk_r20", f"{'skip' if skip else 'fill'} at {ms}: lots {lots}, "
+                                        f"{self.prm['RiskPercent']}% of balance {bal:.2f} over |{px} - {sl}| gives "
+                                        f"{sorted(ok)}")
+        if skip and min(ok) >= float(self.prm["lot_min"]) - 1e-9:
+            self.add(s.sid, "risk_r20", f"skipped_volume at {ms} but the size {min(ok)} is tradeable")
+        pid = _int(s.row.get("position_id"))
+        if not skip and pid is not None and pid in self.deal_volume and lots is not None \
+                and abs(self.deal_volume[pid] - lots) > step / 2:
+            self.add(s.sid, "risk_r20", f"rl_setups volume {lots} != deal volume {self.deal_volume[pid]}")
+
+    def _check_exit(self, s):
+        """SL/TP execution at minute level: the exit bar reaches the level and no M1 bar strictly between the fill
+        bar and the exit bar reached SL or TP first. Longs trigger on Bid (fully in the bars); shorts trigger on Ask,
+        so only necessary Bid conditions are checked for them."""
+        r, B = s.row, self.B
+        if s.reason != "filled" or _str(r.get("reason")) != "filled":
+            return
+        fill_ms, ex_ms, kind = _int(r.get("fill_msc")), _int(r.get("exit_msc")), _str(r.get("exit_kind"))
+        sl, tp, xp = _flt(r.get("sl")), _flt(r.get("tp")), _flt(r.get("exit_price"))
+        if ex_ms is None or kind not in ("sl", "tp") or sl is None or tp is None:
+            return
+        self.chk("exit_sltp")
+        f, x = B.bar_at_ms(fill_ms), B.bar_at_ms(ex_ms)
+        if x is None:
+            self.nochk("exit_after_last_logged_bar", s.sid)
+            return
+        if f == x:
+            self.nochk("exit_same_bar_as_fill", s.sid)
+        lo_j = f + 1 if f is not None else x
+        bad = []
+        if s.sign > 0:
+            if kind == "sl" and not (B.l[x] <= sl + EPS and (xp is None or xp <= sl + self.tol)):
+                bad.append(f"SL exit at {ex_ms} @ {xp}: bar low {B.l[x]} does not reach SL {sl}")
+            if kind == "tp" and not (B.h[x] >= tp - EPS and (xp is None or xp >= tp - self.tol)):
+                bad.append(f"TP exit at {ex_ms} @ {xp}: bar high {B.h[x]} does not reach TP {tp}")
+            hit = [j for j in range(lo_j, x) if B.l[j] <= sl + EPS or B.h[j] >= tp - EPS]
+        else:
+            self.nochk("short_exit_ask", s.sid)
+            if kind == "sl" and xp is not None and xp < sl - self.tol:
+                bad.append(f"SL exit at {ex_ms} @ {xp} below the short SL {sl}")
+            if kind == "tp" and not (B.l[x] <= tp + EPS and (xp is None or xp <= tp + self.tol)):
+                bad.append(f"TP exit at {ex_ms} @ {xp}: bar low {B.l[x]} does not reach TP {tp}")
+            hit = [j for j in range(lo_j, x) if B.h[j] >= sl - EPS]
+        if hit and all(B.gap_open[j] for j in hit):
+            self.nochk("level_in_session_open_bar", s.sid)
+        first = next((j for j in hit if not B.gap_open[j]), None)
+        if first is not None:
+            bad.append(f"bar {B.t[first]} between the fill and the {kind} exit at {ex_ms} already reaches "
+                       f"{'SL or TP' if s.sign > 0 else 'the SL with its Bid'}")
+        for b in bad:
+            self.add(s.sid, "exit_sltp", b)
 
     def _piv_key(self, pid):
         p = self.logged_piv.get(pid)
@@ -899,6 +1107,7 @@ class _Replay:
             pool = {}
             for e in logs:
                 pool.setdefault(e["bar"], []).append(e)
+            self.chk(rule, len(exps))
             for x in exps:
                 cand = pool.get(x["bar"])
                 if cand:
@@ -908,6 +1117,7 @@ class _Replay:
             allowed_break = {x["bar"] for x in exp_by.get("cancelled_second_break", [])}
             for bar, rest in pool.items():
                 for e in rest:
+                    self.chk(rule)
                     if kind == "break" and bar in allowed_break:
                         continue
                     if kind == "touch":
@@ -926,6 +1136,9 @@ class _Replay:
         # rl_setups row
         r = s.row
         reason = _str(r.get("reason"))
+        self.chk({"filled": "entry_r15", "cancelled_second_break": "second_break_r8",
+                  "cancelled_opposing_structure": "cancel_r22"}.get(s.reason, "touch_r5"))
+        self.chk("one_trade_r17")
         if reason != s.reason and reason in mc.REASONS:
             pair = {reason, s.reason}
             rule = ("second_break_r8" if "cancelled_second_break" in pair else
@@ -957,6 +1170,7 @@ class _Replay:
         B, sid, tol, kind = self.B, s.sid, self.tol, x["kind"]
         rule = RULE_BY_KIND[kind]
         if kind in ("touch", "return"):
+            self.nochk("tick_within_minute", sid)
             edge = (s.ob_hi if s.sign > 0 else s.ob_lo) if kind == "touch" else (s.ob_lo if s.sign > 0 else s.ob_hi)
             p, i = e["price"], x["bar"]
             bad = p is None or not (B.l[i] - tol <= p <= B.h[i] + tol)
@@ -1004,6 +1218,7 @@ class _Replay:
         B = self.B
         if e.get("bar") is None:
             return
+        self.chk("fvg_r12")
         scs = [x for x in s.exp if x["kind"] == "sc_hh" and x["bar"] < e["bar"]]
         c1 = B.i(e["ref_time"])
         if c1 is None:
@@ -1029,6 +1244,7 @@ class _Replay:
         ev_bar, peak = B.i(e["bar_time"]), B.i(p["peak_time"])
         if ev_bar is None or peak is None:
             return
+        self.chk("pivot_causality_r9")
         if peak + self.N > ev_bar:
             self.add(s.sid, "pivot_causality_r9", f"{e['kind']} at {B.t[ev_bar]} uses pivot {e['ref_id']} whose "
                                                   f"confirmation bar (peak + {self.N}) closes later")
@@ -1056,12 +1272,21 @@ class _Replay:
 
 # --- public API ------------------------------------------------------------------------------------------------
 def check(setups: pd.DataFrame, events: pd.DataFrame, pivots: pd.DataFrame, bars_m1: pd.DataFrame,
-          bars_m5: pd.DataFrame, params: dict | None = None) -> list[dict]:
+          bars_m5: pd.DataFrame, params: dict | None = None, deals: pd.DataFrame | None = None) -> list[dict]:
     """Violations of R3-R22 re-derived from the logged bars, one dict {setup_id, rule, detail} per failed check."""
-    return _Replay(setups, events, pivots, bars_m1, bars_m5, params).run().out
+    return _Replay(setups, events, pivots, bars_m1, bars_m5, params, deals).run().out
 
 
 def occurrences(setups: pd.DataFrame, events: pd.DataFrame, pivots: pd.DataFrame, bars_m1: pd.DataFrame,
-                bars_m5: pd.DataFrame, params: dict | None = None) -> dict[str, int]:
+                bars_m5: pd.DataFrame, params: dict | None = None,
+                deals: pd.DataFrame | None = None) -> dict[str, int]:
     """How often the replay exercised each behavioural case (expected trajectory, not the EA's claims)."""
-    return {k: int(v) for k, v in _Replay(setups, events, pivots, bars_m1, bars_m5, params).run().occ.items()}
+    return {k: int(v) for k, v in _Replay(setups, events, pivots, bars_m1, bars_m5, params, deals).run().occ.items()}
+
+
+def full(setups: pd.DataFrame, events: pd.DataFrame, pivots: pd.DataFrame, bars_m1: pd.DataFrame,
+         bars_m5: pd.DataFrame, params: dict | None = None, deals: pd.DataFrame | None = None) -> dict:
+    """One replay: violations, occurrences and coverage (checked / failed / passed per rule, plus the cases the
+    logs cannot prove, which are not evidence of conformance)."""
+    r = _Replay(setups, events, pivots, bars_m1, bars_m5, params, deals).run()
+    return {"violations": r.out, "occurrences": {k: int(v) for k, v in r.occ.items()}, "coverage": r.coverage()}

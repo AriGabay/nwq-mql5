@@ -212,17 +212,18 @@ def catalog(drop=()):
                     elif cat == "opposing_structure_cancel":
                         base.update(reason="cancelled_opposing_structure", reason_msc=ms(150))
                         ev += [event(sid, 2, "cancelled_opposing_structure", bar_time=t(149), ref_id=3)]
-                    elif cat in ("winner", "loser", "stacked_entries"):
+                    elif cat in ("winner", "loser", "shared_structure", "far_from_ob"):
                         pos = 1000 + sid
                         # stacked: one structure per group (same sc_hh bar and FVG), later members lost R16 first
-                        sc = 152 if cat == "stacked_entries" else 150 + sid % 7
-                        react = 167 + (k if cat == "stacked_entries" else 0)
+                        sc = 152 if cat == "shared_structure" else 150 + sid % 7
+                        react = 167 + (k if cat == "shared_structure" else 0)
                         base.update(reason="filled", position_id=pos, sc_bar_time=t(sc), fvg_c1_time=t(sc - 2),
-                                    fvg_low=2002.0, fvg_high=2003.0 + 0.01 * (0 if cat == "stacked_entries" else sid),
-                                    reaction_bar_time=t(react), fill_msc=ms(react + 1), fill_price=2004.0,
+                                    fvg_low=2002.0, fvg_high=2003.0 + 0.01 * (0 if cat == "shared_structure" else sid),
+                                    reaction_bar_time=t(react), fill_msc=ms(react + 1),
+                                    fill_price=(2040.0 if d == "L" else 1960.0) if cat == "far_from_ob" else 2004.0,
                                     sl=1996.8, tp=2018.4, exit_msc=ms(200), exit_kind="tp" if cat != "loser" else "sl")
                         ev += [event(sid, 2, "sc_hh", bar_time=t(sc), ref_id=2)]
-                        if cat == "stacked_entries" and k > 0:
+                        if cat == "shared_structure" and k > 0:
                             ev += [event(sid, 3, "reaction", bar_time=t(167)),
                                    event(sid, 4, "lost_competition", bar_time=t(167), ref_id=group[0])]
                         ev += [event(sid, 5, "reaction", bar_time=t(react)),
@@ -257,17 +258,19 @@ def test_each_category_picks_deterministically_under_the_seed():
     rows = {(v, d, c): r for (v, d, c, _), r in zip(picks(a), a.to_dict("records"))}
     assert all(rows[(v, d, "winner")]["net"] > 0 and rows[(v, d, "loser")]["net"] < 0 for v in "AB" for d in "LS")
     assert all(rows[(v, d, "return_break_same_bar")]["reason"] == "cancelled_second_break" for v in "AB" for d in "LS")
-    stacked = rows[("A", "L", "stacked_entries")]
-    assert int(stacked["reaction_bar_time"]) > t(167) and stacked["related"]   # an R16 loser that entered later
+    stacked = rows[("A", "L", "shared_structure")]
+    assert stacked["related"]                                   # names the other fills of its structure
+    far = rows[("A", "S", "far_from_ob")]
+    assert cm.entry_distance(far) == 1997.0 - 1960.0               # short: OB low - fill
     other = cm.select_examples(setups, events, deals, seed=1)
     assert picks(other) != picks(a)   # the seed, not the input order, decides
 
 
 def test_a_category_without_candidates_is_listed_as_missing():
-    setups, events, deals = catalog(drop={("B", "S", "opposing_structure_cancel"), ("A", "L", "stacked_entries"),
+    setups, events, deals = catalog(drop={("B", "S", "opposing_structure_cancel"), ("A", "L", "shared_structure"),
                                           ("A", "L", "return_break_same_bar")})
     sel = cm.select_examples(setups, events, deals)
-    assert set(sel.attrs["missing"]) == {"B_short_opposing_structure_cancel", "A_long_stacked_entries",
+    assert set(sel.attrs["missing"]) == {"B_short_opposing_structure_cancel", "A_long_shared_structure",
                                          "A_long_return_break_same_bar"}
     assert ("B", "S", "opposing_structure_cancel") not in {(v, d, c) for v, d, c, _ in picks(sel)}
     only_a = cm.select_examples(setups[setups["variant"] == 0], events, deals)
@@ -344,3 +347,23 @@ def test_m1_window_stops_an_hour_after_the_fill_when_the_exit_is_later(tmp_path)
     w = cm.windows(win, ev, pv)
     assert w["m5"][1] == fill_s + 5 * 3600
     assert w["m1"][1] == fill_s + 3600
+
+
+def test_timeline_lists_events_in_the_order_they_became_known(tmp_path):
+    """The chart-gate review asked for event and confirmation times, not only positions: bar events are known at
+    the close of their bar, tick events at their tick, pivots at the close of their confirmation bar."""
+    run = load_scenario(tmp_path)
+    s, ev, pv = run["setups"], run["events"], run["pivots"]
+    win = s[s.setup_id == 1].iloc[0]
+    items = cm.timeline(win, cm._events_by_setup(ev)[1], pv)
+    known = [it["known_ms"] for it in items]
+    assert known == sorted(known)
+    whats = [it["what"] for it in items]
+    assert whats[0].startswith("OB identified") and "fill" in whats and whats[-1].startswith("exit")
+    sc = next(it for it in items if it["what"] == "structure change")
+    sc_bar = int(ev[(ev.setup_id == 1) & (ev.kind == "sc_hh")]["bar_time"].iloc[0])
+    assert sc["known_ms"] == (sc_bar + 60) * 1000 and "confirmed at the" in sc["note"]
+    fig, (ax5, ax1, axt) = plt.subplots(3, 1)
+    info = cm.draw_setup(ax5, ax1, win, run, ax_tl=axt)
+    assert "timeline" in info["drawn"] and [it["n"] for it in info["timeline"]] == list(range(1, len(items) + 1))
+    plt.close(fig)

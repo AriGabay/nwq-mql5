@@ -37,11 +37,16 @@ def review(run_id: str) -> dict:
     sb = ev[ev["kind"] == "cancelled_second_break"]
     ret = ev[ev["kind"] == "return"].groupby("setup_id")["bar_time"].max()
     same_bar = int(sum(ret.get(x.setup_id) == x.bar_time for x in sb.itertuples()))
-    sc_bar = ev[ev["kind"] == "sc_hh"].groupby("setup_id")["bar_time"].max()
-    fvg = ev[ev["kind"] == "fvg_fixed"].groupby("setup_id")[["ref_time", "lo", "hi"]].last()
-    keys = filled["setup_id"].map(lambda i: (sc_bar.get(i), tuple(fvg.loc[i]) if i in fvg.index else None))
-    groups = keys.value_counts()
-    stacked = int(groups[groups > 1].sum())
+    # entries sharing one structure (same sc_hh bar, reference pivot and entry FVG) vs repeat entries of one setup
+    fills_per_setup = ev[ev["kind"] == "fill"].groupby("setup_id").size()
+    key = ["dir", "sc_bar_time", "ref_pivot_id", "fvg_c1_time"]
+    sizes = filled.groupby(key).size()
+    multi = filled.set_index(key).loc[sizes[sizes > 1].index].reset_index()
+    groups = list(multi.groupby(key))
+    overlap_pos = sum(any(g.sort_values("fill_msc")["fill_msc"].iloc[i + 1] < g.sort_values("fill_msc")["exit_msc"].iloc[i]
+                          for i in range(len(g) - 1)) for _, g in groups)
+    overlap_zone = sum(any(a.ob_low <= b.ob_high and b.ob_low <= a.ob_high
+                           for ia, a in g.iterrows() for ib, b in g.iterrows() if ia < ib) for _, g in groups)
     return {
         "setups": len(s), "fills": len(filled),
         "reasons": {str(k): int(v) for k, v in s["reason"].value_counts().items()},
@@ -64,7 +69,13 @@ def review(run_id: str) -> dict:
                                  "p90": q(filled["ob_age_bars_entry"], .9),
                                  "max": q(filled["ob_age_bars_entry"], 1.0)},
         "second_break_cancels": int(len(sb)), "second_break_same_bar_as_return": same_bar,
-        "fills_in_stacked_groups": stacked,
+        "repeat_entries_same_setup": int((fills_per_setup > 1).sum()),
+        "shared_structure": {"groups": len(groups), "fills": int(len(multi)),
+                             "groups_all_distinct_obs": int(sum(g["ob_time"].nunique() == len(g) for _, g in groups)),
+                             "groups_same_reaction_bar": int(sum(g["reaction_bar_time"].nunique() < len(g)
+                                                                 for _, g in groups)),
+                             "groups_positions_open_together": int(overlap_pos),
+                             "groups_with_overlapping_ob_zones": int(overlap_zone)},
     }
 
 

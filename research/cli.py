@@ -130,14 +130,16 @@ def conformance_report(run_id: str, dest: str) -> dict:
     """R25 conformance check of one archived research run: the independent M5/M1 replay (KTD11)."""
     from mt5r import conformance_m1 as cm
     d = runner.RUNS / run_id
-    params = {**run_values(run_id), "point": RUN["symbol_spec"]["tick_size"]}
+    params = {**run_values(run_id), "point": RUN["symbol_spec"]["tick_size"],
+              "contract_size": RUN["symbol_spec"]["contract_size"]}
     run = cm.read_run(d, run_id)
-    args = (run["setups"], run["events"], run["pivots"], run["bars_m1"], run["bars_m5"], params)
-    viol = cm.check(*args)
+    res = cm.full(run["setups"], run["events"], run["pivots"], run["bars_m1"], run["bars_m5"], params,
+                  run.get("deals"))
+    viol = res["violations"]
     facts = journal.run_facts(d)
     out = {"run_id": run_id, "setups": len(run["setups"]), "bars_m1": len(run["bars_m1"]),
            "bars_m5": len(run["bars_m5"]), "violations": len(viol), "violation_rows": viol[:500],
-           "occurrences": cm.occurrences(*args),
+           "coverage": res["coverage"], "occurrences": res["occurrences"],
            "journal": {k: facts.get(k) for k in ("warmup_bars", "stops_level_pts", "tick", "discarded_days",
                                                  "discarded_minutes", "total_minute_bars", "funnel")}}
     dst = RESULTS / dest / run_id
@@ -274,6 +276,50 @@ def cmd_pilot(args) -> None:
     PILOT.write_text(json.dumps(out, indent=1))
     print(json.dumps({n: r["fills_per_month"] for n, r in out["runs"].items()}))
     print("Next: `charts`, then STOP for the user's chart review (R27).")
+
+
+TICKCOV = RESULTS / "pilot" / "tick_coverage.json"
+TICK_MONTHS = ["2025.12", "2026.01", "2026.02", "2026.03", "2026.04", "2026.05", "2026.06", "2026.07"]
+
+
+def tick_coverage(per_month: dict) -> dict:
+    """Generated-tick share per month and per R30 fold (3-month train + 1-month OOS, OOS March-July), summed from
+    the tester's per-month 'real ticks discarded for X minutes of Y total minute bars' lines."""
+    def pct(rows):
+        gen = sum(r["discarded_minutes"] for r in rows)
+        tot = sum(r["total_minute_bars"] for r in rows)
+        return {"generated_minutes": gen, "minute_bars": tot, "generated_pct": round(100 * gen / tot, 2) if tot else None}
+    months = {m: {**per_month[m], **pct([per_month[m]])} for m in TICK_MONTHS}
+    folds = []
+    for k in range(3, len(TICK_MONTHS)):
+        train, oos = TICK_MONTHS[k - 3:k], TICK_MONTHS[k]
+        folds.append({"fold": k - 2, "train": [train[0], train[-1]], "oos": oos,
+                      "train_cov": pct([per_month[m] for m in train]), "oos_cov": pct([per_month[oos]])})
+    return {"months": months, "folds": folds, "total": pct(list(per_month.values()))}
+
+
+def cmd_tickcov(args) -> None:
+    """Real-tick coverage per month (one research-build run per calendar month of the WFO window). Only the
+    tester's tick-quality journal lines are used; the runs' trades are not read."""
+    import calendar
+    cfg = env.load_config()
+    per_month = {}
+    for m in TICK_MONTHS:
+        y, mo = map(int, m.split("."))
+        start, end = f"{m}.01", f"{m}.{calendar.monthrange(y, mo)[1]:02d}"
+        run_id = f"tickcov_{y}{mo:02d}"
+        res, rep = pipeline.run_single(cfg, run_id, "research", CHART_PERIOD, start, end,
+                                       overrides={"StructureVariant": 0}, role="tick_coverage",
+                                       purpose="real-tick coverage per month (journal tick lines only)")
+        f = journal.run_facts(runner.RUNS / run_id)
+        per_month[m] = {k: f[k] for k in ("discarded_days", "discarded_minutes", "total_minute_bars",
+                                          "ticks", "real_ticks_begin")}
+        print(m, per_month[m], flush=True)
+    out = tick_coverage(per_month)
+    pilot = journal.run_facts(runner.RUNS / "pilot_a")
+    out["pilot_whole_window"] = {k: pilot[k] for k in ("discarded_days", "discarded_minutes", "total_minute_bars")}
+    TICKCOV.write_text(json.dumps(out, indent=1))
+    print(json.dumps(out["folds"], indent=1))
 
 
 def cmd_charts(args) -> None:
@@ -555,7 +601,8 @@ def cmd_deliver(args) -> None:
 # ------------------------------------------------------------------ entry point
 COMMANDS = {"setup": cmd_setup, "install": cmd_install, "smoke": cmd_smoke, "conformance": cmd_conformance, "optsmoke": cmd_optsmoke,
             "pilot": cmd_pilot, "charts": cmd_charts, "freeze-rules": cmd_freeze_rules, "wfo": cmd_wfo,
-            "freeze": cmd_freeze, "holdout": cmd_holdout, "robustness": cmd_robustness, "deliver": cmd_deliver}
+            "freeze": cmd_freeze, "holdout": cmd_holdout, "robustness": cmd_robustness, "deliver": cmd_deliver,
+            "tickcov": cmd_tickcov}
 
 
 def main() -> None:
@@ -574,6 +621,7 @@ def main() -> None:
     s.add_argument("--start", default="2026.03.02")
     s.add_argument("--end", default="2026.03.06")
     sub.add_parser("pilot", help="R28 frequency pilot of both variants on M5/M1 (no profit fields)")
+    sub.add_parser("tickcov", help="real-tick coverage per month and per fold (one run per month)")
     s = sub.add_parser("charts", help="R26 gate charts from the pilot runs")
     s.add_argument("--run-id")
     s = sub.add_parser("freeze-rules", help="write research/preregistration.json (R21, KTD12)")
