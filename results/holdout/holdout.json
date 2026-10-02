@@ -1,0 +1,37 @@
+{
+ "candidate": {
+  "run_id": "holdout_candidate",
+  "window": [
+   "2026.08.01",
+   "2026.09.29"
+  ],
+  "independent": false,
+  "input_mismatches": [],
+  "conformance_violations": 0,
+  "net_profit": 1017.18,
+  "fills": 53,
+  "fills_per_month": 26.8887,
+  "first_breach": null,
+  "conformance_note": "1 at the run (bos_not_strict_pivot, setup 168): a checker false positive, the pivot is the first logged bar and its left neighbours are unlogged warm-up bars. Checker fixed after the holdout (tooling only, no trading result changes); results/holdout/holdout_candidate/conformance.json re-checked: 0. The holdout was not rerun."
+ },
+ "baseline": {
+  "run_id": "holdout_baseline",
+  "window": [
+   "2026.08.01",
+   "2026.09.29"
+  ],
+  "independent": false,
+  "input_mismatches": [],
+  "conformance_violations": 0,
+  "net_profit": 1497.01,
+  "fills": 118,
+  "fills_per_month": 59.8653,
+  "first_breach": {
+   "date": "2026-09-24 00:00:00",
+   "type": "daily",
+   "eq_min": 11701.51,
+   "daily_floor": 11775.98
+  }
+ },
+ "exposure_record": "archive/2026-09-30-new-test-sweepob/README.md"
+}

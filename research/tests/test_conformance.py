@@ -314,6 +314,18 @@ def test_ae7_bos_pivot_confirmed_after_break_is_flagged():
     assert "bos_pivot_confirmed_after_break" in rules(v)
 
 
+def test_bos_pivot_on_the_first_logged_bar_is_not_flagged_for_unlogged_warmup_neighbours():
+    """Warm-up bars are not in rl_bars: a pivot whose left neighbours lie there cannot be re-checked on that side
+    (found on holdout_candidate setup 168); the logged right side is still checked."""
+    setups, bars = bos_frames()
+    logged = bars.iloc[2:].reset_index(drop=True)        # bars 0-1 were warm-up
+    prm = {**PARAMS, "ObMode": 1, "SwingStrength": 2}
+    assert cf.check(setups, logged, P, prm) == []
+    broken = logged.copy()
+    broken.loc[1, "high"] = 2005.0                        # right neighbour ties the peak: not a strict pivot
+    assert "bos_not_strict_pivot" in rules(cf.check(setups, broken, P, prm))
+
+
 def test_bos_pivot_after_ob_candle_is_flagged():
     setups, bars = bos_frames(bos_pivot_time=t(5), bos_pivot_conf_time=t(7), bos_level=1999.0)
     assert "bos_pivot_not_before_ob" in rules(cf.check(setups, bars, P, {**PARAMS, "ObMode": 1, "SwingStrength": 2}))

@@ -621,7 +621,8 @@ def _check_bos(r, B, prm, sign, ob_i, id_c3_t, act_t, tol, add, idx):
             f"pivot confirmation bar {B.t[conf] if conf < B.n else 'beyond bars'} is not before break {B.t[br]} "
             "(R6 look-ahead, AE7)")
     ext = B.h if sign > 0 else B.l
-    strict = all(0 <= p + s * j < B.n and sign * (ext[p] - ext[p + s * j]) > 0
+    # left neighbours before the first logged bar are unlogged warm-up history: no evidence there, not a violation
+    strict = all((p + s * j < 0 and s < 0) or (0 <= p + s * j < B.n and sign * (ext[p] - ext[p + s * j]) > 0)
                  for j in range(1, S + 1) for s in (-1, 1))
     if not strict:
         add("bos_not_strict_pivot", f"bar {B.t[p]} is not a strict pivot of strength {S}")

@@ -1,0 +1,34 @@
+{
+ "run_id": "holdout_baseline",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "70e3e3cfe36b587a6a13bd6176fd898a41c0e30cbf7aa17a1e234b4c2e9ee2d8",
+ "ini_sha256": "3d11fe972fa231517cf86c11bc11d37f0246a6174ca1bf656d7b610f131ddb3c",
+ "meta": {
+  "kind": "research",
+  "role": "holdout_baseline",
+  "values": {
+   "RiskPercent": "1.0",
+   "MaxExposures": "3",
+   "RiskRR": "2.0",
+   "SignalTF": "15",
+   "ObMode": "0",
+   "EntryMode": "0",
+   "ImpulseWindowBars": "2",
+   "BosWindowBars": "6",
+   "SwingStrength": "3",
+   "ObMaxAgeBars": "96",
+   "FvgWindowBars": "12",
+   "OrderExpiryBars": "12",
+   "StopBufferPoints": "10",
+   "WarmupBars": "3000",
+   "MagicNumber": "770101",
+   "TradeComment": "OBR",
+   "ResearchRunTag": "holdout_baseline"
+  }
+ },
+ "started": "2026-10-02T11:56:00",
+ "status": "ok",
+ "seconds": 26.9,
+ "report": "holdout_baseline.htm",
+ "exit_code": 0
+}

@@ -1,0 +1,34 @@
+{
+ "run_id": "holdout_candidate",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "70e3e3cfe36b587a6a13bd6176fd898a41c0e30cbf7aa17a1e234b4c2e9ee2d8",
+ "ini_sha256": "70ea3676b5762d6a55ce91d8c37a4e7a4f98d1080e718a27d132ca7d9aa164fd",
+ "meta": {
+  "kind": "research",
+  "role": "holdout_candidate",
+  "values": {
+   "RiskPercent": "1.0",
+   "MaxExposures": "3",
+   "RiskRR": "2.0",
+   "SignalTF": "15",
+   "ObMode": "1",
+   "EntryMode": "1",
+   "ImpulseWindowBars": "2",
+   "BosWindowBars": "6",
+   "SwingStrength": "3",
+   "ObMaxAgeBars": "48",
+   "FvgWindowBars": "18",
+   "OrderExpiryBars": "6",
+   "StopBufferPoints": "10",
+   "WarmupBars": "3000",
+   "MagicNumber": "770101",
+   "TradeComment": "OBR",
+   "ResearchRunTag": "holdout_candidate"
+  }
+ },
+ "started": "2026-10-02T11:55:32",
+ "status": "ok",
+ "seconds": 25.0,
+ "report": "holdout_candidate.htm",
+ "exit_code": 0
+}

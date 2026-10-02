@@ -58,3 +58,5 @@ f5_oos_procedure,2026-10-02T11:44:43,fold 5 OOS procedure,oos_procedure,ob_fvg_r
 f5_oos_baseline,2026-10-02T11:45:06,fold 5 OOS baseline,oos_baseline,ob_fvg_retest_research.ex5,M15,2026.07.01,2026.07.31,9360.04,ok,-601.95,48,10.05,
 final_grid,2026-10-02T11:52:36,final grid,train,ob_fvg_retest_research.ex5,M15,2026.05.01,2026.07.31,10000,ok,,,,
 final_selection,2026-10-02T11:52:36,KTD12 selection,selection,,,,,,selected,,,,"{""tag"": ""final"", ""train"": [""2026.05.01"", ""2026.07.31""], ""trade_floor"": 45, ""status"": ""selected"", ""params"": {""ObMode"": 1, ""EntryMode"": 1, ""ObMaxAgeBars"": 48, ""FvgWindowBars"": 18, ""OrderExpiryBars"": 6}, ""eligible_passes"": 43}"
+holdout_candidate,2026-10-02T11:55:57,R24 holdout (non-independent),holdout_candidate,ob_fvg_retest_research.ex5,M15,2026.08.01,2026.09.29,10000,ok,1017.18,53,8.28,
+holdout_baseline,2026-10-02T11:56:27,R24 holdout (non-independent),holdout_baseline,ob_fvg_retest_research.ex5,M15,2026.08.01,2026.09.29,10000,ok,1497.01,118,8.2,
