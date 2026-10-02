@@ -1,6 +1,7 @@
 """OB-FVG retest research pipeline: python research/cli.py <step>  (plan KTD13)
 
-Order: setup (once per machine, then one manual GUI login by the user) -> install -> smoke -> conformance -> optsmoke -> pilot -> charts -> STOP (R39 chart gate, user approval)
+Strategy: M5 OB + M1 structure EA (plan docs/plans/2026-10-03-0013-feat-m5-ob-m1-structure-ea-plan.md).
+Order: setup (once per machine, then one manual GUI login by the user) -> install -> smoke -> conformance -> optsmoke -> pilot -> charts -> STOP (R27 chart gate, user approval)
 -> freeze-rules (commit) -> wfo -> freeze (commit) -> holdout -> robustness -> deliver.
 
 Guards: every step that runs the tester refuses while the live terminal runs (runner.run). wfo, freeze, holdout,
@@ -22,8 +23,8 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from mt5r import compile as compmod  # noqa: E402
-from mt5r import (curate, deliver, env, evaluate, explog, journal, limits, metrics, montecarlo,  # noqa: E402
-                  pipeline, reports, runner, setfile, stats, textio, trades, wfo)
+from mt5r import (curate, deliver, env, evaluate, explog, journal, limits, m1_contract, metrics,  # noqa: E402
+                  montecarlo, pipeline, reports, runner, setfile, stats, textio, trades, wfo)
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 RUN = pipeline.RUN
@@ -37,7 +38,8 @@ ORIG_SET, BASE_SET, CAND_SET = ("ob_fvg_retest_original.set", "ob_fvg_retest_bas
                                 "ob_fvg_retest_candidate.set")
 WFO_WINDOW = list(RUN["windows"]["wfo"])
 DAYS_PER_MONTH, FILL_TARGET = 30.44, 15          # R20 / KTD12
-TF_SECONDS = {1: 60, 5: 300, 15: 900, 30: 1800, 16385: 3600}   # SignalTF enum value -> bar seconds
+CHART_PERIOD = m1_contract.CHART_PERIOD                          # the EA runs on the M1 chart (KTD1)
+VARIANTS = {"A": 0, "B": 1}                                     # StructureVariant (R11)
 
 
 # ------------------------------------------------------------------ guards and hashes
@@ -107,10 +109,6 @@ def refuse_holdout_window(start: str, end: str) -> None:
 
 
 # ------------------------------------------------------------------ shared helpers
-def _period_seconds(values: dict) -> int:
-    return TF_SECONDS[int(values["SignalTF"])]
-
-
 def _num(v):
     for f in (int, float):
         try:
@@ -129,24 +127,23 @@ def run_values(run_id: str) -> dict:
 
 
 def conformance_report(run_id: str, dest: str) -> dict:
-    """R26 conformance check (R17 setup rows vs bars) of one archived research run."""
-    from mt5r import conformance
+    """R25 conformance check of one archived research run: the independent M5/M1 replay (KTD11)."""
+    from mt5r import conformance_m1 as cm
     d = runner.RUNS / run_id
-    vals = run_values(run_id)
-    period_s = _period_seconds(vals)
-    params = {**vals, "point": RUN["symbol_spec"]["tick_size"]}
-    setups = conformance.read_setups(d / f"rl_setups_{run_id}.csv")
-    bars = conformance.read_bars(d / f"rl_bars_{run_id}.csv")
-    viol = conformance.check(setups, bars, period_s, params)
+    params = {**run_values(run_id), "point": RUN["symbol_spec"]["tick_size"]}
+    run = cm.read_run(d, run_id)
+    args = (run["setups"], run["events"], run["pivots"], run["bars_m1"], run["bars_m5"], params)
+    viol = cm.check(*args)
     facts = journal.run_facts(d)
-    out = {"run_id": run_id, "setups": len(setups), "bars": len(bars), "violations": len(viol),
-           "violation_rows": viol[:500], "occurrences": conformance.occurrences(setups, bars, period_s, params),
-           "journal": {k: facts[k] for k in ("warmup_bars", "stops_level_pts", "tick", "discarded_days",
-                                             "discarded_minutes", "total_minute_bars", "funnel")}}
+    out = {"run_id": run_id, "setups": len(run["setups"]), "bars_m1": len(run["bars_m1"]),
+           "bars_m5": len(run["bars_m5"]), "violations": len(viol), "violation_rows": viol[:500],
+           "occurrences": cm.occurrences(*args),
+           "journal": {k: facts.get(k) for k in ("warmup_bars", "stops_level_pts", "tick", "discarded_days",
+                                                 "discarded_minutes", "total_minute_bars", "funnel")}}
     dst = RESULTS / dest / run_id
     dst.mkdir(parents=True, exist_ok=True)
     evaluate.save(out, dst / "conformance.json")
-    print(f"{run_id}: {len(setups)} setups, {len(viol)} conformance violations", flush=True)
+    print(f"{run_id}: {len(run['setups'])} setups, {len(viol)} conformance violations", flush=True)
     return out
 
 
@@ -192,12 +189,14 @@ def cmd_install(args) -> None:
 
 
 def cmd_smoke(args) -> None:
+    """One-month research-build runs of both structure variants on the M1 chart, each checked (U7)."""
     refuse_holdout_window(args.start, args.end)
     cfg = env.load_config()
-    for period in args.period or ["M15", "M5"]:
-        run_id = f"smoke_{period.lower()}"
-        res, rep = pipeline.run_single(cfg, run_id, "research", period, args.start, args.end, role="smoke",
-                                       purpose="U5 smoke", log_extra={"ea_sha256": ea_sha()})
+    for name in args.variant or list(VARIANTS):
+        run_id = f"smoke_{name.lower()}"
+        res, rep = pipeline.run_single(cfg, run_id, "research", CHART_PERIOD, args.start, args.end,
+                                       overrides={"StructureVariant": VARIANTS[name]}, role="smoke",
+                                       purpose=f"U7 smoke, variant {name}", log_extra={"ea_sha256": ea_sha()})
         if rep is None:
             raise SystemExit(f"{run_id}: {res.status}, no report")
         curate.curate(run_id, "smoke")
@@ -210,81 +209,83 @@ def cmd_conformance(args) -> None:
 
 
 def cmd_optsmoke(args) -> None:
-    """8-pass optimization over the categorical inputs only (U5 step 6)."""
+    """2-pass optimization over StructureVariant, the only optimized input (KTD14): proves the optimizer path."""
     refuse_holdout_window(args.start, args.end)
     cfg = env.load_config()
-    run_id = f"optsmoke_{args.period.lower()}"
-    ranges = {"ObMode": (0, 1, 1), "EntryMode": (0, 1, 3)}
-    res, df = pipeline.run_optimization(cfg, run_id, "research", args.period, args.start, args.end, {}, ranges,
-                                        role="optsmoke", purpose="U5 optimization smoke")
+    run_id = "optsmoke"
+    ranges = {"StructureVariant": (0, 1, 1)}
+    res, df = pipeline.run_optimization(cfg, run_id, "research", CHART_PERIOD, args.start, args.end, {}, ranges,
+                                        role="optsmoke", purpose="U7 optimization smoke")
     if df is None:
         raise SystemExit(f"{run_id}: {res.status}, no optimization XML")
     curate.curate(run_id, "smoke")
-    axes = {"ObMode": [0, 1], "EntryMode": [0, 1, 2, 3]}
-    ints = all(pd.api.types.is_integer_dtype(df[c]) for c in axes)
+    axes = {"StructureVariant": [0, 1]}
+    ints = pd.api.types.is_integer_dtype(df["StructureVariant"])
     wfo.merge_grids([df], axes)             # raises on a missing or duplicate combination
     out = {"run_id": run_id, "passes": len(df), "integer_categorical_columns": ints, "merge_grids": "ok"}
     (RESULTS / "smoke" / "optsmoke.json").write_text(json.dumps(out, indent=1))
     print(json.dumps(out, indent=1))
-    if len(df) != 8 or not ints:
-        raise SystemExit("optimization smoke did not yield 8 clean passes")
+    if len(df) != 2 or not ints:
+        raise SystemExit("optimization smoke did not yield 2 clean passes")
 
 
 # ------------------------------------------------------------------ U6: pilot and charts
-def pilot_summary(per_tf: dict, window: list) -> dict:
-    """R20: fills per month, funnel and reason counts only (no profit fields); timeframe by the fill rule."""
+def pilot_summary(per_variant: dict, window: list) -> dict:
+    """R28: fills per month, funnel and reason counts per structure variant (no profit fields). M5/M1 are fixed;
+    a shortfall against 15 fills per month is reported per variant and changes no rule."""
     days = evaluate.window_days(*window)
     runs = {}
-    for period, x in per_tf.items():
+    for name, x in per_variant.items():
         dl = x["deals"]
         fills = int((dl["type"].isin([0, 1]) & (dl["entry"] == 0)).sum())
         reasons = x["setups"]["reason"].astype(str).value_counts() if "reason" in x["setups"] else {}
-        runs[period] = {"run_id": x["run_id"], "fills": fills, "days": days,
-                        "fills_per_month": round(fills / days * DAYS_PER_MONTH, 4),
-                        "funnel": {k: int(v) for k, v in x["funnel"].items()},
-                        "reasons": {str(k): int(v) for k, v in dict(reasons).items()}}
-    ok = [p for p in ("M15", "M5") if p in runs and runs[p]["fills_per_month"] >= FILL_TARGET]
+        runs[name] = {"run_id": x["run_id"], "fills": fills, "days": days,
+                      "fills_per_month": round(fills / days * DAYS_PER_MONTH, 4),
+                      "funnel": {k: int(v) for k, v in x["funnel"].items()},
+                      "reasons": {str(k): int(v) for k, v in dict(reasons).items()}}
     return {"window": list(window), "days_per_month": DAYS_PER_MONTH, "target_fills_per_month": FILL_TARGET,
-            "rule": "longer timeframe averaging >= 15 fills per month; else M5 with the shortfall reported (R20)",
-            "runs": runs, "chosen_period": ok[0] if ok else "M5", "shortfall": not ok}
+            "rule": "M5 zone / M1 confirmation fixed; frequency reported per variant, no rule change (R28)",
+            "runs": runs, "shortfall": {n: r["fills_per_month"] < FILL_TARGET for n, r in runs.items()}}
 
 
 def cmd_pilot(args) -> None:
     if pipeline.prereg() is not None:
-        raise SystemExit("research/preregistration.json exists; the frequency pilot runs before R21")
+        raise SystemExit("research/preregistration.json exists; the frequency pilot runs before R29")
     cfg = env.load_config()
-    per_tf, conf = {}, {}
-    for period in ("M5", "M15"):
-        run_id = f"pilot_{period.lower()}"
-        res, rep = pipeline.run_single(cfg, run_id, "research", period, *WFO_WINDOW, role="pilot",
-                                       purpose="R20 frequency pilot", log_extra={"ea_sha256": ea_sha()})
+    per_variant, conf = {}, {}
+    for name, value in VARIANTS.items():
+        run_id = f"pilot_{name.lower()}"
+        res, rep = pipeline.run_single(cfg, run_id, "research", CHART_PERIOD, *WFO_WINDOW,
+                                       overrides={"StructureVariant": value}, role="pilot",
+                                       purpose=f"R28 frequency pilot, variant {name}",
+                                       log_extra={"ea_sha256": ea_sha()})
         if rep is None:
             raise SystemExit(f"{run_id}: {res.status}, no report")
         curate.curate(run_id, "pilot")
         d = runner.RUNS / run_id
-        per_tf[period] = {"run_id": run_id, "deals": reports.read_deals(d / f"rl_deals_{run_id}.csv"),
-                          "setups": pd.read_csv(d / f"rl_setups_{run_id}.csv", keep_default_na=False),
-                          "funnel": journal.run_facts(d)["funnel"]}
-        conf[period] = conformance_report(run_id, "pilot")["violations"]
-    out = pilot_summary(per_tf, WFO_WINDOW)
-    for p, n in conf.items():
-        out["runs"][p]["conformance_violations"] = n
+        per_variant[name] = {"run_id": run_id, "deals": reports.read_deals(d / f"rl_deals_{run_id}.csv"),
+                             "setups": pd.read_csv(d / f"rl_setups_{run_id}.csv", keep_default_na=False),
+                             "funnel": journal.run_facts(d)["funnel"]}
+        conf[name] = conformance_report(run_id, "pilot")["violations"]
+    out = pilot_summary(per_variant, WFO_WINDOW)
+    for n, v in conf.items():
+        out["runs"][n]["conformance_violations"] = v
     PILOT.parent.mkdir(parents=True, exist_ok=True)
     PILOT.write_text(json.dumps(out, indent=1))
-    print(json.dumps({p: r["fills_per_month"] for p, r in out["runs"].items()}), "->", out["chosen_period"])
-    print("Next: `charts`, then STOP for the user's chart review (R39).")
+    print(json.dumps({n: r["fills_per_month"] for n, r in out["runs"].items()}))
+    print("Next: `charts`, then STOP for the user's chart review (R27).")
 
 
 def cmd_charts(args) -> None:
-    from mt5r import charts_setups, conformance
-    run_id = args.run_id or f"pilot_{json.loads(PILOT.read_text())['chosen_period'].lower()}"
-    d = runner.RUNS / run_id
-    res = charts_setups.render(conformance.read_setups(d / f"rl_setups_{run_id}.csv"),
-                               conformance.read_bars(d / f"rl_bars_{run_id}.csv"),
-                               reports.read_deals(d / f"rl_deals_{run_id}.csv"), RESULTS / "pilot" / "charts",
-                               _period_seconds(run_values(run_id)), seed=stats.SEED)
-    print(json.dumps({k: [str(x) for x in v] if isinstance(v, list) else str(v) for k, v in res.items()}, indent=1))
-    print("STOP: send the charts and table to the user; U7 starts only after approval (R39).")
+    """R26 gate charts from the pilot runs of both variants (or one --run-id)."""
+    from mt5r import charts_m1
+    run_ids = [args.run_id] if args.run_id else [f"pilot_{n.lower()}" for n in VARIANTS]
+    for run_id in run_ids:
+        res = charts_m1.render(charts_m1.load_run(runner.RUNS / run_id, run_id),
+                               RESULTS / "pilot" / f"charts_{run_id}", seed=stats.SEED)
+        print(json.dumps({k: [str(x) for x in v] if isinstance(v, list) else str(v)
+                          for k, v in res.items() if k != "examples"}, indent=1))
+    print("STOP: send the charts and table to the user; U8 starts only after approval (R27).")
 
 
 # ------------------------------------------------------------------ U7: freeze rules
@@ -373,7 +374,7 @@ def cmd_wfo(args) -> None:
 
 
 def tested_values(P: dict, params: dict) -> dict:
-    vals = pipeline.base_values("delivered", P["signal_tf_value"])
+    vals = pipeline.base_values("delivered")
     vals.update(params)
     return vals
 
@@ -562,19 +563,18 @@ def main() -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("setup", help="build/refresh the isolated MT5 copy from allowlisted live files")
     sub.add_parser("install", help="copy EA sources into the isolated copy and compile both builds")
-    s = sub.add_parser("smoke", help="one-month research-build runs + conformance")
-    s.add_argument("--period", choices=["M5", "M15"], action="append")
+    s = sub.add_parser("smoke", help="one-month research-build runs of both variants + conformance")
+    s.add_argument("--variant", choices=list(VARIANTS), action="append")
     s.add_argument("--start", default="2026.03.01")
     s.add_argument("--end", default="2026.03.31")
     s = sub.add_parser("conformance", help="conformance check of archived research runs")
     s.add_argument("run_ids", nargs="+")
     s.add_argument("--dest", default="smoke")
-    s = sub.add_parser("optsmoke", help="8-pass optimization smoke over ObMode x EntryMode")
-    s.add_argument("--period", choices=["M5", "M15"], default="M15")
+    s = sub.add_parser("optsmoke", help="2-pass optimization smoke over StructureVariant")
     s.add_argument("--start", default="2026.03.02")
     s.add_argument("--end", default="2026.03.06")
-    sub.add_parser("pilot", help="R20 frequency pilot on M5 and M15 (no profit fields)")
-    s = sub.add_parser("charts", help="R39 rule-conformance charts from a pilot run")
+    sub.add_parser("pilot", help="R28 frequency pilot of both variants on M5/M1 (no profit fields)")
+    s = sub.add_parser("charts", help="R26 gate charts from the pilot runs")
     s.add_argument("--run-id")
     s = sub.add_parser("freeze-rules", help="write research/preregistration.json (R21, KTD12)")
     s.add_argument("--period", choices=["M5", "M15"], required=True)

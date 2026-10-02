@@ -187,11 +187,11 @@ def _deals(n_fills):
     return pd.DataFrame(rows)
 
 
-def _pilot(m5, m15):
-    setups = pd.DataFrame({"reason": ["filled", "filled", "expired_untouched"]})
+def _pilot(a, b):
+    setups = pd.DataFrame({"reason": ["filled", "filled", "cancelled_second_break"]})
     return cli.pilot_summary({
-        "M5": {"run_id": "pilot_m5", "deals": _deals(m5), "setups": setups, "funnel": {"filled": m5}},
-        "M15": {"run_id": "pilot_m15", "deals": _deals(m15), "setups": setups, "funnel": {"filled": m15}}},
+        "A": {"run_id": "pilot_a", "deals": _deals(a), "setups": setups, "funnel": {"filled": a}},
+        "B": {"run_id": "pilot_b", "deals": _deals(b), "setups": setups, "funnel": {"filled": b}}},
         ["2025.12.01", "2026.07.31"])
 
 
@@ -202,21 +202,18 @@ def _keys(x):
             yield from _keys(v)
 
 
-def test_pilot_summary_has_no_profit_fields_and_picks_longer_tf():
-    s = _pilot(300, 120)            # 243 days: M15 120 fills = 15.03 / month
-    assert s["runs"]["M15"]["fills"] == 120 and s["runs"]["M15"]["days"] == 243
-    assert s["runs"]["M15"]["fills_per_month"] == pytest.approx(15.03, abs=0.005)
-    assert s["runs"]["M5"]["reasons"] == {"filled": 2, "expired_untouched": 1}
-    assert s["chosen_period"] == "M15" and s["shortfall"] is False
+def test_pilot_summary_reports_fills_per_variant_without_profit_fields():
+    """R28: M5/M1 are fixed (no timeframe choice); each variant's fills per month is reported, and a shortfall
+    against 15 per month is flagged per variant, never acted on."""
+    s = _pilot(120, 119)            # 243 days: 120 fills = 15.03 / month
+    assert s["runs"]["A"]["fills"] == 120 and s["runs"]["A"]["days"] == 243
+    assert s["runs"]["A"]["fills_per_month"] == pytest.approx(15.03, abs=0.005)
+    assert s["runs"]["B"]["reasons"] == {"filled": 2, "cancelled_second_break": 1}
+    assert s["shortfall"] == {"A": False, "B": True}
+    assert "chosen_period" not in s
     banned = ("profit", "net", "balance", "equity", "commission", "swap", "pnl", "drawdown")
     assert not [k for k in _keys(s) if any(b in k.lower() for b in banned)]
     assert "12.5" not in json.dumps(s)
-
-
-def test_pilot_timeframe_rule_falls_back_to_m5():
-    assert _pilot(300, 119)["chosen_period"] == "M5"
-    both_short = _pilot(100, 50)
-    assert both_short["chosen_period"] == "M5" and both_short["shortfall"] is True
 
 
 # ------------------------------------------------------------------ help
