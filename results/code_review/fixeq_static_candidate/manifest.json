@@ -1,0 +1,27 @@
+{
+ "run_id": "fixeq_static_candidate",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "1a7d81a95931da7acef0836e8c64949dfdb64a42a51fb4125f1ca1e857be2317",
+ "ini_sha256": "e7182f3ba6c46579b415c6338e4abeddccfc73cbc26394a6077e251682800546",
+ "meta": {
+  "kind": "research",
+  "role": "code_review",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15,
+   "ObMode": 1,
+   "EntryMode": 1,
+   "ObMaxAgeBars": 48,
+   "FvgWindowBars": 18,
+   "OrderExpiryBars": 6,
+   "ResearchRunTag": "fixeq_static_candidate"
+  }
+ },
+ "started": "2026-10-02T15:09:57",
+ "status": "ok",
+ "seconds": 33.5,
+ "report": "fixeq_static_candidate.htm",
+ "exit_code": 0
+}

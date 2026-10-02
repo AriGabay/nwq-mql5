@@ -1,0 +1,22 @@
+{
+ "run_id": "fixeq_f2_oos_baseline",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "1a7d81a95931da7acef0836e8c64949dfdb64a42a51fb4125f1ca1e857be2317",
+ "ini_sha256": "58ea0cc3f9d40b1b99f1553f8116ca0b402c73cbef1c936b4d831c4768eae7b5",
+ "meta": {
+  "kind": "research",
+  "role": "code_review",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15,
+   "ResearchRunTag": "fixeq_f2_oos_baseline"
+  }
+ },
+ "started": "2026-10-02T15:07:13",
+ "status": "ok",
+ "seconds": 21.3,
+ "report": "fixeq_f2_oos_baseline.htm",
+ "exit_code": 0
+}

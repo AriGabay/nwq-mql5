@@ -1,0 +1,125 @@
+{
+ "note": "acceptance recomputed on the corrected deposit chain (folds 4-5 rerun from int(previous true final)); neighbours, var_sr and holdout unchanged",
+ "acceptance": {
+  "criteria": {
+   "oos_frequency": {
+    "value": {
+     "fills": 143,
+     "days": 153,
+     "fills_per_month": 28.4505
+    },
+    "threshold": ">= 15 fills per 30.44 days",
+    "pass": true,
+    "note": ""
+   },
+   "oos_net": {
+    "value": {
+     "net": -1502.04,
+     "baseline_net": -1241.91
+    },
+    "threshold": "> 0 and > baseline net",
+    "pass": false,
+    "note": ""
+   },
+   "bootstrap_ci": {
+    "value": {
+     "ci_mean_daily_pnl": [
+      -38.98,
+      15.71
+     ],
+     "n_days": 109
+    },
+    "threshold": "95% lower bound > 0 (block 5, 10000 resamples, seed 20260930)",
+    "pass": false,
+    "note": ""
+   },
+   "positive_folds": {
+    "value": 2,
+    "threshold": ">= 3 of 5",
+    "pass": false,
+    "note": ""
+   },
+   "top_events_removed": {
+    "value": {
+     "n_events": 141,
+     "bar_minutes": 15,
+     "net_without_top": -2094.45
+    },
+    "threshold": "net after removing the top 2 trade events > 0",
+    "pass": false,
+    "note": ""
+   },
+   "loss_limits": {
+    "value": {
+     "stitched_breach": 1,
+     "monte_carlo": {
+      "breach_prob": 0.994,
+      "daily_breach_prob": 0.08,
+      "total_breach_prob": 0.914,
+      "seed": 20260930,
+      "horizon": 252,
+      "n_paths": 10000,
+      "mean_block": 5,
+      "final_return_p1": -0.1268,
+      "final_return_p5": -0.1184,
+      "final_return_p50": -0.105,
+      "final_return_p95": 0.1784,
+      "final_return_p99": 0.3087,
+      "max_dd_pct_p50": 12.0512,
+      "max_dd_pct_p95": 23.6695,
+      "max_dd_pct_p99": 27.6217
+     }
+    },
+    "threshold": "no stitched breach and MC breach prob <= 0.1 over 252 days",
+    "pass": false,
+    "note": "first breach {'date': Timestamp('2026-03-20 00:00:00'), 'type': 'total', 'eq_min': 8993.56, 'daily_floor': 8648.73}"
+   },
+   "cost_stress": {
+    "value": {
+     "stressed_net": -1860.54,
+     "spread_cost": 275.1,
+     "slippage_cost": 83.4,
+     "stop_exits": 100
+    },
+    "threshold": "> 0 after +1.0x spread and 10 points on every SL exit",
+    "pass": false,
+    "note": ""
+   },
+   "neighbors": {
+    "value": 0.0,
+    "threshold": ">= 0.6",
+    "pass": false,
+    "note": ""
+   },
+   "dsr": {
+    "value": {
+     "n_days": 109,
+     "psr_value": 0.0,
+     "sr": -0.1001,
+     "sr0": 0.3922,
+     "trials": 1090,
+     "var_sr": 0.01430135
+    },
+    "threshold": 0.9,
+    "pass": false,
+    "note": ""
+   },
+   "holdout": {
+    "value": {
+     "fills": 53,
+     "days": 60,
+     "fills_per_month": 26.8887,
+     "net": 1017.18,
+     "breach": 0
+    },
+    "threshold": ">= 15 fills/month, net > 0, no breach (non-independent)",
+    "pass": true,
+    "note": ""
+   }
+  },
+  "passed_all": false,
+  "recommended": false,
+  "recommended_note": "R30: no recommended .set in this research - no independent period exists (the holdout is non-independent, R24); the candidate is delivered as not validated with a forward-test protocol."
+ },
+ "procedure_final": 0
+}

@@ -1,0 +1,22 @@
+{
+ "run_id": "fixeq_f5_oos_baseline",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "1a7d81a95931da7acef0836e8c64949dfdb64a42a51fb4125f1ca1e857be2317",
+ "ini_sha256": "13212f133cf0ae345b967f4782b39c072ac795d30974e873ea0c2224ffdc4da1",
+ "meta": {
+  "kind": "research",
+  "role": "code_review",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15,
+   "ResearchRunTag": "fixeq_f5_oos_baseline"
+  }
+ },
+ "started": "2026-10-02T15:09:32",
+ "status": "ok",
+ "seconds": 22.2,
+ "report": "fixeq_f5_oos_baseline.htm",
+ "exit_code": 0
+}
