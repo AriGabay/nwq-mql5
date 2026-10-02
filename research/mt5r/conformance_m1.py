@@ -552,7 +552,10 @@ class _Replay:
             if s.status == "active" and s.queued is not None and s.queued["bar"] is None:
                 self._apply_outcome(s, None)
             if s.status == "untouched":
-                s.reason = "run_end_untouched"
+                # a touch tick inside the final M1 bar, which never closes and is never logged, has no bar evidence
+                tm = _int(s.row.get("touch_msc"))
+                after_log = self.B.n and tm is not None and tm >= self.B.close_ms(self.B.n - 1)
+                s.reason = "run_end_waiting" if after_log else "run_end_untouched"
             elif s.status == "active":
                 s.reason = "run_end_waiting"
             if s.reason in ("run_end_untouched", "run_end_waiting"):

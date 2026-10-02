@@ -421,3 +421,27 @@ def test_short_fill_sl_uses_the_spread_logged_on_the_entry_attempt():
 
     assert run(2010.3) == []                        # SL 2015.7 = anchor 2015.2 + 0.20 buffer + 0.30 spread
     assert "sl_r18" in rules(run(2010.2))           # logged spread 0.20 does not explain SL 2015.7
+
+
+def test_touch_on_the_final_unlogged_bar_is_not_flagged(base):
+    """The run ends inside an M1 bar that never closes, so it is never logged; a touch tick in it has no bar
+    evidence, and the setup's run_end_waiting is accepted (seen at the end of the U7 pilot)."""
+    last = t(19)                                         # keep bars 0-19 and the M5 bars they complete
+    run = dict(base)
+    run["bars_m1"] = base["bars_m1"][base["bars_m1"]["time"] <= last].reset_index(drop=True)
+    run["bars_m5"] = base["bars_m5"][base["bars_m5"]["time"] + 300 <= last + 60].reset_index(drop=True)
+    run["pivots"] = base["pivots"][base["pivots"]["conf_time"] <= last].reset_index(drop=True)
+    run["events"] = base["events"][base["events"]["kind"] == "touch"].reset_index(drop=True)
+    keep = ["setup_id", "dir", "variant", "ob_time", "ob_high", "ob_low", "idfvg_c1_time", "idfvg_c3_time",
+            "idfvg_low", "idfvg_high", "identified_in_warmup", "touch_msc", "touch_bar_time", "ob_age_bars_touch",
+            "ob_age_min_touch", "breaks", "returns"]
+    row = base["setups"].copy()
+    for c in row.columns:
+        if c not in keep:
+            row[c] = pd.NA if pd.api.types.is_integer_dtype(row[c]) else None
+    row["reason"] = "run_end_waiting"
+    run["setups"] = row
+    assert run_check(run) == []
+    row2 = row.copy()
+    row2["touch_msc"] = (last - 120) * 1000 + 5000       # inside a logged bar that does not reach the OB
+    assert "touch_r5" in rules(run_check({**run, "setups": row2}))

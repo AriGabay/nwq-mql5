@@ -583,20 +583,26 @@ def draw_setup(ax5, ax1, row, run: dict, net=None, category=None, related=None) 
 
     # structure changes: reference level from its pivot's peak to the HH/LL bar, origin bar
     sc_name = "HH" if long_ else "LL"
-    for k, e in enumerate(_of(evs, "sc_hh")):
+    scs = _of(evs, "sc_hh")
+    for k, e in enumerate(scs):
         bar = P1.i(_int(e, "bar_time"))
         ref = piv(_int(e, "ref_id"))
         lvl = _flt(e, "price") if _flt(e, "price") is not None else (ref[1] if ref else None)
         if bar is None or lvl is None:
             continue
+        last = k == len(scs) - 1          # earlier, superseded or lapsed structure changes are drawn faintly
         x0 = ref[0] if ref and ref[0] is not None else bar - 3
+        y = P1.h[bar] if long_ else P1.l[bar]
+        if not last:
+            ax1.hlines(lvl, x0, bar + 0.5, color=MUTED, linestyle=":", linewidth=0.8, zorder=4)
+            ax1.plot([bar], [y], marker="*", markersize=6, color=MUTED, linestyle="none", zorder=7)
+            continue
         ax1.hlines(lvl, x0, bar + 0.5, color=INK, linestyle="--", linewidth=1.1, zorder=5)
         ax1.text(x0, lvl, f"ref {'high' if long_ else 'low'} {lvl:.2f}", fontsize=7, color=INK,
                  va="bottom" if long_ else "top", ha="left", zorder=6)
-        y = P1.h[bar] if long_ else P1.l[bar]
         ax1.plot([bar], [y], marker="*", markersize=10, color=INK, markeredgecolor=SURFACE, linestyle="none",
                  zorder=8)
-        _label(ax1, bar, y, sc_name + (f"{k + 1}" if len(_of(evs, "sc_hh")) > 1 else ""), dy=8 * sign)
+        _label(ax1, bar, y, sc_name + (f" (#{k + 1} of {len(scs)})" if len(scs) > 1 else ""), dy=8 * sign)
         o = P1.i(_int(e, "ref_time"))
         if o is not None:
             yo = P1.l[o] if long_ else P1.h[o]
@@ -643,12 +649,15 @@ def draw_setup(ax5, ax1, row, run: dict, net=None, category=None, related=None) 
             for e in _of(evs, "fvg_fixed")]
     if not fvgs and _int(row, "fvg_c1_time") is not None:
         fvgs = [(_int(row, "fvg_c1_time"), _flt(row, "fvg_low"), _flt(row, "fvg_high"), None)]
-    for c1_t, lo, hi, fixed in fvgs:
+    for k, (c1_t, lo, hi, fixed) in enumerate(fvgs):
         x0 = P1.i(c1_t)
         if x0 is None or lo is None or hi is None:
             continue
         stop = next((x for x in lapses if x is not None and x > (fixed or x0)), None)
         x1 = stop + 0.5 if stop is not None else (fill_x if fill_x is not None else x1_end)
+        if k < len(fvgs) - 1:             # earlier entry FVGs: faint box, no text
+            ax1.fill_between([x0 - 0.45, x1], lo, hi, color=AQUA, alpha=0.10, linewidth=0, zorder=2)
+            continue
         _box(ax1, x0 - 0.45, x1, lo, hi, AQUA, 0.28, "entry FVG", drawn, below=long_)
         if stop is not None:
             _label(ax1, stop, lo if long_ else hi, "FVG lapsed", dy=-8 * sign, color=RED)
