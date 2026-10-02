@@ -1,0 +1,26 @@
+{
+ "ea_sha256": "995158ec86580952db5f417113d50c01bd86e6a4aadda708f27d65e7a3483635",
+ "prereg_sha256": "e73a07460a3d6ad53cf3e678d4cebb79cee1afcdcb4a7a5d871b45ef232aa8ea",
+ "selection": {
+  "tag": "final",
+  "train": [
+   "2026.05.01",
+   "2026.07.31"
+  ],
+  "trade_floor": 45,
+  "status": "selected",
+  "params": {
+   "ObMode": 1,
+   "EntryMode": 1,
+   "ObMaxAgeBars": 48,
+   "FvgWindowBars": 18,
+   "OrderExpiryBars": 6
+  },
+  "eligible_passes": 43
+ },
+ "sets": {
+  "ob_fvg_retest_original.set": "e769816db29f5987db73b0839967827450ea357286b93ac9270ef63d2ae97a96",
+  "ob_fvg_retest_baseline.set": "ca03a1ada964dca0ff363fcdc67e791226df85852ce748f2b742b52698c34d15",
+  "ob_fvg_retest_candidate.set": "835eca274662071df828042dba046dc98225ddddef5c747d421299399a0a90e6"
+ }
+}

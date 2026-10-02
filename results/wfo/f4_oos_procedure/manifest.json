@@ -1,0 +1,27 @@
+{
+ "run_id": "f4_oos_procedure",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "70e3e3cfe36b587a6a13bd6176fd898a41c0e30cbf7aa17a1e234b4c2e9ee2d8",
+ "ini_sha256": "a31781445b2110db017f2013c4f533a1795a8a6062007f6b319853c9c3ec96ce",
+ "meta": {
+  "kind": "research",
+  "role": "oos_procedure",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15,
+   "ObMode": 1,
+   "EntryMode": 3,
+   "ObMaxAgeBars": 48,
+   "FvgWindowBars": 12,
+   "OrderExpiryBars": 18,
+   "ResearchRunTag": "f4_oos_procedure"
+  }
+ },
+ "started": "2026-10-02T11:32:49",
+ "status": "ok",
+ "seconds": 19.1,
+ "report": "f4_oos_procedure.htm",
+ "exit_code": 0
+}

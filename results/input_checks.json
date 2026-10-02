@@ -1,0 +1,116 @@
+{
+ "runs_checked": 10,
+ "runs_with_mismatches": 0,
+ "rows": [
+  {
+   "run_id": "f1_oos_procedure",
+   "expected": {
+    "ObMode": 0,
+    "EntryMode": 2,
+    "ObMaxAgeBars": 96,
+    "FvgWindowBars": 6,
+    "OrderExpiryBars": 12
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f1_oos_baseline",
+   "expected": {
+    "ObMode": 0,
+    "EntryMode": 0,
+    "ObMaxAgeBars": 96,
+    "FvgWindowBars": 12,
+    "OrderExpiryBars": 12
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f2_oos_procedure",
+   "expected": {
+    "ObMode": 1,
+    "EntryMode": 0,
+    "ObMaxAgeBars": 96,
+    "FvgWindowBars": 6,
+    "OrderExpiryBars": 6
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f2_oos_baseline",
+   "expected": {
+    "ObMode": 0,
+    "EntryMode": 0,
+    "ObMaxAgeBars": 96,
+    "FvgWindowBars": 12,
+    "OrderExpiryBars": 12
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f3_oos_procedure",
+   "expected": {
+    "ObMode": 0,
+    "EntryMode": 0,
+    "ObMaxAgeBars": 96,
+    "FvgWindowBars": 12,
+    "OrderExpiryBars": 12
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f3_oos_baseline",
+   "expected": {
+    "ObMode": 0,
+    "EntryMode": 0,
+    "ObMaxAgeBars": 96,
+    "FvgWindowBars": 12,
+    "OrderExpiryBars": 12
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f4_oos_procedure",
+   "expected": {
+    "ObMode": 1,
+    "EntryMode": 3,
+    "ObMaxAgeBars": 48,
+    "FvgWindowBars": 12,
+    "OrderExpiryBars": 18
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f4_oos_baseline",
+   "expected": {
+    "ObMode": 0,
+    "EntryMode": 0,
+    "ObMaxAgeBars": 96,
+    "FvgWindowBars": 12,
+    "OrderExpiryBars": 12
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f5_oos_procedure",
+   "expected": {
+    "ObMode": 1,
+    "EntryMode": 0,
+    "ObMaxAgeBars": 96,
+    "FvgWindowBars": 6,
+    "OrderExpiryBars": 6
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f5_oos_baseline",
+   "expected": {
+    "ObMode": 0,
+    "EntryMode": 0,
+    "ObMaxAgeBars": 96,
+    "FvgWindowBars": 12,
+    "OrderExpiryBars": 12
+   },
+   "mismatches": []
+  }
+ ]
+}

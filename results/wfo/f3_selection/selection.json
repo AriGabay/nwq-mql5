@@ -1,0 +1,17 @@
+{
+ "tag": "f3",
+ "train": [
+  "2026.02.01",
+  "2026.04.30"
+ ],
+ "trade_floor": 45,
+ "status": "no_eligible_pass",
+ "params": {
+  "ObMode": 0,
+  "EntryMode": 0,
+  "ObMaxAgeBars": 96,
+  "FvgWindowBars": 12,
+  "OrderExpiryBars": 12
+ },
+ "eligible_passes": 0
+}

@@ -1,0 +1,49 @@
+{
+ "run_id": "f4_grid",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "70e3e3cfe36b587a6a13bd6176fd898a41c0e30cbf7aa17a1e234b4c2e9ee2d8",
+ "ini_sha256": "59380f4d6a2d76942e569f6fd4fa02f4576d165964faeb03fe965f5c9881bf63",
+ "meta": {
+  "kind": "research",
+  "role": "train",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15,
+   "ResearchRunTag": "f4_grid"
+  },
+  "ranges": {
+   "ObMode": [
+    0,
+    1,
+    1
+   ],
+   "EntryMode": [
+    0,
+    1,
+    3
+   ],
+   "ObMaxAgeBars": [
+    48,
+    48,
+    144
+   ],
+   "FvgWindowBars": [
+    6,
+    6,
+    18
+   ],
+   "OrderExpiryBars": [
+    6,
+    6,
+    18
+   ]
+  }
+ },
+ "started": "2026-10-02T11:26:19",
+ "status": "ok",
+ "seconds": 387.1,
+ "report": "f4_grid.xml",
+ "exit_code": 0
+}

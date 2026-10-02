@@ -35,3 +35,26 @@ pilot_m15,2026-10-02T11:02:15,R20 frequency pilot,pilot,ob_fvg_retest_research.e
 smoke_m15_bos,2026-10-02T11:03:06,U5 FVG+BOS conformance,smoke,ob_fvg_retest_research.ex5,M15,2026.03.01,2026.03.31,10000,ok,-686.63,24,10.51,
 equiv_research_m15,2026-10-02T11:03:31,U5 delivered vs research build,equivalence,ob_fvg_retest_research.ex5,M15,2026.03.01,2026.03.31,10000,ok,-313.77,58,11.9,
 equiv_delivered_m15,2026-10-02T11:03:57,U5 delivered vs research build,equivalence,ob_fvg_retest.ex5,M15,2026.03.01,2026.03.31,10000,ok,-313.77,58,11.9,
+f1_grid,2026-10-02T11:11:56,f1 grid,train,ob_fvg_retest_research.ex5,M15,2025.12.01,2026.02.28,10000,ok,,,,
+f1_selection,2026-10-02T11:11:56,KTD12 selection,selection,,,,,,selected,,,,"{""tag"": ""f1"", ""train"": [""2025.12.01"", ""2026.02.28""], ""trade_floor"": 45, ""status"": ""selected"", ""params"": {""ObMode"": 0, ""EntryMode"": 2, ""ObMaxAgeBars"": 96, ""FvgWindowBars"": 6, ""OrderExpiryBars"": 12}, ""eligible_passes"": 64}"
+f1_oos_procedure,2026-10-02T11:12:20,fold 1 OOS procedure,oos_procedure,ob_fvg_retest_research.ex5,M15,2026.03.01,2026.03.31,10000,ok,-1032.86,33,11.71,
+f1_oos_baseline,2026-10-02T11:12:44,fold 1 OOS baseline,oos_baseline,ob_fvg_retest_research.ex5,M15,2026.03.01,2026.03.31,10000,ok,-313.77,58,11.9,
+f2_grid,2026-10-02T11:18:35,f2 grid,train,ob_fvg_retest_research.ex5,M15,2026.01.01,2026.03.31,10000,ok,,,,
+f2_selection,2026-10-02T11:18:36,KTD12 selection,selection,,,,,,selected,,,,"{""tag"": ""f2"", ""train"": [""2026.01.01"", ""2026.03.31""], ""trade_floor"": 45, ""status"": ""selected"", ""params"": {""ObMode"": 1, ""EntryMode"": 0, ""ObMaxAgeBars"": 96, ""FvgWindowBars"": 6, ""OrderExpiryBars"": 6}, ""eligible_passes"": 5}"
+f2_oos_procedure,2026-10-02T11:19:00,fold 2 OOS procedure,oos_procedure,ob_fvg_retest_research.ex5,M15,2026.04.01,2026.04.30,8967.14,ok,-757.57,21,9.93,
+f2_oos_baseline,2026-10-02T11:19:21,fold 2 OOS baseline,oos_baseline,ob_fvg_retest_research.ex5,M15,2026.04.01,2026.04.30,9686.23,ok,-1232.64,63,17.79,
+f3_grid,2026-10-02T11:25:30,f3 grid,train,ob_fvg_retest_research.ex5,M15,2026.02.01,2026.04.30,10000,ok,,,,
+f3_selection,2026-10-02T11:25:30,KTD12 selection,selection,,,,,,no_eligible_pass,,,,"{""tag"": ""f3"", ""train"": [""2026.02.01"", ""2026.04.30""], ""trade_floor"": 45, ""status"": ""no_eligible_pass"", ""params"": {""ObMode"": 0, ""EntryMode"": 0, ""ObMaxAgeBars"": 96, ""FvgWindowBars"": 12, ""OrderExpiryBars"": 12}, ""eligible_passes"": 0}"
+f3_oos_procedure,2026-10-02T11:25:54,fold 3 OOS procedure,oos_procedure,ob_fvg_retest_research.ex5,M15,2026.05.01,2026.05.31,8209.57,ok,651.81,64,11.72,
+f3_oos_baseline,2026-10-02T11:26:15,fold 3 OOS baseline,oos_baseline,ob_fvg_retest_research.ex5,M15,2026.05.01,2026.05.31,8453.59,ok,611.85,64,12.18,
+f4_grid,2026-10-02T11:32:46,f4 grid,train,ob_fvg_retest_research.ex5,M15,2026.03.01,2026.05.31,10000,ok,,,,
+f4_selection,2026-10-02T11:32:46,KTD12 selection,selection,,,,,,selected,,,,"{""tag"": ""f4"", ""train"": [""2026.03.01"", ""2026.05.31""], ""trade_floor"": 45, ""status"": ""selected"", ""params"": {""ObMode"": 1, ""EntryMode"": 3, ""ObMaxAgeBars"": 48, ""FvgWindowBars"": 12, ""OrderExpiryBars"": 18}, ""eligible_passes"": 6}"
+f4_oos_procedure,2026-10-02T11:33:08,fold 4 OOS procedure,oos_procedure,ob_fvg_retest_research.ex5,M15,2026.06.01,2026.06.30,8861.38,ok,-591.39,16,7.97,
+f4_oos_baseline,2026-10-02T11:33:33,fold 4 OOS baseline,oos_baseline,ob_fvg_retest_research.ex5,M15,2026.06.01,2026.06.30,9065.44,ok,294.6,51,6.86,
+f5_grid,2026-10-02T11:37:17,f5 grid,train,,,,,,infra_interrupted,,,,"the controlling Python process was stopped by the background-task time limit during the fold-5 optimization; no report, no result used; cmd_wfo resumes at fold 5 (folds 1-4 kept in folds.json)"
+f5_grid,2026-10-02T11:44:20,f5 grid,train,ob_fvg_retest_research.ex5,M15,2026.04.01,2026.06.30,10000,ok,,,,
+f5_selection,2026-10-02T11:44:20,KTD12 selection,selection,,,,,,selected,,,,"{""tag"": ""f5"", ""train"": [""2026.04.01"", ""2026.06.30""], ""trade_floor"": 45, ""status"": ""selected"", ""params"": {""ObMode"": 1, ""EntryMode"": 0, ""ObMaxAgeBars"": 96, ""FvgWindowBars"": 6, ""OrderExpiryBars"": 6}, ""eligible_passes"": 3}"
+f5_oos_procedure,2026-10-02T11:44:43,fold 5 OOS procedure,oos_procedure,ob_fvg_retest_research.ex5,M15,2026.07.01,2026.07.31,8269.99,ok,227.97,9,2.9,
+f5_oos_baseline,2026-10-02T11:45:06,fold 5 OOS baseline,oos_baseline,ob_fvg_retest_research.ex5,M15,2026.07.01,2026.07.31,9360.04,ok,-601.95,48,10.05,
+final_grid,2026-10-02T11:52:36,final grid,train,ob_fvg_retest_research.ex5,M15,2026.05.01,2026.07.31,10000,ok,,,,
+final_selection,2026-10-02T11:52:36,KTD12 selection,selection,,,,,,selected,,,,"{""tag"": ""final"", ""train"": [""2026.05.01"", ""2026.07.31""], ""trade_floor"": 45, ""status"": ""selected"", ""params"": {""ObMode"": 1, ""EntryMode"": 1, ""ObMaxAgeBars"": 48, ""FvgWindowBars"": 18, ""OrderExpiryBars"": 6}, ""eligible_passes"": 43}"
