@@ -108,3 +108,19 @@ Consequences, stated before the freeze:
   settled in the brainstorm. The session-limitation handling changes no rule: it adds a sensitivity and reporting
   rules that do not depend on P&L.
 - The report will repeat this exposure record next to the WFO results.
+
+## Decisions after the exposure record (user, 2026-10-03)
+
+- Both variants A and B stay in the planned research. B is not chosen, no parameter changes and the grid is not
+  widened because of the exposed pilot results. The grid stays `StructureVariant` in {A, B}, with per-fold selection
+  on train only (KTD14).
+- The sensitivity stays labelled as a re-pricing of a fixed trade list. Its drawdown is labelled as a closed-trade
+  (balance) measure only.
+- The report shows two drawdowns separately for every result: the closed-trade balance drawdown and the tester's
+  original equity drawdown.
+- Risk-limit checks (the train selection's 10% limit and the acceptance loss limits) use the metric fixed in the
+  plan: the tester's maximum equity drawdown (KTD14), with the Monte Carlo limits as defined there. The balance
+  drawdown is reported only.
+- No further technical clarification round. Open: only the user's approval that the chart examples represent the
+  strategy (R27). After it, U8 freezes the protocol and the research runs through to the final report and review,
+  including when the result is negative.
