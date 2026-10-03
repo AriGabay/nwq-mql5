@@ -1,0 +1,15 @@
+{
+ "run_id": "session_probe",
+ "ex5": "session_probe.ex5",
+ "ex5_sha256": "efa3338b6d6bd3857535310534737eac9929e60b3c2a8dfe8e0f9a22cb0ab342",
+ "ini_sha256": "c87125dcae6619fa36858fb1cb5d66ea4a3242a8344e9adc44d08f9c9ac430b9",
+ "meta": {
+  "kind": "probe",
+  "values": {}
+ },
+ "started": "2026-10-03T09:19:13",
+ "status": "ok",
+ "seconds": 30.8,
+ "report": "session_probe.htm",
+ "exit_code": 0
+}

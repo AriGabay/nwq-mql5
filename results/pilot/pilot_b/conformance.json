@@ -167,7 +167,7 @@
    },
    "level_in_session_open_bar": {
     "cases": 9,
-    "why": "SL/TP level reached only inside the first M1 bar after a quote gap (daily break, weekend): the tester executes no order or stop in that minute (pilot: 0 fills and 0 exits in those bars, ticks present); the exit came later and is not re-derivable",
+    "why": "SL/TP level reached only inside the first M1 bar after a quote gap (daily break, weekend). Quotes start 01:00, the trade session 01:01, so nothing executes in that minute (research/session_probe.py: Market orders refused 169/169 at 01:00, filled 169/169 at 01:01; replicas exit as the EA did). The later exit needs the tick log; results/pilot/gate_decisions.md holds the pre-registered sensitivity",
     "example_setups": [
      919,
      1057,

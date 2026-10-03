@@ -86,8 +86,10 @@ UNVERIFIABLE = {
     "exit_same_bar_as_fill": "fill and exit in one M1 bar: tick order inside the bar is not in the logs",
     "exit_after_last_logged_bar": "exit tick inside the final M1 bar, which is never logged",
     "level_in_session_open_bar": "SL/TP level reached only inside the first M1 bar after a quote gap (daily break, "
-                                 "weekend): the tester executes no order or stop in that minute (pilot: 0 fills and "
-                                 "0 exits in those bars, ticks present); the exit came later and is not re-derivable",
+                                 "weekend). Quotes start 01:00, the trade session 01:01, so nothing executes in that "
+                                 "minute (research/session_probe.py: Market orders refused 169/169 at 01:00, filled "
+                                 "169/169 at 01:01; replicas exit as the EA did). The later exit needs the tick log; "
+                                 "results/pilot/gate_decisions.md holds the pre-registered sensitivity",
 }
 RULE_BY_KIND = {"touch": "touch_r5", "break": "break_r6", "return": "return_r7",
                 "cancelled_second_break": "second_break_r8", "sc_hh": "sc_r10", "sc_superseded": "sc_r10",

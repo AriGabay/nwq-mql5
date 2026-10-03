@@ -1,0 +1,15 @@
+kind,weekday,index,from_s,to_s
+quote,1,0,3600,86280
+trade,1,0,3660,86280
+quote,2,0,3600,86280
+trade,2,0,3660,86280
+quote,3,0,3600,86280
+trade,3,0,3660,86280
+quote,4,0,3600,86280
+trade,4,0,3660,86280
+quote,5,0,3600,86220
+trade,5,0,3660,86220
+spec_trade_mode,4,0,0,0
+spec_stops_level,20,0,0,0
+spec_freeze_level,0,0,0,0
+spec_exemode,2,0,0,0

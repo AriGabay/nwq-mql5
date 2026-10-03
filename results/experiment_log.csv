@@ -104,3 +104,4 @@ tickcov_202604,2026-10-03T01:47:59,real-tick coverage per month (journal tick li
 tickcov_202605,2026-10-03T01:48:21,real-tick coverage per month (journal tick lines only),tick_coverage,ob_m1_structure_research.ex5,M1,2026.05.01,2026.05.31,10000,ok,225.18,138,17.86,
 tickcov_202606,2026-10-03T01:48:46,real-tick coverage per month (journal tick lines only),tick_coverage,ob_m1_structure_research.ex5,M1,2026.06.01,2026.06.30,10000,ok,-606.83,169,19.76,
 tickcov_202607,2026-10-03T01:49:11,real-tick coverage per month (journal tick lines only),tick_coverage,ob_m1_structure_research.ex5,M1,2026.07.01,2026.07.31,10000,ok,-327.03,196,19.66,
+session_probe,2026-10-03T09:19:44,"gate review: sessions, ticks, order acceptance and SL/TP replicas at quote-gap opens (probe EA, no strategy rules)",diagnostic,session_probe.ex5,M1,2025.12.01,2026.07.31,,ok,,,,
