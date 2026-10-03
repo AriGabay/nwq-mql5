@@ -10,8 +10,12 @@ sensitivity re-prices each affected position as if its stop or target had execut
 quote-only minute that reached the level on the trigger side (buy: Bid <= SL or Bid >= TP; sell: Ask >= SL or
 Ask <= TP), at that tick's price. It is reported next to the primary result and is never used for a choice.
 
-First-order limits (stated in the report): later positions keep their actual sizes, entries and cap slots; swap and
-commission keep their actual values; drawdown is measured on the closed-trade balance curve for both versions.
+Method: a re-pricing of a FIXED trade list, not a path re-simulation. The same positions keep their entries, sizes
+and SL/TP; only an affected position's exit time and price change. Not reproduced (stated in the report): later
+position sizes that would follow from a different balance (R20), cap slots freed or held at other times (R21) and
+so the later signals that would have been taken or skipped, and swap. Drawdown is computed on the corrected
+timeline: each result is booked at its (re-priced) exit time on the closed-trade balance curve, the same basis for
+primary and sensitivity. It has no floating equity, so it is not the tester's equity drawdown.
 """
 from __future__ import annotations
 

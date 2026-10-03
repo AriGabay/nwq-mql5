@@ -45,7 +45,20 @@ Pre-registered handling:
   closed-balance max drawdown are reported next to the primary result for every WFO OOS fold, the WFO aggregate and
   the August-September check. Affected positions come from the same rule as the checker; their ticks come from a
   probe run over those runs (research/session_probe.py with the run ids).
-- First-order limits: later positions keep their actual sizes, entries and cap slots; swap and commission unchanged.
+- Method: this is a re-pricing of a fixed trade list, not a simulation that recomputes the rest of the path. The
+  same positions, with the same entries, sizes and SL/TP, stay in the list. Only each affected position's exit time
+  and exit price change, to the first trigger tick of its quote-only minute.
+- What it does not reproduce: an earlier or different exit would change the balance, and with it the size of every
+  later position (R20). It would free or keep a cap slot at other times (R21), which changes which later signals
+  would have been taken or skipped (skipped_cap, R16 competition). It would also change swap. None of this is
+  re-simulated: later positions keep their actual sizes, entries and cap slots, and swap and commission keep their
+  actual values.
+- Drawdown: computed on the corrected timeline. Each affected position's result is booked at its re-priced exit time,
+  and the balance curve is re-sorted by exit time.
+- Equity limits: the drawdown is measured on the closed-trade balance curve, for both the primary and the
+  sensitivity figure. It contains no floating (intra-trade) equity, so it is not the tester report's equity drawdown
+  and is usually lower. The primary result's official equity drawdown stays the tester's figure. The sensitivity
+  states only the change on the closed-balance basis.
 - The sensitivity is never used for a choice. If any acceptance verdict differs between primary and sensitivity,
   the report says the conclusion depends on the quote-only minute.
 - Pilot size of the effect (R28: no absolute profit fields): A 29 of 1,381 positions, 2 flips, net change -4.31% of
@@ -72,3 +85,26 @@ Pre-registered reporting:
 - Acceptance is evaluated as planned on all folds and, for the report only, again on group R alone. If the verdicts
   differ, the report says the conclusion depends on folds trained with generated ticks. A real-tick OOS month does
   not remove the effect of generated-tick training on the variant choice.
+
+## P&L exposure before the freeze
+
+This stage was not free of profit-and-loss exposure. Everything below happened before the protocol freeze, and the
+frozen protocol must say so.
+
+| What | Seen by | When |
+|---|---|---|
+| Net result (after costs) of each chart example, in chart titles and the `net` column of setups_table.md (32 examples per chart set, both variants, both chart versions) | user and agent | chart gate, U7 and the review round |
+| Pilot sensitivity effect: net change as % of the deposit and closed-balance drawdown change (A -4.31% / +4.18 points, B -3.52% / +3.44 points) | user and agent | session diagnosis |
+| Absolute pilot net and closed-balance max drawdown of both variants (Dec 2025-Jul 2026, the whole WFO window): A -6,051.03 USD and 65.85%, B -190.94 USD and 23.34% | agent; written here for the user | printed once by the first sensitivity computation, before its pilot output was cut to relative figures |
+| Net profit and equity drawdown of every tester run (pilot_a/b, smoke, build-equivalence runs, the eight monthly tick-coverage runs of variant A) | recorded in results/experiment_log.* by the runner; not displayed in the conversation | U7 onward |
+| Exit timing of 38 positions, including 3 outcome flips (A #4403, B #4403, A #5014) | user and agent | session diagnosis |
+
+Consequences, stated before the freeze:
+- The pilot window is the whole WFO window, so every fold's train and OOS months were seen in aggregate, through the
+  pilot result of each variant, before the per-fold selection. The WFO results are therefore not blind to the
+  researchers, even though the selection rule itself is mechanical (train window only, pre-registered).
+- No rule or parameter was changed after this exposure. N = 3 and the 20-point buffer were proposed before the
+  pilot and stayed unchanged. The approval of entries from different OBs on one structure kept the rule already
+  settled in the brainstorm. The session-limitation handling changes no rule: it adds a sensitivity and reporting
+  rules that do not depend on P&L.
+- The report will repeat this exposure record next to the WFO results.
