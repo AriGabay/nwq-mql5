@@ -1,0 +1,15 @@
+{
+ "run_id": "validate_ob_m1_structure_candidate",
+ "ex5": "ob_m1_structure.ex5",
+ "ex5_sha256": "5cba969a17f64e6bbbea5dc98e608d0e36c54807f4a9d72625a8d0a7c275d719",
+ "ini_sha256": "49bd5f7a1e164052d2eacf6831bde295373ea865520928a08caba8977c753162",
+ "meta": {
+  "role": "set_validation",
+  "set": "ob_m1_structure_candidate.set"
+ },
+ "started": "2026-10-04T15:43:23",
+ "status": "ok",
+ "seconds": 20.4,
+ "report": "validate_ob_m1_structure_candidate.htm",
+ "exit_code": 0
+}

@@ -141,3 +141,7 @@ stability_2,2026-10-04T15:37:23,KTD15 stability (not used for selection),stabili
 stability_3,2026-10-04T15:38:14,KTD15 stability (not used for selection),stability,ob_m1_structure_research.ex5,M1,2026.03.01,2026.07.31,10000,ok,-644.49,849,32.6,
 stability_4,2026-10-04T15:39:05,KTD15 stability (not used for selection),stability,ob_m1_structure_research.ex5,M1,2026.03.01,2026.07.31,10000,ok,879.78,841,28.06,
 session_probe_wfo,2026-10-04T15:39:55,"gate review: sessions, ticks, order acceptance and SL/TP replicas at quote-gap opens (probe EA, no strategy rules)",diagnostic,session_probe.ex5,M1,2025.12.01,2026.07.31,,ok,,,,
+validate_ob_m1_structure_original,2026-10-04T15:42:39,R33 .set validation,set_validation,ob_m1_structure.ex5,,,,,ok,,,,
+validate_ob_m1_structure_variant_a,2026-10-04T15:43:01,R33 .set validation,set_validation,ob_m1_structure.ex5,,,,,ok,,,,
+validate_ob_m1_structure_variant_b,2026-10-04T15:43:22,R33 .set validation,set_validation,ob_m1_structure.ex5,,,,,ok,,,,
+validate_ob_m1_structure_candidate,2026-10-04T15:43:43,R33 .set validation,set_validation,ob_m1_structure.ex5,,,,,ok,,,,

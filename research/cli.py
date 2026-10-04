@@ -700,7 +700,10 @@ def cmd_deliver(args) -> None:
                   "baseline": f["oos"]["fixed_a"]["net_profit"], "candidate_trades": f["oos"]["procedure"]["trades"]}
                  for f in folds]
     mc = acc["acceptance"]["procedure"]["criteria"]["loss_limits"]["value"]["monte_carlo"]
-    made = deliver.charts({labels[w]: series[w] for w in SERIES}, fold_bars, mc, DELIV / "charts", label, "oos")
+    same = all(f["selection"]["params"] == FIXED["fixed_a"] for f in folds)   # every fold fell back to A
+    curves = ({"Variant A = WFO procedure (A in every fold)": series["fixed_a"], labels["fixed_b"]: series["fixed_b"]}
+              if same else {labels[w]: series[w] for w in SERIES})
+    made = deliver.charts(curves, fold_bars, mc, DELIV / "charts", label, "oos")
     if hold:
         made += deliver.charts({w.replace("_", " ").title(): s for w, s in hold.items()}, [], {}, DELIV / "charts",
                                f"Aug-Sep {P['holdout'][0]}-{P['holdout'][1]} (non-independent)", "aug_sep")
