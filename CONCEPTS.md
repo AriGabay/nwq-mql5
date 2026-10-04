@@ -64,6 +64,12 @@ A parameter set held constant in every fold of a walk-forward study and run on t
 ### Fallback
 The default parameters carried into an out-of-window month when no train pass met the eligibility thresholds (`no_eligible_pass`); it completes the evaluation path and is never a selected or improved candidate.
 
+### Original risk (R0)
+The distance between a position's actual fill price and the stop accepted on it at the fill, |E − SL0|. It is fixed for the whole trade: R figures of a run with a trailing stop are measured against it, never against a trailed stop.
+
+### 1R trailing stop
+The optional exit change behind `EnableTrailingStop` (default off). From +1R on Bid (long) or Ask (short), the stop follows the best Bid or Ask since the fill at a distance of one Original risk, on every tick and only in the trade's favour; the 2R target does not move. An exit at a stop that had moved is the exit kind `trail`, which is not necessarily a loss.
+
 ### Recovery attempt
 A new try of an optimization window that failed verification, under its own attempt ID, run IDs and folders. Earlier attempts' records stay as they are, a verified window is never retried, and the tester cache is not deleted.
 

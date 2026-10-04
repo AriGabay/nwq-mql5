@@ -18,8 +18,17 @@ MT5 Expert Advisor for XAUUSD.s, researched with a gated, pre-registered protoco
    closes beyond it in the trade direction (long: green, close above its upper boundary). Entry is a Market order on
    the first tradeable tick after the reaction candle closes.
 4. **Risk.** Stop beyond the farther of the OB edge and the M1 structure level, plus a 20-point buffer (plus the
-   spread for shorts); target 2R from the fill; 1% of balance per trade; at most 3 open positions; no breakeven,
-   trailing or partial exits. An opposing M1 swing sequence after the touch cancels a waiting setup.
+   spread for shorts); target 2R from the fill; 1% of balance per trade; at most 3 open positions; no breakeven
+   or partial exits. An opposing M1 swing sequence after the touch cancels a waiting setup.
+5. **Optional 1R trailing stop** (`EnableTrailingStop`, default **false** = the rules above unchanged).
+   - **What R is:** R0 = |fill − original SL|, fixed for the whole trade.
+   - **When it starts:** at +1R (Bid ≥ E + R0 for a long, Ask ≤ E − R0 for a short).
+   - **How it moves:** the stop trails 1R behind the best Bid (long) or the best Ask (short) since the fill, on every
+     tick, and only in the trade's favour.
+   - **What stays fixed:** the TP stays 2R.
+   - **Status:** development comparison only, in
+     [`results/trailing_v1/dev_comparison_he.md`](results/trailing_v1/dev_comparison_he.md); plan
+     [`docs/plans/2026-10-05-0007-feat-trailing-stop-1r-plan.md`](docs/plans/2026-10-05-0007-feat-trailing-stop-1r-plan.md).
 
 Full rules: R3–R23 in the plan below. Terms: [`CONCEPTS.md`](CONCEPTS.md).
 
