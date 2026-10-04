@@ -1,0 +1,34 @@
+{
+ "run_id": "optsmoke_m15",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "4c0a9e3ba215aa484e454a7055941156e9b1c70b6fdaa35f8c71ed83a6d7a57f",
+ "ini_sha256": "9854d2e45b1c981f23dd9e510d86d7c6820a27f0720f93e45d245fc1ad9e1afd",
+ "meta": {
+  "kind": "research",
+  "role": "optsmoke",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15,
+   "ResearchRunTag": "optsmoke_m15"
+  },
+  "ranges": {
+   "ObMode": [
+    0,
+    1,
+    1
+   ],
+   "EntryMode": [
+    0,
+    1,
+    3
+   ]
+  }
+ },
+ "started": "2026-10-01T00:09:24",
+ "status": "ok",
+ "seconds": 42.5,
+ "report": "optsmoke_m15.xml",
+ "exit_code": 0
+}

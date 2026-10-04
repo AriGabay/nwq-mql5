@@ -1,0 +1,49 @@
+{
+ "run_id": "f5_vm12",
+ "ex5": "new_test_research.ex5",
+ "ex5_sha256": "90fefdd09a264b5cc0419d088d861ed41415ae9cc2def436ce5d333c976a972b",
+ "ini_sha256": "13ca76d18e696b4df7410039b0b59bf703631344b2dab105d0ab5df1ee5c3383",
+ "meta": {
+  "kind": "research",
+  "role": "train",
+  "values": {
+   "DrawObjects": false,
+   "DebugMode": false,
+   "PopupAlerts": false,
+   "LotMode": 1,
+   "RiskPercent": 1.0,
+   "MaxOpenPositions": 3,
+   "EnableTrading": true,
+   "SignalTF": 15,
+   "VolumeMultiplier": 1.2,
+   "ResearchRunTag": "f5_vm12"
+  },
+  "ranges": {
+   "PivL": [
+    2,
+    1,
+    5
+   ],
+   "PivR": [
+    2,
+    1,
+    4
+   ],
+   "SweepToSetupBars": [
+    6,
+    6,
+    24
+   ],
+   "ConfirmationBars": [
+    3,
+    3,
+    9
+   ]
+  }
+ },
+ "started": "2026-09-30T19:07:46",
+ "status": "ok",
+ "seconds": 124.2,
+ "report": "f5_vm12.xml",
+ "exit_code": 0
+}

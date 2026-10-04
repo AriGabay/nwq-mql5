@@ -1,0 +1,15 @@
+{
+ "run_id": "validate_new_test_candidate",
+ "ex5": "new_test.ex5",
+ "ex5_sha256": "a56242b92a98c3c2f74e5c67e03c131f96a27fc668216b7a59a039b36e8b490b",
+ "ini_sha256": "92d0f57987fddd521be28996e66e03ca2f1dba33e14cf8b498875c292d88322a",
+ "meta": {
+  "role": "set_validation",
+  "set": "new_test_candidate.set"
+ },
+ "started": "2026-09-30T19:43:52",
+ "status": "ok",
+ "seconds": 26.5,
+ "report": "validate_new_test_candidate.htm",
+ "exit_code": 0
+}

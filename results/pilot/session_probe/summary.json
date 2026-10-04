@@ -1,0 +1,118 @@
+{
+ "sessions": {
+  "quote": {
+   "Mon": [
+    "01:00:00-23:58:00"
+   ],
+   "Tue": [
+    "01:00:00-23:58:00"
+   ],
+   "Wed": [
+    "01:00:00-23:58:00"
+   ],
+   "Thu": [
+    "01:00:00-23:58:00"
+   ],
+   "Fri": [
+    "01:00:00-23:57:00"
+   ]
+  },
+  "trade": {
+   "Mon": [
+    "01:01:00-23:58:00"
+   ],
+   "Tue": [
+    "01:01:00-23:58:00"
+   ],
+   "Wed": [
+    "01:01:00-23:58:00"
+   ],
+   "Thu": [
+    "01:01:00-23:58:00"
+   ],
+   "Fri": [
+    "01:01:00-23:57:00"
+   ]
+  }
+ },
+ "spec": {
+  "trade_mode": 4,
+  "stops_level": 20,
+  "freeze_level": 0,
+  "exemode": 2
+ },
+ "order_probe": [
+  {
+   "probe": "next_minute_first_tick",
+   "retcode": 10009,
+   "n": 172
+  },
+  {
+   "probe": "open_first_tick",
+   "retcode": 10009,
+   "n": 3
+  },
+  {
+   "probe": "open_first_tick",
+   "retcode": 10018,
+   "n": 169
+  }
+ ],
+ "order_probe_by_minute": [
+  {
+   "probe": "next_minute_first_tick",
+   "minute": "01:01",
+   "retcode": 10009,
+   "n": 169
+  },
+  {
+   "probe": "open_first_tick",
+   "minute": "01:00",
+   "retcode": 10018,
+   "n": 169
+  },
+  {
+   "probe": "next_minute_first_tick",
+   "minute": "01:04",
+   "retcode": 10009,
+   "n": 1
+  },
+  {
+   "probe": "next_minute_first_tick",
+   "minute": "01:02",
+   "retcode": 10009,
+   "n": 1
+  },
+  {
+   "probe": "next_minute_first_tick",
+   "minute": "03:26",
+   "retcode": 10009,
+   "n": 1
+  },
+  {
+   "probe": "open_first_tick",
+   "minute": "01:01",
+   "retcode": 10009,
+   "n": 1
+  },
+  {
+   "probe": "open_first_tick",
+   "minute": "01:03",
+   "retcode": 10009,
+   "n": 1
+  },
+  {
+   "probe": "open_first_tick",
+   "minute": "03:25",
+   "retcode": 10009,
+   "n": 1
+  }
+ ],
+ "cases": 38,
+ "cases_with_trigger_in_gap_minute": 38,
+ "cases_with_trigger_before_gap": 0,
+ "exit_is_first_trigger_after_gap_minute": 27,
+ "replica_matches_ea_exit": 38,
+ "replicas_closed": 38,
+ "synthetic_month_cases": 12
+}

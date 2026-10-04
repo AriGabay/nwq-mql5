@@ -1,0 +1,22 @@
+{
+ "run_id": "f3_oos_baseline",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "70e3e3cfe36b587a6a13bd6176fd898a41c0e30cbf7aa17a1e234b4c2e9ee2d8",
+ "ini_sha256": "8863f8d8d633f89fa94b4dc880d165886027fc92918447175fe43e794a5006a4",
+ "meta": {
+  "kind": "research",
+  "role": "oos_baseline",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15,
+   "ResearchRunTag": "f3_oos_baseline"
+  }
+ },
+ "started": "2026-10-02T11:25:57",
+ "status": "ok",
+ "seconds": 18.0,
+ "report": "f3_oos_baseline.htm",
+ "exit_code": 0
+}

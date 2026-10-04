@@ -1,0 +1,182 @@
+{
+ "runs_checked": 22,
+ "runs_with_mismatches": 0,
+ "rows": [
+  {
+   "run_id": "f1_oos_procedure",
+   "expected": {
+    "StructureVariant": 0
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f1_oos_fixed_a",
+   "expected": {
+    "StructureVariant": 0
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f1_oos_fixed_b",
+   "expected": {
+    "StructureVariant": 1
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f2_oos_procedure",
+   "expected": {
+    "StructureVariant": 0
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f2_oos_fixed_a",
+   "expected": {
+    "StructureVariant": 0
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f2_oos_fixed_b",
+   "expected": {
+    "StructureVariant": 1
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f3_oos_procedure",
+   "expected": {
+    "StructureVariant": 0
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f3_oos_fixed_a",
+   "expected": {
+    "StructureVariant": 0
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f3_oos_fixed_b",
+   "expected": {
+    "StructureVariant": 1
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f4_oos_procedure",
+   "expected": {
+    "StructureVariant": 0
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f4_oos_fixed_a",
+   "expected": {
+    "StructureVariant": 0
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f4_oos_fixed_b",
+   "expected": {
+    "StructureVariant": 1
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f5_oos_procedure",
+   "expected": {
+    "StructureVariant": 0
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f5_oos_fixed_a",
+   "expected": {
+    "StructureVariant": 0
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "f5_oos_fixed_b",
+   "expected": {
+    "StructureVariant": 1
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "stability_candidate",
+   "expected": {
+    "StructureVariant": 0
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "stability_1",
+   "expected": {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 2
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "stability_2",
+   "expected": {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 4
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "stability_3",
+   "expected": {
+    "StructureVariant": 0,
+    "StopBufferPoints": 10
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "stability_4",
+   "expected": {
+    "StructureVariant": 0,
+    "StopBufferPoints": 40
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "holdout_variant_a",
+   "expected": {
+    "StructureVariant": "0",
+    "ImpulseWindowBars": "2",
+    "SwingStrengthM1": "3",
+    "StopBufferPoints": "20",
+    "RiskRR": "2.0",
+    "RiskPercent": "1.0",
+    "MaxExposures": "3",
+    "WarmupDays": "30",
+    "MagicNumber": "770201",
+    "TradeComment": "OBM1"
+   },
+   "mismatches": []
+  },
+  {
+   "run_id": "holdout_variant_b",
+   "expected": {
+    "StructureVariant": "1",
+    "ImpulseWindowBars": "2",
+    "SwingStrengthM1": "3",
+    "StopBufferPoints": "20",
+    "RiskRR": "2.0",
+    "RiskPercent": "1.0",
+    "MaxExposures": "3",
+    "WarmupDays": "30",
+    "MagicNumber": "770201",
+    "TradeComment": "OBM1"
+   },
+   "mismatches": []
+  }
+ ]
+}

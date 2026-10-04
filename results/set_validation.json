@@ -1,0 +1,34 @@
+{
+ "ob_m1_structure_original.set": {
+  "mismatches": [],
+  "period": [
+   "2026.03.01",
+   "2026.03.31"
+  ],
+  "status": "ok"
+ },
+ "ob_m1_structure_variant_a.set": {
+  "mismatches": [],
+  "period": [
+   "2026.03.01",
+   "2026.03.31"
+  ],
+  "status": "ok"
+ },
+ "ob_m1_structure_variant_b.set": {
+  "mismatches": [],
+  "period": [
+   "2026.03.01",
+   "2026.03.31"
+  ],
+  "status": "ok"
+ },
+ "ob_m1_structure_candidate.set": {
+  "mismatches": [],
+  "period": [
+   "2026.03.01",
+   "2026.03.31"
+  ],
+  "status": "ok"
+ }
+}

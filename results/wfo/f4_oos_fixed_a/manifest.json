@@ -1,0 +1,22 @@
+{
+ "run_id": "f4_oos_fixed_a",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "02a44b32bae4246d6e68f21f284851f985bd628dc7e5f51ace8ee4ada5fed666",
+ "ini_sha256": "3b3256c316ff1a6789bc3bc885a0a6f43b1ac2b74e2a8be6486c2452f99c31f8",
+ "meta": {
+  "kind": "research",
+  "role": "oos_fixed_a",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "StructureVariant": 0,
+   "ResearchRunTag": "f4_oos_fixed_a"
+  }
+ },
+ "started": "2026-10-04T15:25:46",
+ "status": "ok",
+ "seconds": 22.3,
+ "report": "f4_oos_fixed_a.htm",
+ "exit_code": 0
+}

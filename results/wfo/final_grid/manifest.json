@@ -1,0 +1,28 @@
+{
+ "run_id": "final_grid",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "02a44b32bae4246d6e68f21f284851f985bd628dc7e5f51ace8ee4ada5fed666",
+ "ini_sha256": "98254ca6efb1ecb76e1ebf33be926af24d5a350e5f5490baea808b911c7b991a",
+ "meta": {
+  "kind": "research",
+  "role": "train",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "ResearchRunTag": "final_grid"
+  },
+  "ranges": {
+   "StructureVariant": [
+    0,
+    1,
+    1
+   ]
+  }
+ },
+ "started": "2026-10-04T15:28:30",
+ "status": "ok",
+ "seconds": 38.6,
+ "report": "final_grid.xml",
+ "exit_code": 0
+}

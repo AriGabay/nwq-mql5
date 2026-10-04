@@ -1,0 +1,109 @@
+{
+ "window": [
+  "2026.03.01",
+  "2026.07.31"
+ ],
+ "runs": [
+  {
+   "run_id": "f1_oos_procedure",
+   "deposit": 10000.0,
+   "deals_frozen": 67,
+   "deals_fixed": 67,
+   "identical": true
+  },
+  {
+   "run_id": "f1_oos_baseline",
+   "deposit": 10000.0,
+   "deals_frozen": 117,
+   "deals_fixed": 117,
+   "identical": true
+  },
+  {
+   "run_id": "f2_oos_procedure",
+   "deposit": 8967.0,
+   "deals_frozen": 43,
+   "deals_fixed": 43,
+   "identical": true
+  },
+  {
+   "run_id": "f2_oos_baseline",
+   "deposit": 9686.0,
+   "deals_frozen": 127,
+   "deals_fixed": 127,
+   "identical": true
+  },
+  {
+   "run_id": "f3_oos_procedure",
+   "deposit": 8209.0,
+   "deals_frozen": 129,
+   "deals_fixed": 129,
+   "identical": true
+  },
+  {
+   "run_id": "f3_oos_baseline",
+   "deposit": 8453.0,
+   "deals_frozen": 129,
+   "deals_fixed": 129,
+   "identical": true
+  },
+  {
+   "run_id": "f4_oos_procedure",
+   "deposit": 8861.0,
+   "deals_frozen": 33,
+   "deals_fixed": 33,
+   "identical": true
+  },
+  {
+   "run_id": "f4_oos_baseline",
+   "deposit": 9065.0,
+   "deals_frozen": 103,
+   "deals_fixed": 103,
+   "identical": true
+  },
+  {
+   "run_id": "f5_oos_procedure",
+   "deposit": 8269.0,
+   "deals_frozen": 19,
+   "deals_fixed": 19,
+   "identical": true
+  },
+  {
+   "run_id": "f5_oos_baseline",
+   "deposit": 9360.0,
+   "deals_frozen": 97,
+   "deals_fixed": 97,
+   "identical": true
+  },
+  {
+   "run_id": "static_candidate",
+   "deposit": 10000.0,
+   "deals_frozen": 205,
+   "deals_fixed": 205,
+   "identical": true
+  },
+  {
+   "run_id": "static_nb1",
+   "deposit": 10000.0,
+   "deals_frozen": 219,
+   "deals_fixed": 219,
+   "identical": true
+  },
+  {
+   "run_id": "static_nb2",
+   "deposit": 10000.0,
+   "deals_frozen": 197,
+   "deals_fixed": 197,
+   "identical": true
+  },
+  {
+   "run_id": "static_nb3",
+   "deposit": 10000.0,
+   "deals_frozen": 239,
+   "deals_fixed": 239,
+   "identical": true
+  }
+ ],
+ "all_identical": true,
+ "total_deals_compared": 1724,
+ "not_rerun": "holdout 2026.08.01-09.29 (R24: run once)"
+}

@@ -1,0 +1,14 @@
+{
+ "run_id": "validate_new_test_original",
+ "ex5": "new_test_v103.ex5",
+ "ex5_sha256": "6aee6faa13c46f7328013f586f503c1cbbf9f7742982ea8e3d42e1b73d68949a",
+ "ini_sha256": "67f852c7f12fd6e66cacdff74f50a6c1d9f35fb4d7524a5844a7305839e51166",
+ "meta": {
+  "role": "set_validation"
+ },
+ "started": "2026-09-30T19:44:59",
+ "status": "ok",
+ "seconds": 23.6,
+ "report": "validate_new_test_original.htm",
+ "exit_code": 0
+}

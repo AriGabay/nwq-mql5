@@ -1,0 +1,31 @@
+{
+ "run_id": "check_aug_sep_candidate",
+ "ex5": "new_test_research.ex5",
+ "ex5_sha256": "90fefdd09a264b5cc0419d088d861ed41415ae9cc2def436ce5d333c976a972b",
+ "ini_sha256": "3722fd8122f10135b256f271e56416407334e010d9b0a9d9b56b473c83c3ffb8",
+ "meta": {
+  "kind": "research",
+  "role": "check_period",
+  "values": {
+   "DrawObjects": false,
+   "DebugMode": false,
+   "PopupAlerts": false,
+   "LotMode": 1,
+   "RiskPercent": 1.0,
+   "MaxOpenPositions": 3,
+   "EnableTrading": true,
+   "SignalTF": 15,
+   "PivL": 5,
+   "PivR": 3,
+   "SweepToSetupBars": 24,
+   "VolumeMultiplier": 1.2,
+   "ConfirmationBars": 6,
+   "ResearchRunTag": "check_aug_sep_candidate"
+  }
+ },
+ "started": "2026-09-30T19:40:14",
+ "status": "ok",
+ "seconds": 19.6,
+ "report": "check_aug_sep_candidate.htm",
+ "exit_code": 0
+}

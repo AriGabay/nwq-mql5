@@ -1,0 +1,31 @@
+{
+ "run_id": "static_cand_202604",
+ "ex5": "new_test_research.ex5",
+ "ex5_sha256": "90fefdd09a264b5cc0419d088d861ed41415ae9cc2def436ce5d333c976a972b",
+ "ini_sha256": "61ffd0fbd1e256309341f6dada9554b9a846f14bc9d1684669ab9c9394e0243e",
+ "meta": {
+  "kind": "research",
+  "role": "static_candidate",
+  "values": {
+   "DrawObjects": false,
+   "DebugMode": false,
+   "PopupAlerts": false,
+   "LotMode": 1,
+   "RiskPercent": 1.0,
+   "MaxOpenPositions": 3,
+   "EnableTrading": true,
+   "SignalTF": 15,
+   "PivL": 5,
+   "PivR": 3,
+   "SweepToSetupBars": 24,
+   "VolumeMultiplier": 1.2,
+   "ConfirmationBars": 6,
+   "ResearchRunTag": "static_cand_202604"
+  }
+ },
+ "started": "2026-09-30T19:30:45",
+ "status": "ok",
+ "seconds": 13.7,
+ "report": "static_cand_202604.htm",
+ "exit_code": 0
+}

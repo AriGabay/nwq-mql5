@@ -1,0 +1,17 @@
+{
+ "tag": "f5",
+ "train": [
+  "2026.04.01",
+  "2026.06.30"
+ ],
+ "trade_floor": 45,
+ "status": "selected",
+ "params": {
+  "ObMode": 1,
+  "EntryMode": 0,
+  "ObMaxAgeBars": 96,
+  "FvgWindowBars": 6,
+  "OrderExpiryBars": 6
+ },
+ "eligible_passes": 3
+}

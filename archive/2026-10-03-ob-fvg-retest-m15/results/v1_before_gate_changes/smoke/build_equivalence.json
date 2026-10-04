@@ -1,0 +1,16 @@
+{
+ "delivered_deals": 117,
+ "research_deals": 117,
+ "columns": [
+  "Time",
+  "Symbol",
+  "Type",
+  "Direction",
+  "Volume",
+  "Price",
+  "Commission",
+  "Swap",
+  "Profit"
+ ],
+ "identical": true
+}

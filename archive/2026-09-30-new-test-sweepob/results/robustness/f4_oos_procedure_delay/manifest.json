@@ -1,0 +1,31 @@
+{
+ "run_id": "f4_oos_procedure_delay",
+ "ex5": "new_test_research.ex5",
+ "ex5_sha256": "90fefdd09a264b5cc0419d088d861ed41415ae9cc2def436ce5d333c976a972b",
+ "ini_sha256": "8f591e46fdafb84f84b7b33ec21c60be11ca9b0328330fb4c06008a4889d6596",
+ "meta": {
+  "kind": "research",
+  "role": "stress_delay",
+  "values": {
+   "DrawObjects": false,
+   "DebugMode": false,
+   "PopupAlerts": false,
+   "LotMode": 1,
+   "RiskPercent": 1.0,
+   "MaxOpenPositions": 3,
+   "EnableTrading": true,
+   "SignalTF": 15,
+   "PivL": 5,
+   "PivR": 4,
+   "SweepToSetupBars": 18,
+   "VolumeMultiplier": 1.2,
+   "ConfirmationBars": 9,
+   "ResearchRunTag": "f4_oos_procedure_delay"
+  }
+ },
+ "started": "2026-09-30T19:28:52",
+ "status": "ok",
+ "seconds": 14.1,
+ "report": "f4_oos_procedure_delay.htm",
+ "exit_code": 0
+}

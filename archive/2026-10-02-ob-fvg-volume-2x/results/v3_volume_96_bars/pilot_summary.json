@@ -1,0 +1,98 @@
+{
+ "window": [
+  "2025.12.01",
+  "2026.07.31"
+ ],
+ "days_per_month": 30.44,
+ "target_fills_per_month": 15,
+ "rule": "longer timeframe averaging >= 15 fills per month; else M5 with the shortfall reported (R20)",
+ "runs": {
+  "M5": {
+   "run_id": "pilot_m5",
+   "fills": 10,
+   "days": 243,
+   "fills_per_month": 1.2527,
+   "funnel": {
+    "activated": 29,
+    "touched": 25,
+    "confirmed": 14,
+    "placed": 14,
+    "filled": 10,
+    "filled_late": 0,
+    "expired_untouched": 4,
+    "invalidated_active": 0,
+    "invalidated_touched": 10,
+    "invalidated_confirmed": 0,
+    "invalidated_pending": 0,
+    "cancelled_no_fvg": 1,
+    "skipped_price_past": 0,
+    "skipped_too_close": 0,
+    "skipped_sl_stops": 0,
+    "skipped_volume": 0,
+    "skipped_margin": 0,
+    "skipped_cap": 0,
+    "skipped_duplicate": 0,
+    "expired_unfilled": 4,
+    "run_end_pending": 0,
+    "skipped_market_closed": 0,
+    "skipped_broker_reject": 0,
+    "warmup_dropped": 6,
+    "idfvg_rejected_volume": 6845,
+    "market_closed_retries": 0
+   },
+   "reasons": {
+    "invalidated_touched": 10,
+    "filled": 10,
+    "expired_untouched": 4,
+    "expired_unfilled": 4,
+    "cancelled_no_fvg": 1
+   },
+   "conformance_violations": 0
+  },
+  "M15": {
+   "run_id": "pilot_m15",
+   "fills": 5,
+   "days": 243,
+   "fills_per_month": 0.6263,
+   "funnel": {
+    "activated": 20,
+    "touched": 15,
+    "confirmed": 6,
+    "placed": 6,
+    "filled": 5,
+    "filled_late": 0,
+    "expired_untouched": 4,
+    "invalidated_active": 1,
+    "invalidated_touched": 6,
+    "invalidated_confirmed": 0,
+    "invalidated_pending": 0,
+    "cancelled_no_fvg": 3,
+    "skipped_price_past": 0,
+    "skipped_too_close": 0,
+    "skipped_sl_stops": 0,
+    "skipped_volume": 0,
+    "skipped_margin": 0,
+    "skipped_cap": 0,
+    "skipped_duplicate": 0,
+    "expired_unfilled": 1,
+    "run_end_pending": 0,
+    "skipped_market_closed": 0,
+    "skipped_broker_reject": 0,
+    "warmup_dropped": 3,
+    "idfvg_rejected_volume": 2107,
+    "market_closed_retries": 1
+   },
+   "reasons": {
+    "invalidated_touched": 6,
+    "filled": 5,
+    "expired_untouched": 4,
+    "cancelled_no_fvg": 3,
+    "invalidated_active": 1,
+    "expired_unfilled": 1
+   },
+   "conformance_violations": 0
+  }
+ },
+ "chosen_period": "M5",
+ "shortfall": true
+}

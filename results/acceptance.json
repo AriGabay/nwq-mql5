@@ -1,0 +1,845 @@
+{
+ "candidate": {
+  "StructureVariant": 0
+ },
+ "candidate_series": "fixed_a",
+ "acceptance": {
+  "procedure": {
+   "criteria": {
+    "oos_frequency": {
+     "value": {
+      "fills": 855,
+      "days": 153,
+      "fills_per_month": 170.1059
+     },
+     "threshold": ">= 15 fills per 30.44 days",
+     "evaluated": true,
+     "pass": true,
+     "note": ""
+    },
+    "oos_net": {
+     "value": {
+      "net": -468.51,
+      "baseline_net": -468.51
+     },
+     "threshold": "> 0 and > baseline net",
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    },
+    "bootstrap_ci": {
+     "value": {
+      "ci_mean_daily_pnl": [
+       -67.88,
+       61.26
+      ],
+      "n_days": 109
+     },
+     "threshold": "95% lower bound > 0 (block 5, 10000 resamples, seed 20260930)",
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    },
+    "positive_folds": {
+     "value": 2,
+     "threshold": "strict majority: >= 3 of 5",
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    },
+    "top_events_removed": {
+     "value": {
+      "n_events": 855,
+      "bar_minutes": 1,
+      "net_without_top": -1387.5
+     },
+     "threshold": "net after removing the top 2 trade events > 0",
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    },
+    "loss_limits": {
+     "value": {
+      "stitched_breach": 1,
+      "monte_carlo": {
+       "breach_prob": 1.0,
+       "daily_breach_prob": 0.9775,
+       "total_breach_prob": 0.0643,
+       "seed": 20260930,
+       "horizon": 252,
+       "n_paths": 10000,
+       "mean_block": 5,
+       "final_return_p1": -0.1234,
+       "final_return_p5": -0.1069,
+       "final_return_p50": -0.0281,
+       "final_return_p95": 0.2009,
+       "final_return_p99": 0.3089,
+       "max_dd_pct_p50": 6.7779,
+       "max_dd_pct_p95": 11.5109,
+       "max_dd_pct_p99": 14.2703
+      }
+     },
+     "threshold": "no stitched breach and MC breach prob <= 0.1 over 252 days",
+     "evaluated": true,
+     "pass": false,
+     "note": "first breach {'date': Timestamp('2026-03-10 00:00:00'), 'type': 'total', 'eq_min': 8998.82, 'daily_floor': 8535.44}"
+    },
+    "cost_stress": {
+     "value": {
+      "stressed_net": -3146.9,
+      "spread_cost": 1561.19,
+      "slippage_cost": 455.6,
+      "entry_slippage_cost": 661.6,
+      "stop_exits": 565
+     },
+     "threshold": "> 0 after +1.0x spread, 10 points on every SL exit and 10 points on every Market entry",
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    },
+    "stability": {
+     "value": 0.5,
+     "threshold": ">= 0.6 of the 4 KTD15 perturbations",
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    },
+    "dsr": {
+     "value": {
+      "n_days": 109,
+      "psr_value": 0.0609,
+      "sr": -0.0116,
+      "sr0": 0.1375,
+      "trials": 12,
+      "var_sr": 0.00682378
+     },
+     "threshold": 0.9,
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    }
+   },
+   "passed_all": false,
+   "evaluated_all": true,
+   "drawdowns": {
+    "balance_dd_pct": 30.682,
+    "equity_dd_pct": 31.529
+   },
+   "recommended": false,
+   "recommended_note": "R33: no recommended .set in this research - no independent period exists (August-September is a non-independent historical check, R31); at most candidate.set with a forward-test protocol."
+  },
+  "fixed_a": {
+   "criteria": {
+    "oos_frequency": {
+     "value": {
+      "fills": 855,
+      "days": 153,
+      "fills_per_month": 170.1059
+     },
+     "threshold": ">= 15 fills per 30.44 days",
+     "evaluated": true,
+     "pass": true,
+     "note": ""
+    },
+    "oos_net": {
+     "value": {
+      "net": -468.51,
+      "baseline_net": -468.51
+     },
+     "threshold": "> 0 (this series is the baseline)",
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    },
+    "bootstrap_ci": {
+     "value": {
+      "ci_mean_daily_pnl": [
+       -67.88,
+       61.26
+      ],
+      "n_days": 109
+     },
+     "threshold": "95% lower bound > 0 (block 5, 10000 resamples, seed 20260930)",
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    },
+    "positive_folds": {
+     "value": 2,
+     "threshold": "strict majority: >= 3 of 5",
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    },
+    "top_events_removed": {
+     "value": {
+      "n_events": 855,
+      "bar_minutes": 1,
+      "net_without_top": -1387.5
+     },
+     "threshold": "net after removing the top 2 trade events > 0",
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    },
+    "loss_limits": {
+     "value": {
+      "stitched_breach": 1,
+      "monte_carlo": {
+       "breach_prob": 1.0,
+       "daily_breach_prob": 0.9775,
+       "total_breach_prob": 0.0643,
+       "seed": 20260930,
+       "horizon": 252,
+       "n_paths": 10000,
+       "mean_block": 5,
+       "final_return_p1": -0.1234,
+       "final_return_p5": -0.1069,
+       "final_return_p50": -0.0281,
+       "final_return_p95": 0.2009,
+       "final_return_p99": 0.3089,
+       "max_dd_pct_p50": 6.7779,
+       "max_dd_pct_p95": 11.5109,
+       "max_dd_pct_p99": 14.2703
+      }
+     },
+     "threshold": "no stitched breach and MC breach prob <= 0.1 over 252 days",
+     "evaluated": true,
+     "pass": false,
+     "note": "first breach {'date': Timestamp('2026-03-10 00:00:00'), 'type': 'total', 'eq_min': 8998.82, 'daily_floor': 8535.44}"
+    },
+    "cost_stress": {
+     "value": {
+      "stressed_net": -3146.9,
+      "spread_cost": 1561.19,
+      "slippage_cost": 455.6,
+      "entry_slippage_cost": 661.6,
+      "stop_exits": 565
+     },
+     "threshold": "> 0 after +1.0x spread, 10 points on every SL exit and 10 points on every Market entry",
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    },
+    "stability": {
+     "value": 0.5,
+     "threshold": ">= 0.6 of the 4 KTD15 perturbations",
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    },
+    "dsr": {
+     "value": {
+      "n_days": 109,
+      "psr_value": 0.0609,
+      "sr": -0.0116,
+      "sr0": 0.1375,
+      "trials": 12,
+      "var_sr": 0.00682378
+     },
+     "threshold": 0.9,
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    }
+   },
+   "passed_all": false,
+   "evaluated_all": true,
+   "drawdowns": {
+    "balance_dd_pct": 30.682,
+    "equity_dd_pct": 31.529
+   },
+   "recommended": false,
+   "recommended_note": "R33: no recommended .set in this research - no independent period exists (August-September is a non-independent historical check, R31); at most candidate.set with a forward-test protocol."
+  },
+  "fixed_b": {
+   "criteria": {
+    "oos_frequency": {
+     "value": {
+      "fills": 256,
+      "days": 153,
+      "fills_per_month": 50.9323
+     },
+     "threshold": ">= 15 fills per 30.44 days",
+     "evaluated": true,
+     "pass": true,
+     "note": ""
+    },
+    "oos_net": {
+     "value": {
+      "net": 1129.53,
+      "baseline_net": -468.51
+     },
+     "threshold": "> 0 and > baseline net",
+     "evaluated": true,
+     "pass": true,
+     "note": ""
+    },
+    "bootstrap_ci": {
+     "value": {
+      "ci_mean_daily_pnl": [
+       -28.24,
+       50.92
+      ],
+      "n_days": 109
+     },
+     "threshold": "95% lower bound > 0 (block 5, 10000 resamples, seed 20260930)",
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    },
+    "positive_folds": {
+     "value": 3,
+     "threshold": "strict majority: >= 3 of 5",
+     "evaluated": true,
+     "pass": true,
+     "note": ""
+    },
+    "top_events_removed": {
+     "value": {
+      "n_events": 256,
+      "bar_minutes": 1,
+      "net_without_top": 684.49
+     },
+     "threshold": "net after removing the top 2 trade events > 0",
+     "evaluated": true,
+     "pass": true,
+     "note": ""
+    },
+    "loss_limits": {
+     "value": {
+      "stitched_breach": 1,
+      "monte_carlo": {
+       "breach_prob": 0.9911,
+       "daily_breach_prob": 0.4761,
+       "total_breach_prob": 0.515,
+       "seed": 20260930,
+       "horizon": 252,
+       "n_paths": 10000,
+       "mean_block": 5,
+       "final_return_p1": -0.1329,
+       "final_return_p5": -0.1197,
+       "final_return_p50": -0.1003,
+       "final_return_p95": 0.4928,
+       "final_return_p99": 0.7247,
+       "max_dd_pct_p50": 12.6676,
+       "max_dd_pct_p95": 23.8208,
+       "max_dd_pct_p99": 28.6263
+      }
+     },
+     "threshold": "no stitched breach and MC breach prob <= 0.1 over 252 days",
+     "evaluated": true,
+     "pass": false,
+     "note": "first breach {'date': Timestamp('2026-03-18 00:00:00'), 'type': 'total', 'eq_min': 8998.68, 'daily_floor': 8538.69}"
+    },
+    "cost_stress": {
+     "value": {
+      "stressed_net": 393.14,
+      "spread_cost": 430.09,
+      "slippage_cost": 124.7,
+      "entry_slippage_cost": 181.6,
+      "stop_exits": 162
+     },
+     "threshold": "> 0 after +1.0x spread, 10 points on every SL exit and 10 points on every Market entry",
+     "evaluated": true,
+     "pass": true,
+     "note": ""
+    },
+    "stability": {
+     "value": 0.0,
+     "threshold": ">= 0.6",
+     "evaluated": false,
+     "pass": null,
+     "note": "not run for this series"
+    },
+    "dsr": {
+     "value": {
+      "n_days": 109,
+      "psr_value": 0.1737,
+      "sr": 0.0477,
+      "sr0": 0.1375,
+      "trials": 12,
+      "var_sr": 0.00682378
+     },
+     "threshold": 0.9,
+     "evaluated": true,
+     "pass": false,
+     "note": ""
+    }
+   },
+   "passed_all": false,
+   "evaluated_all": false,
+   "drawdowns": {
+    "balance_dd_pct": 17.943,
+    "equity_dd_pct": 18.507
+   },
+   "recommended": false,
+   "recommended_note": "R33: no recommended .set in this research - no independent period exists (August-September is a non-independent historical check, R31); at most candidate.set with a forward-test protocol."
+  }
+ },
+ "acceptance_group_R_report_only": {
+  "criteria": {
+   "oos_frequency": {
+    "value": {
+     "fills": 503,
+     "days": 92,
+     "fills_per_month": 166.4274
+    },
+    "threshold": ">= 15 fills per 30.44 days",
+    "evaluated": true,
+    "pass": true,
+    "note": ""
+   },
+   "oos_net": {
+    "value": {
+     "net": -665.52,
+     "baseline_net": -665.52
+    },
+    "threshold": "> 0 and > baseline net",
+    "evaluated": true,
+    "pass": false,
+    "note": ""
+   },
+   "bootstrap_ci": {
+    "value": {
+     "ci_mean_daily_pnl": [
+      -81.62,
+      62.03
+     ],
+     "n_days": 66
+    },
+    "threshold": "95% lower bound > 0 (block 5, 10000 resamples, seed 20260930)",
+    "evaluated": true,
+    "pass": false,
+    "note": ""
+   },
+   "positive_folds": {
+    "value": 1,
+    "threshold": "strict majority: >= 2 of 3",
+    "evaluated": true,
+    "pass": false,
+    "note": ""
+   },
+   "top_events_removed": {
+    "value": {
+     "n_events": 503,
+     "bar_minutes": 1,
+     "net_without_top": -1221.36
+    },
+    "threshold": "net after removing the top 2 trade events > 0",
+    "evaluated": true,
+    "pass": false,
+    "note": ""
+   },
+   "loss_limits": {
+    "value": {
+     "stitched_breach": 1,
+     "monte_carlo": {
+      "breach_prob": 1.0,
+      "daily_breach_prob": 0.9923,
+      "total_breach_prob": 0.0555,
+      "seed": 20260930,
+      "horizon": 252,
+      "n_paths": 10000,
+      "mean_block": 5,
+      "final_return_p1": -0.1181,
+      "final_return_p5": -0.1032,
+      "final_return_p50": -0.0288,
+      "final_return_p95": 0.1553,
+      "final_return_p99": 0.2674,
+      "max_dd_pct_p50": 7.3676,
+      "max_dd_pct_p95": 11.3477,
+      "max_dd_pct_p99": 13.3857
+     }
+    },
+    "threshold": "no stitched breach and MC breach prob <= 0.1 over 252 days",
+    "evaluated": true,
+    "pass": false,
+    "note": "first breach {'date': Timestamp('2026-05-14 00:00:00'), 'type': 'daily', 'eq_min': 10307.96, 'daily_floor': 10624.150000000001}"
+   },
+   "cost_stress": {
+    "value": {
+     "stressed_net": -2481.8,
+     "spread_cost": 1063.68,
+     "slippage_cost": 309.4,
+     "entry_slippage_cost": 443.2,
+     "stop_exits": 334
+    },
+    "threshold": "> 0 after +1.0x spread, 10 points on every SL exit and 10 points on every Market entry",
+    "evaluated": true,
+    "pass": false,
+    "note": ""
+   },
+   "stability": {
+    "value": 0.5,
+    "threshold": ">= 0.6 of the 4 KTD15 perturbations",
+    "evaluated": true,
+    "pass": false,
+    "note": ""
+   },
+   "dsr": {
+    "value": {
+     "n_days": 66,
+     "psr_value": 0.0893,
+     "sr": -0.0287,
+     "sr0": 0.1375,
+     "trials": 12,
+     "var_sr": 0.00682378
+    },
+    "threshold": 0.9,
+    "evaluated": true,
+    "pass": false,
+    "note": ""
+   }
+  },
+  "passed_all": false,
+  "evaluated_all": true,
+  "drawdowns": {
+   "balance_dd_pct": 25.271,
+   "equity_dd_pct": 26.306
+  },
+  "recommended": false,
+  "recommended_note": "R33: no recommended .set in this research - no independent period exists (August-September is a non-independent historical check, R31); at most candidate.set with a forward-test protocol."
+ },
+ "passed_all": false,
+ "recommended": false,
+ "fold_rows": [
+  {
+   "fold": 1,
+   "test": [
+    "2026.03.01",
+    "2026.03.31"
+   ],
+   "selected": {
+    "StructureVariant": 0
+   },
+   "status": "no_eligible_pass",
+   "train_generated_pct": 39.06,
+   "procedure_net": 1805.7,
+   "fixed_a_net": 1805.7,
+   "fixed_b_net": 657.23,
+   "procedure_fills": 180,
+   "fixed_a_fills": 180,
+   "fixed_b_fills": 54,
+   "procedure_tester_equity_dd_pct": 14.46,
+   "fixed_a_tester_equity_dd_pct": 14.46,
+   "fixed_b_tester_equity_dd_pct": 10.99,
+   "procedure_tester_balance_dd_pct": 14.33,
+   "fixed_a_tester_balance_dd_pct": 14.33,
+   "fixed_b_tester_balance_dd_pct": 9.97
+  },
+  {
+   "fold": 2,
+   "test": [
+    "2026.04.01",
+    "2026.04.30"
+   ],
+   "selected": {
+    "StructureVariant": 0
+   },
+   "status": "no_eligible_pass",
+   "train_generated_pct": 4.15,
+   "procedure_net": -1608.69,
+   "fixed_a_net": -1608.69,
+   "fixed_b_net": -895.91,
+   "procedure_fills": 172,
+   "fixed_a_fills": 172,
+   "fixed_b_fills": 47,
+   "procedure_tester_equity_dd_pct": 26.21,
+   "fixed_a_tester_equity_dd_pct": 26.21,
+   "fixed_b_tester_equity_dd_pct": 11.53,
+   "procedure_tester_balance_dd_pct": 24.64,
+   "fixed_a_tester_balance_dd_pct": 24.64,
+   "fixed_b_tester_balance_dd_pct": 9.94
+  },
+  {
+   "fold": 3,
+   "test": [
+    "2026.05.01",
+    "2026.05.31"
+   ],
+   "selected": {
+    "StructureVariant": 0
+   },
+   "status": "no_eligible_pass",
+   "train_generated_pct": 0.0,
+   "procedure_net": 304.64,
+   "fixed_a_net": 304.64,
+   "fixed_b_net": -318.02,
+   "procedure_fills": 138,
+   "fixed_a_fills": 138,
+   "fixed_b_fills": 58,
+   "procedure_tester_equity_dd_pct": 17.84,
+   "fixed_a_tester_equity_dd_pct": 17.84,
+   "fixed_b_tester_equity_dd_pct": 17.76,
+   "procedure_tester_balance_dd_pct": 16.13,
+   "fixed_a_tester_balance_dd_pct": 16.13,
+   "fixed_b_tester_balance_dd_pct": 16.75
+  },
+  {
+   "fold": 4,
+   "test": [
+    "2026.06.01",
+    "2026.06.30"
+   ],
+   "selected": {
+    "StructureVariant": 0
+   },
+   "status": "no_eligible_pass",
+   "train_generated_pct": 0.0,
+   "procedure_net": -757.4,
+   "fixed_a_net": -757.4,
+   "fixed_b_net": 874.11,
+   "procedure_fills": 169,
+   "fixed_a_fills": 169,
+   "fixed_b_fills": 45,
+   "procedure_tester_equity_dd_pct": 19.6,
+   "fixed_a_tester_equity_dd_pct": 19.6,
+   "fixed_b_tester_equity_dd_pct": 8.83,
+   "procedure_tester_balance_dd_pct": 18.2,
+   "fixed_a_tester_balance_dd_pct": 18.2,
+   "fixed_b_tester_balance_dd_pct": 7.44
+  },
+  {
+   "fold": 5,
+   "test": [
+    "2026.07.01",
+    "2026.07.31"
+   ],
+   "selected": {
+    "StructureVariant": 0
+   },
+   "status": "no_eligible_pass",
+   "train_generated_pct": 0.0,
+   "procedure_net": -212.76,
+   "fixed_a_net": -212.76,
+   "fixed_b_net": 812.12,
+   "procedure_fills": 196,
+   "fixed_a_fills": 196,
+   "fixed_b_fills": 52,
+   "procedure_tester_equity_dd_pct": 19.39,
+   "fixed_a_tester_equity_dd_pct": 19.39,
+   "fixed_b_tester_equity_dd_pct": 9.3,
+   "procedure_tester_balance_dd_pct": 18.82,
+   "fixed_a_tester_balance_dd_pct": 18.82,
+   "fixed_b_tester_balance_dd_pct": 7.74
+  }
+ ],
+ "groups": {
+  "procedure": {
+   "all": {
+    "net": -468.51,
+    "fills": 855,
+    "fills_per_month": 170.1059,
+    "win_rate": 0.3357,
+    "balance_dd_pct": 30.682,
+    "equity_dd_pct": 31.529
+   },
+   "G": {
+    "net": 197.01,
+    "fills": 352,
+    "fills_per_month": 175.6538,
+    "win_rate": 0.3381,
+    "balance_dd_pct": 25.28,
+    "equity_dd_pct": 26.269
+   },
+   "R": {
+    "net": -665.52,
+    "fills": 503,
+    "fills_per_month": 166.4274,
+    "win_rate": 0.334,
+    "balance_dd_pct": 25.271,
+    "equity_dd_pct": 26.306
+   }
+  },
+  "fixed_a": {
+   "all": {
+    "net": -468.51,
+    "fills": 855,
+    "fills_per_month": 170.1059,
+    "win_rate": 0.3357,
+    "balance_dd_pct": 30.682,
+    "equity_dd_pct": 31.529
+   },
+   "G": {
+    "net": 197.01,
+    "fills": 352,
+    "fills_per_month": 175.6538,
+    "win_rate": 0.3381,
+    "balance_dd_pct": 25.28,
+    "equity_dd_pct": 26.269
+   },
+   "R": {
+    "net": -665.52,
+    "fills": 503,
+    "fills_per_month": 166.4274,
+    "win_rate": 0.334,
+    "balance_dd_pct": 25.271,
+    "equity_dd_pct": 26.306
+   }
+  },
+  "fixed_b": {
+   "all": {
+    "net": 1129.53,
+    "fills": 256,
+    "fills_per_month": 50.9323,
+    "win_rate": 0.3594,
+    "balance_dd_pct": 17.943,
+    "equity_dd_pct": 18.507
+   },
+   "G": {
+    "net": -238.68,
+    "fills": 101,
+    "fills_per_month": 50.4007,
+    "win_rate": 0.3267,
+    "balance_dd_pct": 11.604,
+    "equity_dd_pct": 12.263
+   },
+   "R": {
+    "net": 1368.21,
+    "fills": 155,
+    "fills_per_month": 51.2848,
+    "win_rate": 0.3806,
+    "balance_dd_pct": 17.353,
+    "equity_dd_pct": 17.764
+   }
+  }
+ },
+ "stability": {
+  "profitable_share": 0.5,
+  "rows": [
+   {
+    "run_id": "stability_candidate",
+    "perturbation": {},
+    "net": -331.25,
+    "fills": 850,
+    "tester_equity_dd_pct": 29.74,
+    "tester_balance_dd_pct": 29.56,
+    "conformance_violations": 0,
+    "input_mismatches": []
+   },
+   {
+    "run_id": "stability_1",
+    "perturbation": {
+     "SwingStrengthM1": 2
+    },
+    "net": 963.74,
+    "fills": 841,
+    "tester_equity_dd_pct": 32.34,
+    "tester_balance_dd_pct": 31.81,
+    "conformance_violations": 0,
+    "input_mismatches": []
+   },
+   {
+    "run_id": "stability_2",
+    "perturbation": {
+     "SwingStrengthM1": 4
+    },
+    "net": -1847.82,
+    "fills": 829,
+    "tester_equity_dd_pct": 40.55,
+    "tester_balance_dd_pct": 40.29,
+    "conformance_violations": 0,
+    "input_mismatches": []
+   },
+   {
+    "run_id": "stability_3",
+    "perturbation": {
+     "StopBufferPoints": 10
+    },
+    "net": -644.49,
+    "fills": 849,
+    "tester_equity_dd_pct": 32.6,
+    "tester_balance_dd_pct": 31.64,
+    "conformance_violations": 0,
+    "input_mismatches": []
+   },
+   {
+    "run_id": "stability_4",
+    "perturbation": {
+     "StopBufferPoints": 40
+    },
+    "net": 879.78,
+    "fills": 841,
+    "tester_equity_dd_pct": 28.06,
+    "tester_balance_dd_pct": 27.88,
+    "conformance_violations": 0,
+    "input_mismatches": []
+   }
+  ],
+  "window": [
+   "2026.03.01",
+   "2026.07.31"
+  ]
+ },
+ "var_sr": 0.006823778161317517,
+ "var_sr_source": "optimization Custom column (EA OnTester daily Sharpe) of the training grids, passes with trades, variance averaged over grids",
+ "var_sr_passes": 12,
+ "shuffle_mc": {
+  "procedure": {
+   "seed": 20260930,
+   "n_paths": 10000,
+   "max_dd_pct_p50": 35.045122792957116,
+   "max_dd_pct_p95": 47.52895640356494,
+   "max_dd_pct_p99": 52.731066157033226,
+   "max_losing_streak_p50": 14.0,
+   "max_losing_streak_p95": 20.0,
+   "max_losing_streak_p99": 25.0
+  },
+  "fixed_a": {
+   "seed": 20260930,
+   "n_paths": 10000,
+   "max_dd_pct_p50": 35.045122792957116,
+   "max_dd_pct_p95": 47.52895640356494,
+   "max_dd_pct_p99": 52.731066157033226,
+   "max_losing_streak_p50": 14.0,
+   "max_losing_streak_p95": 20.0,
+   "max_losing_streak_p99": 25.0
+  },
+  "fixed_b": {
+   "seed": 20260930,
+   "n_paths": 10000,
+   "max_dd_pct_p50": 16.73300627551773,
+   "max_dd_pct_p95": 24.761674953852786,
+   "max_dd_pct_p99": 28.69802855120357,
+   "max_losing_streak_p50": 10.0,
+   "max_losing_streak_p95": 16.0,
+   "max_losing_streak_p99": 19.0
+  }
+ },
+ "session_sensitivity": {
+  "procedure": {
+   "deposit": 10000.0,
+   "positions": 855,
+   "affected": 13,
+   "outcome_flips": 1,
+   "net_primary": -468.51,
+   "net_sensitivity": -775.33,
+   "net_delta": -306.82,
+   "max_dd_closed_pct_primary": 30.682,
+   "max_dd_closed_pct_sensitivity": 33.256
+  },
+  "fixed_a": {
+   "deposit": 10000.0,
+   "positions": 855,
+   "affected": 13,
+   "outcome_flips": 1,
+   "net_primary": -468.51,
+   "net_sensitivity": -775.33,
+   "net_delta": -306.82,
+   "max_dd_closed_pct_primary": 30.682,
+   "max_dd_closed_pct_sensitivity": 33.256
+  },
+  "fixed_b": {
+   "deposit": 10000.0,
+   "positions": 256,
+   "affected": 7,
+   "outcome_flips": 1,
+   "net_primary": 1129.53,
+   "net_sensitivity": 766.02,
+   "net_delta": -363.51,
+   "max_dd_closed_pct_primary": 17.943,
+   "max_dd_closed_pct_sensitivity": 21.343
+  }
+ }
+}

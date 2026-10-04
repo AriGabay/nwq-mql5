@@ -1,0 +1,28 @@
+{
+ "run_id": "optsmoke_single_pivl3",
+ "ex5": "new_test.ex5",
+ "ex5_sha256": "a56242b92a98c3c2f74e5c67e03c131f96a27fc668216b7a59a039b36e8b490b",
+ "ini_sha256": "485524ee1b39b37918439b7dbf4227c9be36bcef927cdbe780178ab2958ea2e8",
+ "meta": {
+  "kind": "v104",
+  "role": "smoke",
+  "values": {
+   "DrawObjects": false,
+   "DebugMode": false,
+   "PopupAlerts": false,
+   "LotMode": 1,
+   "RiskPercent": 1.0,
+   "MaxOpenPositions": 3,
+   "EnableTrading": true,
+   "SignalTF": 15,
+   "VolumeMultiplier": 1.2,
+   "SweepToSetupBars": 24,
+   "PivL": 3
+  }
+ },
+ "started": "2026-09-30T18:30:30",
+ "status": "ok",
+ "seconds": 14.3,
+ "report": "optsmoke_single_pivl3.htm",
+ "exit_code": 0
+}

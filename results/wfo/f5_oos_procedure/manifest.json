@@ -1,0 +1,22 @@
+{
+ "run_id": "f5_oos_procedure",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "02a44b32bae4246d6e68f21f284851f985bd628dc7e5f51ace8ee4ada5fed666",
+ "ini_sha256": "4557bea05d7bbdc928b6e8e913c58ebaf2a4e874e5e5a52261a7f25c5684365a",
+ "meta": {
+  "kind": "research",
+  "role": "oos_procedure",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "StructureVariant": 0,
+   "ResearchRunTag": "f5_oos_procedure"
+  }
+ },
+ "started": "2026-10-04T15:27:14",
+ "status": "ok",
+ "seconds": 22.1,
+ "report": "f5_oos_procedure.htm",
+ "exit_code": 0
+}

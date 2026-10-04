@@ -1,0 +1,21 @@
+{
+ "run_id": "fixcheck_delivered_m15",
+ "ex5": "ob_fvg_retest.ex5",
+ "ex5_sha256": "67aa27ce637b06588e5fb8d6ce38ecdf3b09b4e0b0070d44e1c96296b5841c5b",
+ "ini_sha256": "057b8747d4fb7d1db84fdcd5dc5cb6aca934b5d0a54f3643bfa1825b4cfa3990",
+ "meta": {
+  "kind": "delivered",
+  "role": "code_review",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15
+  }
+ },
+ "started": "2026-10-02T12:07:59",
+ "status": "ok",
+ "seconds": 20.6,
+ "report": "fixcheck_delivered_m15.htm",
+ "exit_code": 0
+}

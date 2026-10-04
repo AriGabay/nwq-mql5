@@ -1,0 +1,22 @@
+{
+ "run_id": "pilot_m15",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "7e9d7be1c890d2a1b4eba2e41fef09eadca0f13cd33f84c774222b8da2793c18",
+ "ini_sha256": "14e26d62a758b701576e25dd631f1fb149c63ca5e689a6b865fd80d57e51b053",
+ "meta": {
+  "kind": "research",
+  "role": "pilot",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15,
+   "ResearchRunTag": "pilot_m15"
+  }
+ },
+ "started": "2026-10-01T16:22:36",
+ "status": "ok",
+ "seconds": 32.6,
+ "report": "pilot_m15.htm",
+ "exit_code": 0
+}

@@ -1,0 +1,13 @@
+{
+ "ea_sha256": "f375835e4d21ad87d38a87c4887d1176e630f97fc7955d52a828146f0a4ab24c",
+ "ob_fvg_retest.mq5": {
+  "errors": 0,
+  "warnings": 0,
+  "ex5_exists": true
+ },
+ "ob_fvg_retest_research.mq5": {
+  "errors": 0,
+  "warnings": 0,
+  "ex5_exists": true
+ }
+}

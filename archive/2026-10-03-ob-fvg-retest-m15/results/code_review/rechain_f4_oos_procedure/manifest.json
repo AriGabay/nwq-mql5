@@ -1,0 +1,27 @@
+{
+ "run_id": "rechain_f4_oos_procedure",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "1a7d81a95931da7acef0836e8c64949dfdb64a42a51fb4125f1ca1e857be2317",
+ "ini_sha256": "f692d7fcef0373f28210206a5018c9699b998f61f4eec11f84ef1b8beb5debe5",
+ "meta": {
+  "kind": "research",
+  "role": "rechain",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15,
+   "ObMode": 1,
+   "EntryMode": 3,
+   "ObMaxAgeBars": 48,
+   "FvgWindowBars": 12,
+   "OrderExpiryBars": 18,
+   "ResearchRunTag": "rechain_f4_oos_procedure"
+  }
+ },
+ "started": "2026-10-02T15:12:26",
+ "status": "ok",
+ "seconds": 20.2,
+ "report": "rechain_f4_oos_procedure.htm",
+ "exit_code": 0
+}

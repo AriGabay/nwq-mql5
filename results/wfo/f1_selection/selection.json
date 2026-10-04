@@ -1,0 +1,13 @@
+{
+ "tag": "f1",
+ "train": [
+  "2025.12.01",
+  "2026.02.28"
+ ],
+ "trade_floor": 45,
+ "status": "no_eligible_pass",
+ "params": {
+  "StructureVariant": 0
+ },
+ "eligible_passes": 0
+}

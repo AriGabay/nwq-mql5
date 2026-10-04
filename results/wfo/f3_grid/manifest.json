@@ -1,0 +1,28 @@
+{
+ "run_id": "f3_grid",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "02a44b32bae4246d6e68f21f284851f985bd628dc7e5f51ace8ee4ada5fed666",
+ "ini_sha256": "3b4e7c954f22a243bc0c8ac973a5e3a53947d0fe6ea25093125bf2e9156c6b39",
+ "meta": {
+  "kind": "research",
+  "role": "train",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "ResearchRunTag": "f3_grid"
+  },
+  "ranges": {
+   "StructureVariant": [
+    0,
+    1,
+    1
+   ]
+  }
+ },
+ "started": "2026-10-04T15:22:51",
+ "status": "ok",
+ "seconds": 34.2,
+ "report": "f3_grid.xml",
+ "exit_code": 0
+}

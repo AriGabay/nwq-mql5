@@ -1,0 +1,22 @@
+{
+ "run_id": "smoke_a",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "02a44b32bae4246d6e68f21f284851f985bd628dc7e5f51ace8ee4ada5fed666",
+ "ini_sha256": "6091e42e6007d5ea75e0471ef0f042acb40c4b26f1d0af52af687edae3b77f3a",
+ "meta": {
+  "kind": "research",
+  "role": "smoke",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "StructureVariant": 0,
+   "ResearchRunTag": "smoke_a"
+  }
+ },
+ "started": "2026-10-03T01:20:25",
+ "status": "ok",
+ "seconds": 22.1,
+ "report": "smoke_a.htm",
+ "exit_code": 0
+}

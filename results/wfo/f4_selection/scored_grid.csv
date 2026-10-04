@@ -1,0 +1,3 @@
+StructureVariant,profit,trades,eq_dd_pct,recovery_factor,custom,sharpe,eq_dd_money,eligible,raw_score,smoothed
+0,645.32,485,25.5267,0.207625,0.0445795412619841,0.457178,3108.103552077062,False,0.0,0.0
+1,-645.36,159,19.2742,-0.307943,-0.032042907983972,-1.126871,2095.7125182257755,False,0.0,0.0

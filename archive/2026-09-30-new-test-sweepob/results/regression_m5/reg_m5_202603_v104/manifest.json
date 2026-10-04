@@ -1,0 +1,25 @@
+{
+ "run_id": "reg_m5_202603_v104",
+ "ex5": "new_test.ex5",
+ "ex5_sha256": "a56242b92a98c3c2f74e5c67e03c131f96a27fc668216b7a59a039b36e8b490b",
+ "ini_sha256": "5ff63aa03382c67de696fa98405047cafa92f708ccf3a7e46a9ea1b742384188",
+ "meta": {
+  "kind": "v104",
+  "role": "regression",
+  "values": {
+   "DrawObjects": false,
+   "DebugMode": false,
+   "PopupAlerts": false,
+   "LotMode": 1,
+   "RiskPercent": 1.0,
+   "MaxOpenPositions": 3,
+   "EnableTrading": true,
+   "SignalTF": 5
+  }
+ },
+ "started": "2026-09-30T18:23:03",
+ "status": "ok",
+ "seconds": 13.2,
+ "report": "reg_m5_202603_v104.htm",
+ "exit_code": 0
+}

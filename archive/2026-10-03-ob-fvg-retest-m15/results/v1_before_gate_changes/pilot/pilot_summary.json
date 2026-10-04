@@ -1,0 +1,101 @@
+{
+ "window": [
+  "2025.12.01",
+  "2026.07.31"
+ ],
+ "days_per_month": 30.44,
+ "target_fills_per_month": 15,
+ "rule": "longer timeframe averaging >= 15 fills per month; else M5 with the shortfall reported (R20)",
+ "runs": {
+  "M5": {
+   "run_id": "pilot_m5",
+   "fills": 1536,
+   "days": 243,
+   "fills_per_month": 192.4109,
+   "funnel": {
+    "activated": 6281,
+    "touched": 5111,
+    "confirmed": 2171,
+    "placed": 1914,
+    "filled": 1536,
+    "filled_late": 0,
+    "expired_untouched": 727,
+    "invalidated_active": 441,
+    "invalidated_touched": 2441,
+    "invalidated_confirmed": 0,
+    "invalidated_pending": 0,
+    "cancelled_no_fvg": 499,
+    "skipped_price_past": 21,
+    "skipped_too_close": 49,
+    "skipped_sl_stops": 0,
+    "skipped_volume": 33,
+    "skipped_margin": 0,
+    "skipped_cap": 154,
+    "skipped_duplicate": 0,
+    "expired_unfilled": 378,
+    "run_end_pending": 2,
+    "warmup_dropped": 130
+   },
+   "reasons": {
+    "invalidated_touched": 2441,
+    "filled": 1536,
+    "expired_untouched": 727,
+    "cancelled_no_fvg": 499,
+    "invalidated_active": 441,
+    "expired_unfilled": 378,
+    "skipped_cap": 154,
+    "skipped_too_close": 49,
+    "skipped_volume": 33,
+    "skipped_price_past": 21,
+    "run_end_pending": 2
+   },
+   "conformance_violations": 0
+  },
+  "M15": {
+   "run_id": "pilot_m15",
+   "fills": 456,
+   "days": 243,
+   "fills_per_month": 57.122,
+   "funnel": {
+    "activated": 2093,
+    "touched": 1662,
+    "confirmed": 665,
+    "placed": 576,
+    "filled": 456,
+    "filled_late": 0,
+    "expired_untouched": 263,
+    "invalidated_active": 167,
+    "invalidated_touched": 801,
+    "invalidated_confirmed": 0,
+    "invalidated_pending": 0,
+    "cancelled_no_fvg": 195,
+    "skipped_price_past": 10,
+    "skipped_too_close": 6,
+    "skipped_sl_stops": 0,
+    "skipped_volume": 7,
+    "skipped_margin": 0,
+    "skipped_cap": 66,
+    "skipped_duplicate": 0,
+    "expired_unfilled": 120,
+    "run_end_pending": 2,
+    "warmup_dropped": 151
+   },
+   "reasons": {
+    "invalidated_touched": 801,
+    "filled": 456,
+    "expired_untouched": 263,
+    "cancelled_no_fvg": 195,
+    "invalidated_active": 167,
+    "expired_unfilled": 120,
+    "skipped_cap": 66,
+    "skipped_price_past": 10,
+    "skipped_volume": 7,
+    "skipped_too_close": 6,
+    "run_end_pending": 2
+   },
+   "conformance_violations": 0
+  }
+ },
+ "chosen_period": "M15",
+ "shortfall": false
+}

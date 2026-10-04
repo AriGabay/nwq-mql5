@@ -1,0 +1,292 @@
+[
+ {
+  "fold": 1,
+  "selection": {
+   "tag": "f1",
+   "train": [
+    "2025.12.01",
+    "2026.02.28"
+   ],
+   "trade_floor": 45,
+   "status": "selected",
+   "params": {
+    "ObMode": 0,
+    "EntryMode": 2,
+    "ObMaxAgeBars": 96,
+    "FvgWindowBars": 6,
+    "OrderExpiryBars": 12
+   },
+   "eligible_passes": 64
+  },
+  "test": [
+   "2026.03.01",
+   "2026.03.31"
+  ],
+  "deposits": {
+   "procedure": 10000,
+   "baseline": 10000
+  },
+  "oos": {
+   "procedure": {
+    "net_profit": -1032.86,
+    "trades": 33,
+    "profit_factor": 0.55,
+    "recovery_factor": -0.87,
+    "equity_dd_money": 1189.5,
+    "equity_dd_pct": 11.71,
+    "balance_dd_pct": 10.63,
+    "final_balance": 8967.14,
+    "run_id": "f1_oos_procedure",
+    "conformance_violations": 0
+   },
+   "baseline": {
+    "net_profit": -313.77,
+    "trades": 58,
+    "profit_factor": 0.91,
+    "recovery_factor": -0.26,
+    "equity_dd_money": 1226.78,
+    "equity_dd_pct": 11.9,
+    "balance_dd_pct": 11.44,
+    "final_balance": 9686.23,
+    "run_id": "f1_oos_baseline",
+    "conformance_violations": 0
+   }
+  },
+  "next_deposits": {
+   "procedure": 8967.14,
+   "baseline": 9686.23
+  }
+ },
+ {
+  "fold": 2,
+  "selection": {
+   "tag": "f2",
+   "train": [
+    "2026.01.01",
+    "2026.03.31"
+   ],
+   "trade_floor": 45,
+   "status": "selected",
+   "params": {
+    "ObMode": 1,
+    "EntryMode": 0,
+    "ObMaxAgeBars": 96,
+    "FvgWindowBars": 6,
+    "OrderExpiryBars": 6
+   },
+   "eligible_passes": 5
+  },
+  "test": [
+   "2026.04.01",
+   "2026.04.30"
+  ],
+  "deposits": {
+   "procedure": 8967.14,
+   "baseline": 9686.23
+  },
+  "oos": {
+   "procedure": {
+    "net_profit": -757.57,
+    "trades": 21,
+    "profit_factor": 0.43,
+    "recovery_factor": -0.84,
+    "equity_dd_money": 901.72,
+    "equity_dd_pct": 9.93,
+    "balance_dd_pct": 8.94,
+    "final_balance": 8209.57,
+    "run_id": "f2_oos_procedure",
+    "conformance_violations": 0
+   },
+   "baseline": {
+    "net_profit": -1232.64,
+    "trades": 63,
+    "profit_factor": 0.69,
+    "recovery_factor": -0.69,
+    "equity_dd_money": 1778.32,
+    "equity_dd_pct": 17.79,
+    "balance_dd_pct": 16.85,
+    "final_balance": 8453.59,
+    "run_id": "f2_oos_baseline",
+    "conformance_violations": 0
+   }
+  },
+  "next_deposits": {
+   "procedure": 8209.57,
+   "baseline": 8453.59
+  }
+ },
+ {
+  "fold": 3,
+  "selection": {
+   "tag": "f3",
+   "train": [
+    "2026.02.01",
+    "2026.04.30"
+   ],
+   "trade_floor": 45,
+   "status": "no_eligible_pass",
+   "params": {
+    "ObMode": 0,
+    "EntryMode": 0,
+    "ObMaxAgeBars": 96,
+    "FvgWindowBars": 12,
+    "OrderExpiryBars": 12
+   },
+   "eligible_passes": 0
+  },
+  "test": [
+   "2026.05.01",
+   "2026.05.31"
+  ],
+  "deposits": {
+   "procedure": 8209.57,
+   "baseline": 8453.59
+  },
+  "oos": {
+   "procedure": {
+    "net_profit": 651.81,
+    "trades": 64,
+    "profit_factor": 1.19,
+    "recovery_factor": 0.57,
+    "equity_dd_money": 1138.36,
+    "equity_dd_pct": 11.72,
+    "balance_dd_pct": 11.32,
+    "final_balance": 8861.38,
+    "run_id": "f3_oos_procedure",
+    "conformance_violations": 0
+   },
+   "baseline": {
+    "net_profit": 611.85,
+    "trades": 64,
+    "profit_factor": 1.17,
+    "recovery_factor": 0.5,
+    "equity_dd_money": 1219.69,
+    "equity_dd_pct": 12.18,
+    "balance_dd_pct": 11.89,
+    "final_balance": 9065.44,
+    "run_id": "f3_oos_baseline",
+    "conformance_violations": 0
+   }
+  },
+  "next_deposits": {
+   "procedure": 8861.38,
+   "baseline": 9065.44
+  }
+ },
+ {
+  "fold": 4,
+  "selection": {
+   "tag": "f4",
+   "train": [
+    "2026.03.01",
+    "2026.05.31"
+   ],
+   "trade_floor": 45,
+   "status": "selected",
+   "params": {
+    "ObMode": 1,
+    "EntryMode": 3,
+    "ObMaxAgeBars": 48,
+    "FvgWindowBars": 12,
+    "OrderExpiryBars": 18
+   },
+   "eligible_passes": 6
+  },
+  "test": [
+   "2026.06.01",
+   "2026.06.30"
+  ],
+  "deposits": {
+   "procedure": 8861.38,
+   "baseline": 9065.44
+  },
+  "oos": {
+   "procedure": {
+    "net_profit": -591.39,
+    "trades": 16,
+    "profit_factor": 0.47,
+    "recovery_factor": -0.83,
+    "equity_dd_money": 715.87,
+    "equity_dd_pct": 7.97,
+    "balance_dd_pct": 7.72,
+    "final_balance": 8269.99,
+    "run_id": "f4_oos_procedure",
+    "conformance_violations": 0
+   },
+   "baseline": {
+    "net_profit": 294.6,
+    "trades": 51,
+    "profit_factor": 1.11,
+    "recovery_factor": 0.43,
+    "equity_dd_money": 688.99,
+    "equity_dd_pct": 6.86,
+    "balance_dd_pct": 6.05,
+    "final_balance": 9360.04,
+    "run_id": "f4_oos_baseline",
+    "conformance_violations": 0
+   }
+  },
+  "next_deposits": {
+   "procedure": 8269.99,
+   "baseline": 9360.04
+  }
+ },
+ {
+  "fold": 5,
+  "selection": {
+   "tag": "f5",
+   "train": [
+    "2026.04.01",
+    "2026.06.30"
+   ],
+   "trade_floor": 45,
+   "status": "selected",
+   "params": {
+    "ObMode": 1,
+    "EntryMode": 0,
+    "ObMaxAgeBars": 96,
+    "FvgWindowBars": 6,
+    "OrderExpiryBars": 6
+   },
+   "eligible_passes": 3
+  },
+  "test": [
+   "2026.07.01",
+   "2026.07.31"
+  ],
+  "deposits": {
+   "procedure": 8269.99,
+   "baseline": 9360.04
+  },
+  "oos": {
+   "procedure": {
+    "net_profit": 227.97,
+    "trades": 9,
+    "profit_factor": 1.49,
+    "recovery_factor": 0.95,
+    "equity_dd_money": 239.8,
+    "equity_dd_pct": 2.9,
+    "balance_dd_pct": 2.76,
+    "final_balance": 8497.96,
+    "run_id": "f5_oos_procedure",
+    "conformance_violations": 0
+   },
+   "baseline": {
+    "net_profit": -601.95,
+    "trades": 48,
+    "profit_factor": 0.79,
+    "recovery_factor": -0.63,
+    "equity_dd_money": 955.97,
+    "equity_dd_pct": 10.05,
+    "balance_dd_pct": 9.72,
+    "final_balance": 8758.09,
+    "run_id": "f5_oos_baseline",
+    "conformance_violations": 0
+   }
+  },
+  "next_deposits": {
+   "procedure": 8497.96,
+   "baseline": 8758.09
+  }
+ }
+]

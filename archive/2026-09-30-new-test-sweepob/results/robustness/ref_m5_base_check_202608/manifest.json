@@ -1,0 +1,26 @@
+{
+ "run_id": "ref_m5_base_check_202608",
+ "ex5": "new_test_research.ex5",
+ "ex5_sha256": "90fefdd09a264b5cc0419d088d861ed41415ae9cc2def436ce5d333c976a972b",
+ "ini_sha256": "c35ffadb9ac4fb8916cc506127433f7993229732b32ed783c289d9b1a8cf22f0",
+ "meta": {
+  "kind": "research",
+  "role": "m5_reference",
+  "values": {
+   "DrawObjects": false,
+   "DebugMode": false,
+   "PopupAlerts": false,
+   "LotMode": 1,
+   "RiskPercent": 1.0,
+   "MaxOpenPositions": 3,
+   "EnableTrading": true,
+   "SignalTF": 5,
+   "ResearchRunTag": "ref_m5_base_check_202608"
+  }
+ },
+ "started": "2026-09-30T19:42:29",
+ "status": "ok",
+ "seconds": 17.5,
+ "report": "ref_m5_base_check_202608.htm",
+ "exit_code": 0
+}

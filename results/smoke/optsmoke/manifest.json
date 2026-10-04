@@ -1,0 +1,28 @@
+{
+ "run_id": "optsmoke",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "02a44b32bae4246d6e68f21f284851f985bd628dc7e5f51ace8ee4ada5fed666",
+ "ini_sha256": "854a705fd7dbe38d789c550c011d1fe11ed8223f86facf7989fa09a8f9811a64",
+ "meta": {
+  "kind": "research",
+  "role": "optsmoke",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "ResearchRunTag": "optsmoke"
+  },
+  "ranges": {
+   "StructureVariant": [
+    0,
+    1,
+    1
+   ]
+  }
+ },
+ "started": "2026-10-03T01:23:12",
+ "status": "ok",
+ "seconds": 22.8,
+ "report": "optsmoke.xml",
+ "exit_code": 0
+}

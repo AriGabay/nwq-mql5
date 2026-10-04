@@ -1,0 +1,15 @@
+{
+ "run_id": "validate_ob_fvg_retest_original",
+ "ex5": "ob_fvg_retest.ex5",
+ "ex5_sha256": "05a79507b18ecad6fc5c13c72da0dbce873e9c768f710d80dc31c6b7f5ceda3f",
+ "ini_sha256": "4d84a7f61a74f8b36717b9aaf4232d6f4276e36facc4d2aa2686b50b1f958917",
+ "meta": {
+  "role": "set_validation",
+  "set": "ob_fvg_retest_original.set"
+ },
+ "started": "2026-10-02T12:02:02",
+ "status": "ok",
+ "seconds": 20.0,
+ "report": "validate_ob_fvg_retest_original.htm",
+ "exit_code": 0
+}

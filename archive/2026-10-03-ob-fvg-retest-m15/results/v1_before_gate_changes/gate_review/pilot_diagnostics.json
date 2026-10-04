@@ -1,0 +1,102 @@
+{
+ "M5": {
+  "all": {
+   "closed_trades": 1536,
+   "win_rate_pct": 30.5,
+   "avg_win_r": 2.032,
+   "avg_loss_r": -1.025,
+   "expectancy_r_before_costs": -0.084,
+   "expectancy_r_after_costs": -0.092,
+   "expectancy_usd_after_costs": -4.88,
+   "net_usd": -7490.24,
+   "swap_usd": -227.64,
+   "commission_usd": 0.0,
+   "exits_tp": 468,
+   "exits_sl": 1067,
+   "exits_end": 1
+  },
+  "long": {
+   "closed_trades": 791,
+   "win_rate_pct": 30.2,
+   "avg_win_r": 2.024,
+   "avg_loss_r": -1.026,
+   "expectancy_r_before_costs": -0.094,
+   "expectancy_r_after_costs": -0.105,
+   "expectancy_usd_after_costs": -4.27,
+   "net_usd": -3376.22,
+   "swap_usd": -371.8,
+   "commission_usd": 0.0,
+   "exits_tp": 239,
+   "exits_sl": 552,
+   "exits_end": 0
+  },
+  "short": {
+   "closed_trades": 745,
+   "win_rate_pct": 30.9,
+   "avg_win_r": 2.04,
+   "avg_loss_r": -1.024,
+   "expectancy_r_before_costs": -0.075,
+   "expectancy_r_after_costs": -0.078,
+   "expectancy_usd_after_costs": -5.52,
+   "net_usd": -4114.02,
+   "swap_usd": 144.16,
+   "commission_usd": 0.0,
+   "exits_tp": 229,
+   "exits_sl": 515,
+   "exits_end": 1
+  },
+  "final_balance": 2509.76,
+  "max_equity_dd_usd": 8523.35,
+  "max_equity_dd_pct": 79.1
+ },
+ "M15": {
+  "all": {
+   "closed_trades": 456,
+   "win_rate_pct": 32.0,
+   "avg_win_r": 2.047,
+   "avg_loss_r": -1.026,
+   "expectancy_r_before_costs": -0.046,
+   "expectancy_r_after_costs": -0.042,
+   "expectancy_usd_after_costs": -4.72,
+   "net_usd": -2152.53,
+   "swap_usd": -189.05,
+   "commission_usd": 0.0,
+   "exits_tp": 144,
+   "exits_sl": 310,
+   "exits_end": 2
+  },
+  "long": {
+   "closed_trades": 241,
+   "win_rate_pct": 29.0,
+   "avg_win_r": 2.033,
+   "avg_loss_r": -1.045,
+   "expectancy_r_before_costs": -0.129,
+   "expectancy_r_after_costs": -0.151,
+   "expectancy_usd_after_costs": -13.12,
+   "net_usd": -3161.52,
+   "swap_usd": -289.15,
+   "commission_usd": 0.0,
+   "exits_tp": 70,
+   "exits_sl": 171,
+   "exits_end": 0
+  },
+  "short": {
+   "closed_trades": 215,
+   "win_rate_pct": 35.3,
+   "avg_win_r": 2.059,
+   "avg_loss_r": -1.003,
+   "expectancy_r_before_costs": 0.047,
+   "expectancy_r_after_costs": 0.08,
+   "expectancy_usd_after_costs": 4.69,
+   "net_usd": 1008.99,
+   "swap_usd": 100.1,
+   "commission_usd": 0.0,
+   "exits_tp": 74,
+   "exits_sl": 139,
+   "exits_end": 2
+  },
+  "final_balance": 7847.47,
+  "max_equity_dd_usd": 3186.17,
+  "max_equity_dd_pct": 31.08
+ }
+}

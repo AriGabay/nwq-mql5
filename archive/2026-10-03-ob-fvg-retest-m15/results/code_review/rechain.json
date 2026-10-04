@@ -1,0 +1,118 @@
+{
+ "procedure": {
+  "folds": [
+   {
+    "fold": 1,
+    "original_start": 10000.0,
+    "corrected_start": 10000,
+    "original_net": -1032.86,
+    "rerun": false,
+    "corrected_net": -1032.86,
+    "run_id": "f1_oos_procedure",
+    "corrected_final": 8967.14
+   },
+   {
+    "fold": 2,
+    "original_start": 8967.0,
+    "corrected_start": 8967,
+    "original_net": -757.57,
+    "rerun": false,
+    "corrected_net": -757.57,
+    "run_id": "f2_oos_procedure",
+    "corrected_final": 8209.43
+   },
+   {
+    "fold": 3,
+    "original_start": 8209.0,
+    "corrected_start": 8209,
+    "original_net": 651.81,
+    "rerun": false,
+    "corrected_net": 651.81,
+    "run_id": "f3_oos_procedure",
+    "corrected_final": 8860.81
+   },
+   {
+    "fold": 4,
+    "original_start": 8861.0,
+    "corrected_start": 8860,
+    "original_net": -591.39,
+    "rerun": true,
+    "corrected_net": -591.39,
+    "run_id": "rechain_f4_oos_procedure",
+    "same_deals_as_original": false,
+    "corrected_final": 8268.61
+   },
+   {
+    "fold": 5,
+    "original_start": 8269.0,
+    "corrected_start": 8268,
+    "original_net": 227.97,
+    "rerun": true,
+    "corrected_net": 227.97,
+    "run_id": "rechain_f5_oos_procedure",
+    "same_deals_as_original": false,
+    "corrected_final": 8495.97
+   }
+  ],
+  "net": -1502.04,
+  "final": 8495.97
+ },
+ "baseline": {
+  "folds": [
+   {
+    "fold": 1,
+    "original_start": 10000.0,
+    "corrected_start": 10000,
+    "original_net": -313.77,
+    "rerun": false,
+    "corrected_net": -313.77,
+    "run_id": "f1_oos_baseline",
+    "corrected_final": 9686.23
+   },
+   {
+    "fold": 2,
+    "original_start": 9686.0,
+    "corrected_start": 9686,
+    "original_net": -1232.64,
+    "rerun": false,
+    "corrected_net": -1232.64,
+    "run_id": "f2_oos_baseline",
+    "corrected_final": 8453.36
+   },
+   {
+    "fold": 3,
+    "original_start": 8453.0,
+    "corrected_start": 8453,
+    "original_net": 611.85,
+    "rerun": false,
+    "corrected_net": 611.85,
+    "run_id": "f3_oos_baseline",
+    "corrected_final": 9064.85
+   },
+   {
+    "fold": 4,
+    "original_start": 9065.0,
+    "corrected_start": 9064,
+    "original_net": 294.6,
+    "rerun": true,
+    "corrected_net": 294.6,
+    "run_id": "rechain_f4_oos_baseline",
+    "same_deals_as_original": false,
+    "corrected_final": 9358.6
+   },
+   {
+    "fold": 5,
+    "original_start": 9360.0,
+    "corrected_start": 9358,
+    "original_net": -601.95,
+    "rerun": true,
+    "corrected_net": -601.95,
+    "run_id": "rechain_f5_oos_baseline",
+    "same_deals_as_original": false,
+    "corrected_final": 8756.05
+   }
+  ],
+  "net": -1241.91,
+  "final": 8756.05
+ }
+}

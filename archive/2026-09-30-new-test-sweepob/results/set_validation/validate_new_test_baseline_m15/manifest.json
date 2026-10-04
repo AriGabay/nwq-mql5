@@ -1,0 +1,15 @@
+{
+ "run_id": "validate_new_test_baseline_m15",
+ "ex5": "new_test.ex5",
+ "ex5_sha256": "a56242b92a98c3c2f74e5c67e03c131f96a27fc668216b7a59a039b36e8b490b",
+ "ini_sha256": "1ff7d687798d6fb24dbf00ffad053ec779ee9e29cd5ac5924b573b4418f250fe",
+ "meta": {
+  "role": "set_validation",
+  "set": "new_test_baseline_m15.set"
+ },
+ "started": "2026-09-30T19:44:18",
+ "status": "ok",
+ "seconds": 24.4,
+ "report": "validate_new_test_baseline_m15.htm",
+ "exit_code": 0
+}

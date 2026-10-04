@@ -1,0 +1,5 @@
+setup_id,dir,ob_mode,entry_mode,ob_time,ob_high,ob_low,idfvg_c1_time,idfvg_c3_time,idfvg_low,idfvg_high,bos_pivot_time,bos_pivot_conf_time,bos_level,bos_break_time,activation_time,touch_time,cfvg_c1_time,cfvg_c3_time,cfvg_low,cfvg_high,entry,sl,tp,volume,stops_level_pts,place_time_msc,order_ticket,fill_time_msc,fill_price,position_id,exit_time_msc,exit_price,exit_kind,reason,reason_time_msc,retest_seen_no_fill,idfvg_vol_ratio,cfvg_vol_ratio,market_closed_first_msc,place_attempts
+1,S,0,0,1768928400,4748.54,4738.54,1768928400,1768930200,4735.60,4738.54,,,,,1768930200,1768931100,,,,,,,,,,,,,,,,,,invalidated_touched,1768935600000,0,2.0693,,,0
+2,S,0,0,1769014800,4868.76,4847.04,1769014800,1769016600,4845.50,4847.04,,,,,1769016600,1769017500,,,,,,,,,,,,,,,,,,cancelled_no_fvg,1769029200000,0,2.0198,,,0
+3,S,0,0,1771310700,4953.83,4949.36,1771311600,1771313400,4902.35,4927.33,,,,,1771313400,,,,,,,,,,,,,,,,,,,expired_untouched,1771404300000,0,2.1942,,,0
+5,S,0,0,1771605900,5060.50,5048.75,1771605900,1771607700,5044.78,5048.75,,,,,1771607700,1771609500,,,,,,,,,,,,,,,,,,invalidated_touched,1771613100000,0,2.0551,,,0

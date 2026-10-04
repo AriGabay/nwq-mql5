@@ -1,0 +1,215 @@
+{
+ "protocol": "docs/plans/2026-10-03-0013-feat-m5-ob-m1-structure-ea-plan.md (R29, KTD14, KTD15)",
+ "frozen_note": "Committed before the first optimization run. Nothing here changes afterwards.",
+ "strategy": "M5 OB + M1 structure change + M1 FVG retest with a reaction candle (ob_m1_structure.mq5)",
+ "chart_period": "M1",
+ "zone_period": "M5",
+ "deposit": 10000,
+ "fixed_constants": {
+  "ImpulseWindowBars": "2",
+  "SwingStrengthM1": "3",
+  "StopBufferPoints": "20",
+  "RiskRR": "2.0",
+  "RiskPercent": "1.0",
+  "MaxExposures": "3",
+  "WarmupDays": "30"
+ },
+ "fixed_constants_note": "N = SwingStrengthM1 = 3 and the 20-point buffer are fixed research constants, approved at the chart gate, not claimed optimal",
+ "baseline": "variant A (StructureVariant = 0, the code default) with the run_constants risk inputs",
+ "series": {
+  "procedure": "per fold, the variant selected on that fold's train window",
+  "fixed_a": "variant A in every fold (the baseline)",
+  "fixed_b": "variant B in every fold"
+ },
+ "folds": [
+  {
+   "fold": 1,
+   "train": [
+    "2025.12.01",
+    "2026.02.28"
+   ],
+   "test": [
+    "2026.03.01",
+    "2026.03.31"
+   ]
+  },
+  {
+   "fold": 2,
+   "train": [
+    "2026.01.01",
+    "2026.03.31"
+   ],
+   "test": [
+    "2026.04.01",
+    "2026.04.30"
+   ]
+  },
+  {
+   "fold": 3,
+   "train": [
+    "2026.02.01",
+    "2026.04.30"
+   ],
+   "test": [
+    "2026.05.01",
+    "2026.05.31"
+   ]
+  },
+  {
+   "fold": 4,
+   "train": [
+    "2026.03.01",
+    "2026.05.31"
+   ],
+   "test": [
+    "2026.06.01",
+    "2026.06.30"
+   ]
+  },
+  {
+   "fold": 5,
+   "train": [
+    "2026.04.01",
+    "2026.06.30"
+   ],
+   "test": [
+    "2026.07.01",
+    "2026.07.31"
+   ]
+  }
+ ],
+ "final_train": [
+  "2026.05.01",
+  "2026.07.31"
+ ],
+ "holdout": [
+  "2026.08.01",
+  "2026.09.29"
+ ],
+ "holdout_independent": false,
+ "holdout_label": "בדיקה היסטורית לא עצמאית",
+ "holdout_rules": "runs once, after the candidate freeze, for variant A and variant B (the candidate is the frozen one of them); reported apart from the WFO; never used to choose parameters, the variant or rules; not an acceptance criterion (R31)",
+ "grid": {
+  "StructureVariant": [
+   0,
+   1
+  ]
+ },
+ "grid_ranges": {
+  "StructureVariant": [
+   0,
+   1,
+   1
+  ]
+ },
+ "categorical": [
+  "StructureVariant"
+ ],
+ "defaults": {
+  "StructureVariant": 0
+ },
+ "passes_per_fold": 2,
+ "selection": {
+  "trade_floor_per_month": 15,
+  "train_months": 3,
+  "max_equity_dd_pct": 10.0,
+  "drawdown_metric": "the tester's maximum equity drawdown of the train pass",
+  "score": "recovery factor (net profit / max equity DD), ineligible passes score 0",
+  "tie_break": "variant A (the default)",
+  "fallback": "variant A with status no_eligible_pass"
+ },
+ "acceptance": {
+  "gating_series": "procedure",
+  "reported_series": [
+   "fixed_a",
+   "fixed_b"
+  ],
+  "min_fills_per_month": 15,
+  "days_per_month": 30.44,
+  "bootstrap_alpha": 0.05,
+  "min_positive_folds": 3,
+  "positive_folds_rule": "strict majority of the folds evaluated (3 of 5; 2 of 3 for the group R report)",
+  "remove_top_events": 2,
+  "event_bar": "M1",
+  "mc_breach_prob_max": 0.1,
+  "spread_stress_k": 1.0,
+  "stop_slippage_points": 10,
+  "entry_slippage_points": 10,
+  "min_stability_profitable_share": 0.6,
+  "dsr_min": 0.9,
+  "dsr_min_days": 60,
+  "net_vs_baseline": "the procedure's OOS net must exceed fixed A's",
+  "risk_metric": "loss limits on the daily equity records (eq_min) and MC on daily equity; the train selection uses the tester's maximum equity drawdown"
+ },
+ "stability": {
+  "runs": [
+   {
+    "SwingStrengthM1": 2
+   },
+   {
+    "SwingStrengthM1": 4
+   },
+   {
+    "StopBufferPoints": 10
+   },
+   {
+    "StopBufferPoints": 40
+   }
+  ],
+  "window": [
+   "2026.03.01",
+   "2026.07.31"
+  ],
+  "applies_to": "candidate",
+  "criterion": "share of the 4 perturbations with net > 0 >= 0.60: an acceptance criterion of the candidate; the runs are never used for selection (KTD15)"
+ },
+ "loss_limits": {
+  "daily_loss_pct_of_initial": 5.0,
+  "total_floor": 9000.0,
+  "trailing": false
+ },
+ "stats": {
+  "seed": 20260930,
+  "bootstrap_resamples": 10000,
+  "mean_block_days": 5,
+  "mc_paths": 10000,
+  "mc_horizon_days": 252,
+  "dsr_trials": 12,
+  "dsr_trials_note": "2 variants x 5 folds + this strategy's pilot runs; the final-train selection, the tick-coverage runs (variant A, single months) and the session probe are not separate trials",
+  "pilot_runs": [
+   "pilot_a",
+   "pilot_b"
+  ]
+ },
+ "reporting": {
+  "decisions": "results/pilot/gate_decisions.md",
+  "chart_gate": "approved by the user (2026-10-04): the 8 charts in results/pilot/gate_package match the agreed rules; the approval covers the examples and the start of the research only",
+  "shared_structure": "entries from different OBs on one structure stay allowed (R16, R17, R21 unchanged)",
+  "both_variants": "A and B both stay; B is not chosen, no parameter changes and no grid widening because of the exposed pilot results",
+  "drawdowns": "every result reports the closed-trade balance drawdown and the tester's equity drawdown apart",
+  "session_minute": {
+   "finding": "quotes 01:00, trade session 01:01: SL/TP reached only in the quote-only minute execute from 01:01 (results/pilot/session_probe)",
+   "primary": "tester results unchanged",
+   "sensitivity": "research/mt5r/session_sensitivity.py: re-pricing of a fixed trade list at the first trigger tick of the quote-only minute; balance drawdown on the corrected timeline, closed trades only; later sizes, cap slots and signals are not re-simulated; reported for every OOS fold, the WFO aggregate and August-September; never used for a choice"
+  },
+  "generated_ticks": {
+   "months": {
+    "2025.12": 100.0,
+    "2026.01": 12.48
+   },
+   "folds_group_G": [
+    1,
+    2
+   ],
+   "folds_group_R": [
+    3,
+    4,
+    5
+   ],
+   "rule": "OOS aggregates for all folds, group G and group R; acceptance also evaluated on group R alone for the report; a difference is stated"
+  },
+  "pnl_exposure": "results/pilot/gate_decisions.md#pl-exposure-before-the-freeze: pilot net and drawdown of both variants were seen before this freeze; the WFO results are not blind to the researchers"
+ },
+ "ea_source_sha256": "6dbea8e784aa7b979bdf7b9fe1f72eb889d2099888179001bd8dd8e58e7417fa",
+ "gate_rule_changes": []
+}

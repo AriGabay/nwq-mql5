@@ -1,0 +1,28 @@
+{
+ "run_id": "holdout_variant_b",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "02a44b32bae4246d6e68f21f284851f985bd628dc7e5f51ace8ee4ada5fed666",
+ "ini_sha256": "49374583fd9ae55c0d8ce291d4d8defa75e4f008e74dd82c224b6b051e268ec3",
+ "meta": {
+  "kind": "research",
+  "role": "holdout_variant_b",
+  "values": {
+   "RiskPercent": "1.0",
+   "MaxExposures": "3",
+   "RiskRR": "2.0",
+   "StructureVariant": "1",
+   "ImpulseWindowBars": "2",
+   "SwingStrengthM1": "3",
+   "StopBufferPoints": "20",
+   "WarmupDays": "30",
+   "MagicNumber": "770201",
+   "TradeComment": "OBM1",
+   "ResearchRunTag": "holdout_variant_b"
+  }
+ },
+ "started": "2026-10-04T15:31:01",
+ "status": "ok",
+ "seconds": 25.8,
+ "report": "holdout_variant_b.htm",
+ "exit_code": 0
+}

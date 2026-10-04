@@ -1,0 +1,15 @@
+{
+ "window": [
+  "2026.03.01",
+  "2026.03.31"
+ ],
+ "bos_conformance": {
+  "setups": 239,
+  "violations": 0
+ },
+ "equivalence": {
+  "research_deals": 117,
+  "delivered_deals": 117,
+  "identical": true
+ }
+}

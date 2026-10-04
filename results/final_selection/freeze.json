@@ -1,0 +1,24 @@
+{
+ "ea_sha256": "6dbea8e784aa7b979bdf7b9fe1f72eb889d2099888179001bd8dd8e58e7417fa",
+ "prereg_sha256": "8176aa44c2bf3ca1322479de2dd29dee3c3e3ae3ea90c1a02c848f6bf9acf68f",
+ "selection": {
+  "tag": "final",
+  "train": [
+   "2026.05.01",
+   "2026.07.31"
+  ],
+  "trade_floor": 45,
+  "status": "no_eligible_pass",
+  "params": {
+   "StructureVariant": 0
+  },
+  "eligible_passes": 0
+ },
+ "candidate_variant": "A",
+ "sets": {
+  "ob_m1_structure_original.set": "1b9b057e69918e3e50b61916b9ab7bf19be194da2756de6ce256f9b76c1f8ffd",
+  "ob_m1_structure_variant_a.set": "1724c0509a252a563b53d1686ded21be83701134bb65f7e614f10de5e5f92ff9",
+  "ob_m1_structure_variant_b.set": "20704a6be8e8527872830bdadec03278450e02f8f8c815bcb0998e17390187cf",
+  "ob_m1_structure_candidate.set": "741dad0e0680f721b94f60a865825cd624c0acd3da9fa7118ae860a8d7cabc20"
+ }
+}

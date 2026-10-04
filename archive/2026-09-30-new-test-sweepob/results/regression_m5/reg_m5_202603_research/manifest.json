@@ -1,0 +1,26 @@
+{
+ "run_id": "reg_m5_202603_research",
+ "ex5": "new_test_research.ex5",
+ "ex5_sha256": "90fefdd09a264b5cc0419d088d861ed41415ae9cc2def436ce5d333c976a972b",
+ "ini_sha256": "0bee3cf48987bbbb1e3d364939a3a465f1143bc7e5748d3d77c623cb58be5be3",
+ "meta": {
+  "kind": "research",
+  "role": "regression",
+  "values": {
+   "DrawObjects": false,
+   "DebugMode": false,
+   "PopupAlerts": false,
+   "LotMode": 1,
+   "RiskPercent": 1.0,
+   "MaxOpenPositions": 3,
+   "EnableTrading": true,
+   "SignalTF": 5,
+   "ResearchRunTag": "reg_m5_202603_research"
+  }
+ },
+ "started": "2026-09-30T18:23:16",
+ "status": "ok",
+ "seconds": 13.8,
+ "report": "reg_m5_202603_research.htm",
+ "exit_code": 0
+}

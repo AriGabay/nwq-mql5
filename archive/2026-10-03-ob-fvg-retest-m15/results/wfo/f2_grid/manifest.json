@@ -1,0 +1,49 @@
+{
+ "run_id": "f2_grid",
+ "ex5": "ob_fvg_retest_research.ex5",
+ "ex5_sha256": "70e3e3cfe36b587a6a13bd6176fd898a41c0e30cbf7aa17a1e234b4c2e9ee2d8",
+ "ini_sha256": "514abb5df2300ccc93d10fcada92dd688e251601333c5b1b0fd66e616827c071",
+ "meta": {
+  "kind": "research",
+  "role": "train",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "SignalTF": 15,
+   "ResearchRunTag": "f2_grid"
+  },
+  "ranges": {
+   "ObMode": [
+    0,
+    1,
+    1
+   ],
+   "EntryMode": [
+    0,
+    1,
+    3
+   ],
+   "ObMaxAgeBars": [
+    48,
+    48,
+    144
+   ],
+   "FvgWindowBars": [
+    6,
+    6,
+    18
+   ],
+   "OrderExpiryBars": [
+    6,
+    6,
+    18
+   ]
+  }
+ },
+ "started": "2026-10-02T11:12:47",
+ "status": "ok",
+ "seconds": 348.2,
+ "report": "f2_grid.xml",
+ "exit_code": 0
+}

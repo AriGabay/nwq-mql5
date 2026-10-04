@@ -1,0 +1,35 @@
+{
+ "run_id": "optsmoke_m15_202603",
+ "ex5": "new_test_research.ex5",
+ "ex5_sha256": "90fefdd09a264b5cc0419d088d861ed41415ae9cc2def436ce5d333c976a972b",
+ "ini_sha256": "26dff500ee3e70ccc454d6ea19ac57c02de0c5f892d8977de3a579041acd5712",
+ "meta": {
+  "kind": "research",
+  "role": "smoke",
+  "values": {
+   "DrawObjects": false,
+   "DebugMode": false,
+   "PopupAlerts": false,
+   "LotMode": 1,
+   "RiskPercent": 1.0,
+   "MaxOpenPositions": 3,
+   "EnableTrading": true,
+   "SignalTF": 15,
+   "VolumeMultiplier": 1.2,
+   "SweepToSetupBars": 24,
+   "ResearchRunTag": "optsmoke_m15_202603"
+  },
+  "ranges": {
+   "PivL": [
+    2,
+    1,
+    3
+   ]
+  }
+ },
+ "started": "2026-09-30T18:29:38",
+ "status": "ok",
+ "seconds": 22.0,
+ "report": "optsmoke_m15_202603.xml",
+ "exit_code": 0
+}

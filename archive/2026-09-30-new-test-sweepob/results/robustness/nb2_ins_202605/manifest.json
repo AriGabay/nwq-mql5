@@ -1,0 +1,31 @@
+{
+ "run_id": "nb2_ins_202605",
+ "ex5": "new_test_research.ex5",
+ "ex5_sha256": "90fefdd09a264b5cc0419d088d861ed41415ae9cc2def436ce5d333c976a972b",
+ "ini_sha256": "1977d709217e6eb460df51b2614e9f295d343653dc2ad4138b46e2887b37a2c9",
+ "meta": {
+  "kind": "research",
+  "role": "neighbor_insample",
+  "values": {
+   "DrawObjects": false,
+   "DebugMode": false,
+   "PopupAlerts": false,
+   "LotMode": 1,
+   "RiskPercent": 1.0,
+   "MaxOpenPositions": 3,
+   "EnableTrading": true,
+   "SignalTF": 15,
+   "PivL": 5,
+   "PivR": 4,
+   "SweepToSetupBars": 24,
+   "VolumeMultiplier": 1.2,
+   "ConfirmationBars": 6,
+   "ResearchRunTag": "nb2_ins_202605"
+  }
+ },
+ "started": "2026-09-30T19:33:51",
+ "status": "ok",
+ "seconds": 13.2,
+ "report": "nb2_ins_202605.htm",
+ "exit_code": 0
+}
