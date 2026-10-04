@@ -145,7 +145,7 @@ def conformance_report(run_id: str, dest: str) -> dict:
               "contract_size": RUN["symbol_spec"]["contract_size"]}
     run = cm.read_run(d, run_id)
     res = cm.full(run["setups"], run["events"], run["pivots"], run["bars_m1"], run["bars_m5"], params,
-                  run.get("deals"))
+                  run.get("deals"), run.get("trail"), run.get("sl_moves"))
     viol = res["violations"]
     facts = journal.run_facts(d)
     out = {"run_id": run_id, "setups": len(run["setups"]), "bars_m1": len(run["bars_m1"]),

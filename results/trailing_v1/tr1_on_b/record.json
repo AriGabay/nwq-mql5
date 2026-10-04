@@ -1,0 +1,26 @@
+{
+ "run_id": "tr1_on_b",
+ "kind": "research",
+ "status": "ok",
+ "inputs": {
+  "ImpulseWindowBars": 2,
+  "SwingStrengthM1": 3,
+  "StopBufferPoints": 20,
+  "RiskRR": 2.0,
+  "RiskPercent": 1.0,
+  "MaxExposures": 3,
+  "WarmupDays": 30,
+  "StructureVariant": 1,
+  "EnableTrailingStop": true
+ },
+ "input_mismatches": [],
+ "net_profit": 233.75,
+ "trades": 56,
+ "profit_factor": 1.1,
+ "recovery_factor": 0.2,
+ "equity_dd_money": 1177.02,
+ "equity_dd_pct": 11.68,
+ "balance_dd_pct": 9.81,
+ "history_quality": "100% real ticks",
+ "build": "6231"
+}

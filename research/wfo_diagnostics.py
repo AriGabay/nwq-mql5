@@ -26,7 +26,7 @@ import pandas as pd
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import cli  # noqa: E402
-from mt5r import conformance_m1 as cm, evaluate, reports, stats, trades  # noqa: E402
+from mt5r import conformance_m1 as cm, evaluate, reports, stats, trades, trailing  # noqa: E402
 
 OUT = cli.RESULTS / "diagnostics"
 SEED = stats.SEED
@@ -51,6 +51,7 @@ def _load(folder, run_id):
 
 def run_positions(folder: str, run_id: str):
     run, deals, days, setups = _load(folder, run_id)
+    trailing.refuse_trailed("wfo_diagnostics (+1R/-1R races, r_levels)", setups, run.get("trail"))
     tab = trades.trade_table(setups, deals)
     s = run["setups"]
     s = s[s["position_id"].notna()].copy()

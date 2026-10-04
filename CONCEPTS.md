@@ -20,7 +20,7 @@ It holds no password written by the pipeline; the Strategy Tester still requires
 The state of the isolated copy in which it cannot place orders or expose trading tools: automated trading disabled, the terminal's built-in MCP server off, and no stored password in its configuration.
 
 ### Quote-only minute
-The first minute after a break in a symbol's quotes (the daily break or the weekend) in which prices arrive but no order, stop or target executes, because the symbol's trading session starts a minute after its quote session.
+The first minute after a break in a symbol's quotes (the daily break or the weekend) in which prices arrive but no order, stop or target executes and no stop modification is accepted, because the symbol's trading session starts a minute after its quote session.
 
 A level reached only during a quote-only minute fills from the first tradeable tick or later, possibly much later if price moves back; a check that re-derives execution from bars treats that bar as no-execution and reports such cases as unverifiable rather than as violations.
 
@@ -63,6 +63,12 @@ A parameter set held constant in every fold of a walk-forward study and run on t
 
 ### Fallback
 The default parameters carried into an out-of-window month when no train pass met the eligibility thresholds (`no_eligible_pass`); it completes the evaluation path and is never a selected or improved candidate.
+
+### Original risk (R0)
+The distance between a position's actual fill price and the stop accepted on it at the fill, |E − SL0|. It is fixed for the whole trade: R figures of a run with a trailing stop are measured against it, never against a trailed stop.
+
+### 1R trailing stop
+The optional exit change behind `EnableTrailingStop` (default off). From +1R on Bid (long) or Ask (short), the stop follows the best Bid or Ask since the fill at a distance of one Original risk, on every tick and only in the trade's favour; the 2R target does not move. An exit at a stop that had moved is the exit kind `trail`, which is not necessarily a loss.
 
 ### Recovery attempt
 A new try of an optimization window that failed verification, under its own attempt ID, run IDs and folders. Earlier attempts' records stay as they are, a verified window is never retried, and the tester cache is not deleted.

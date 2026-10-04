@@ -1,6 +1,8 @@
 """Cost stress applied to closed trades: wider spread, adverse slippage on stop exits and on Market entries."""
 import pandas as pd
 
+from . import trailing
+
 
 def extra_cost(trades_df, contract_size, k_spread, spread_by_day=None, fixed_spread=None) -> pd.Series:
     """Extra round-trip cost per trade = k * spread * volume * contract_size (USD).
@@ -28,6 +30,7 @@ def stop_slippage_cost(trades_df, contract_size, points, point) -> pd.Series:
 
     A trade is a stop exit when its exit_kind is "sl"; TP, end-of-run and open trades cost nothing.
     """
+    trailing.refuse_trailed("the stop-slippage cost stress", trades_df)
     is_sl = trades_df["exit_kind"].astype(str).str.lower().eq("sl")
     return (float(points) * float(point) * float(contract_size) * trades_df["volume"].astype(float)).where(is_sl, 0.0)
 

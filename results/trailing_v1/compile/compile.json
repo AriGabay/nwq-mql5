@@ -1,0 +1,14 @@
+{
+ "ob_m1_structure.mq5": {
+  "errors": 0,
+  "warnings": 0,
+  "ex5_exists": true,
+  "source_sha256": "ae51120feeeebb6d21c303a5ee8773911da7632ab379bbaf39a3b2065a5aa059"
+ },
+ "ob_m1_structure_research.mq5": {
+  "errors": 0,
+  "warnings": 0,
+  "ex5_exists": true,
+  "source_sha256": "b587ea4e93a77568f3d779e3ba195ba98afd234ca546c1fb988492b11bcd94ed"
+ }
+}

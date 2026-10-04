@@ -1,0 +1,32 @@
+{
+ "on_a": [
+  "results/trailing_v1/charts/tr1_on_a_L_trail_pos10.png",
+  "results/trailing_v1/charts/tr1_on_a_L_trail_pos26.png",
+  "results/trailing_v1/charts/tr1_on_a_S_trail_pos2.png",
+  "results/trailing_v1/charts/tr1_on_a_S_trail_pos6.png",
+  "results/trailing_v1/charts/tr1_on_a_L_tp_pos30.png",
+  "results/trailing_v1/charts/tr1_on_a_L_tp_pos45.png",
+  "results/trailing_v1/charts/tr1_on_a_S_tp_pos17.png",
+  "results/trailing_v1/charts/tr1_on_a_S_tp_pos73.png",
+  "results/trailing_v1/charts/tr1_on_a_L_sl_pos14.png",
+  "results/trailing_v1/charts/tr1_on_a_L_sl_pos16.png",
+  "results/trailing_v1/charts/tr1_on_a_S_sl_pos4.png",
+  "results/trailing_v1/charts/tr1_on_a_S_sl_pos8.png",
+  "results/trailing_v1/charts/tr1_on_a_L_end_pos382.png"
+ ],
+ "on_b": [
+  "results/trailing_v1/charts/tr1_on_b_L_trail_pos8.png",
+  "results/trailing_v1/charts/tr1_on_b_L_trail_pos19.png",
+  "results/trailing_v1/charts/tr1_on_b_S_trail_pos10.png",
+  "results/trailing_v1/charts/tr1_on_b_S_trail_pos29.png",
+  "results/trailing_v1/charts/tr1_on_b_L_tp_pos78.png",
+  "results/trailing_v1/charts/tr1_on_b_L_tp_pos103.png",
+  "results/trailing_v1/charts/tr1_on_b_S_tp_pos12.png",
+  "results/trailing_v1/charts/tr1_on_b_S_tp_pos47.png",
+  "results/trailing_v1/charts/tr1_on_b_L_sl_pos4.png",
+  "results/trailing_v1/charts/tr1_on_b_L_sl_pos17.png",
+  "results/trailing_v1/charts/tr1_on_b_S_sl_pos2.png",
+  "results/trailing_v1/charts/tr1_on_b_S_sl_pos6.png",
+  "results/trailing_v1/charts/tr1_on_b_L_end_pos112.png"
+ ]
+}

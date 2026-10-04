@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from mt5r import compile as compmod, conformance_m1 as cm, env, explog, ini, runner  # noqa: E402
+from mt5r import compile as compmod, conformance_m1 as cm, env, explog, ini, runner, trailing  # noqa: E402
 from mt5r.session_sensitivity import trigger as _trigger  # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
@@ -43,6 +43,7 @@ def cases(run_ids=PILOT_RUNS) -> pd.DataFrame:
     for k, run_id in enumerate(run_ids):
         base, v = (k + 1) * 1_000_000, run_id.split("_")[-1]
         run = cm.read_run(runner.RUNS / run_id, run_id)
+        trailing.refuse_trailed("the session probe cases", run["setups"], run.get("trail"))
         B = cm._Bars(run["bars_m1"], 60)
         s = run["setups"]
         for r in s[s["reason"] == "filled"].to_dict("records"):

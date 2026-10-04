@@ -28,6 +28,7 @@ input int    MaxExposures      = 3;      // open positions at once (R21)
 input int    WarmupDays        = 30;     // calendar days of closed M5/M1 bars replayed with trading off (KTD8)
 input long   MagicNumber       = 770201; // magic number
 input string TradeComment      = "OBM1"; // order comment prefix (commas are removed)
+input bool   EnableTrailingStop = false; // 1R trailing stop: from +1R, 1R behind the best price (off = baseline)
 #ifdef RESEARCH_LOG
 input string ResearchRunTag    = "";     // tag for research CSV files ("" = no CSV)
 #endif
@@ -175,6 +176,35 @@ double   gCacheShort = 0.0;   // lowest untouched short OB low
 int      gBrokenCnt = 0;      // setups in a break episode (returns are checked only for them)
 bool     gAnyQueued = false;
 
+// 1R trailing stop registry (plan 2026-10-05-0007, KTD1): one entry per open position, keyed by ticket; R0 is fixed
+// at the fill and never recomputed; persisted in terminal global variables (KTD4)
+struct TrailPos
+  {
+   ulong    ticket;
+   int      setupId;
+   int      dir;
+   double   fill;           // E: actual fill price
+   double   sl0;            // stop accepted on the position at the fill
+   double   r0;             // |E - SL0|, fixed
+   double   tp;             // never moved
+   double   best;           // long: highest Bid since the fill; short: lowest Ask
+   double   sl;             // stop currently on the position (read back)
+   bool     active;
+   long     actMsc;
+   double   actBid;
+   double   actAsk;
+   double   lastFailed;     // last value rejected or not sent (0 = none)
+   datetime lastFailedBar;  // M1 bar of that failure: the same value is not re-sent within it
+   datetime closedBar;      // M1 bar answered 'market closed': no request before the next bar
+   int      requests;
+   int      accepted;
+   int      rejected;
+   int      notSent;
+   bool     stateOk;        // the saved state read back equal at the fill
+   bool     restored;       // rebuilt from global variables after a restart
+  };
+TrailPos gTr[];
+
 CTrade   trade;
 double   gTick = 0.0;
 int      gDigits = 0;
@@ -249,6 +279,8 @@ bool Waiting(const Setup &s) { return s.state >= ST_TRACK && s.state <= ST_READY
 #define RL_BARS_HEADER "time,open,high,low,close,tick_volume,spread,warmup"
 #define RL_PIVOTS_HEADER "pivot_id,type,peak_time,conf_time,level,replaced_by,outside_bar"
 #define RL_EVENTS_HEADER "setup_id,seq,kind,bar_time,tick_msc,price,lo,hi,ref_id,ref_time,detail"
+#define RL_TRAIL_HEADER "position_id,setup_id,dir,fill_price,sl0,r0,tp,activated_msc,activation_bid,activation_ask,best_price,final_sl,requests,accepted,rejected,not_sent,exit_kind,state_roundtrip"
+#define RL_SLMOVES_HEADER "position_id,tick_msc,bid,ask,best,requested_sl,sl_before,accepted_sl,retcode,outcome"
 #define RL_SETUPS_HEADER "setup_id,dir,variant,ob_time,ob_high,ob_low,idfvg_c1_time,idfvg_c3_time,idfvg_low,idfvg_high,identified_in_warmup,touch_msc,touch_bar_time,ob_age_bars_touch,ob_age_min_touch,breaks,returns,sc_bar_time,origin_time,ref_pivot_id,hl_pivot_id,fvg_c1_time,fvg_low,fvg_high,reaction_bar_time,entry_request_msc,request_price,attempts,sl,sl_anchor,sl_anchor_price,buffer_pts,tp,volume,fill_msc,fill_price,position_id,ob_age_bars_entry,ob_age_min_entry,exit_msc,exit_price,exit_kind,reason,reason_msc"
 datetime rlDay = 0;
 double   rlBalOpen = 0, rlEqOpen = 0, rlEqMin = 0, rlEqMax = 0, rlBalClose = 0, rlEqClose = 0;
@@ -259,6 +291,8 @@ bool     rlFinalized = false;
 bool     rlOn = false;        // setup/event/bar rows are collected only when files will be written
 string   rlSetupRows[];
 string   rlEventRows[];
+string   rlTrailRows[];       // rl_trail: one row per trailed position (only with EnableTrailingStop)
+string   rlMoveRows[];        // rl_sl_moves: one row per stop request or skip
 MqlRates rlBars1[];
 MqlRates rlBars5[];
 int      rlWarm1 = 0;         // the first rlWarm1 rows of rlBars1 are warm-up bars
@@ -304,6 +338,8 @@ void RL_Init()
    rlOn = (ResearchRunTag != "" && !MQLInfoInteger(MQL_OPTIMIZATION));
    ArrayResize(rlSetupRows, 0);
    ArrayResize(rlEventRows, 0);
+   ArrayResize(rlTrailRows, 0);
+   ArrayResize(rlMoveRows, 0);
    ArrayResize(rlBars1, 0);
    ArrayResize(rlBars5, 0);
    rlWarm1 = 0;
@@ -424,6 +460,32 @@ void RL_Event(long seq, int setupId, string kind, datetime barTime, long msc, do
    int sz = ArraySize(rlEventRows);
    ArrayResize(rlEventRows, sz + 1, 16384);
    rlEventRows[sz] = row;
+  }
+
+// rl_sl_moves: every stop request (accepted / rejected) and every request held back (not_sent:<reason>)
+void RL_SlMove(const TrailPos &t, const MqlTick &tk, double req, double before, double after, long rc, string outcome)
+  {
+   if(!rlOn) return;
+   string row = IntegerToString((long)t.ticket) + "," + IntegerToString(tk.time_msc) + "," + Fmt(tk.bid) + "," +
+                Fmt(tk.ask) + "," + Fmt(t.best) + "," + Fmt(req) + "," + Fmt(before) + "," + Fmt(after) + "," +
+                IntegerToString(rc) + "," + outcome;
+   int sz = ArraySize(rlMoveRows);
+   ArrayResize(rlMoveRows, sz + 1, 16384);
+   rlMoveRows[sz] = row;
+  }
+// rl_trail: one row per trailed position at its exit (or at the run end)
+void RL_TrailRow(const TrailPos &t, string exitKind)
+  {
+   if(!rlOn) return;
+   string row = IntegerToString((long)t.ticket) + "," + IntegerToString(t.setupId) + "," + (t.dir == 1 ? "L" : "S") +
+                "," + Fmt(t.fill) + "," + Fmt(t.sl0) + "," + Fmt(t.r0) + "," + Fmt(t.tp) + "," +
+                RL_L(t.actMsc, t.active) + "," + RL_P(t.actBid, t.active) + "," + RL_P(t.actAsk, t.active) + "," +
+                Fmt(t.best) + "," + Fmt(t.sl) + "," + IntegerToString(t.requests) + "," + IntegerToString(t.accepted) +
+                "," + IntegerToString(t.rejected) + "," + IntegerToString(t.notSent) + "," + exitKind + "," +
+                (t.stateOk ? "ok" : "mismatch");
+   int sz = ArraySize(rlTrailRows);
+   ArrayResize(rlTrailRows, sz + 1, 1024);
+   rlTrailRows[sz] = row;
   }
 
 // one rl_setups row of final facts per setup
@@ -561,6 +623,11 @@ void RL_WriteRunFiles()
      }
    RL_WriteBars("rl_bars_m1_" + ResearchRunTag + ".csv", RL_BARS_HEADER, rlBars1, rlWarm1);
    RL_WriteBars("rl_bars_m5_" + ResearchRunTag + ".csv", RL_BARS_HEADER, rlBars5, rlWarm5);
+   if(EnableTrailingStop)
+     {
+      RL_WriteRows("rl_trail_" + ResearchRunTag + ".csv", RL_TRAIL_HEADER, rlTrailRows);
+      RL_WriteRows("rl_sl_moves_" + ResearchRunTag + ".csv", RL_SLMOVES_HEADER, rlMoveRows);
+     }
   }
 void RL_Deinit()
   {
@@ -1251,6 +1318,240 @@ int CountOpenPositions()
    return cnt;
   }
 
+//==================================================================
+// 1R TRAILING STOP (plan 2026-10-05-0007; reference model research/mt5r/trailing.py)
+//==================================================================
+// R0 = |E - SL0| is fixed at the fill. A long trails 1R below the highest Bid since the fill, a short 1R above the
+// lowest Ask (no extra spread term: SL0 already holds the entry spread). Active from +1R, only in the trade's favour,
+// never switched off; the TP is never moved. Every effect runs only with EnableTrailingStop.
+string TrailGvPrefix(ulong ticket) { return "OBM1T." + IntegerToString(MagicNumber) + "." + IntegerToString((long)ticket) + "."; }
+
+void TrailInit(TrailPos &t)
+  {
+   t.ticket = 0; t.setupId = 0; t.dir = 0; t.fill = 0; t.sl0 = 0; t.r0 = 0; t.tp = 0; t.best = 0; t.sl = 0;
+   t.active = false; t.actMsc = 0; t.actBid = 0; t.actAsk = 0; t.lastFailed = 0; t.lastFailedBar = 0;
+   t.closedBar = 0; t.requests = 0; t.accepted = 0; t.rejected = 0; t.notSent = 0; t.stateOk = false; t.restored = false;
+  }
+
+// KTD4: E, SL0, R0, TP, direction and the trail state per position, flushed to disk on every save
+void TrailSave(const TrailPos &t)
+  {
+   string p = TrailGvPrefix(t.ticket);
+   GlobalVariableSet(p + "dir", t.dir);
+   GlobalVariableSet(p + "setup", t.setupId);
+   GlobalVariableSet(p + "e", t.fill);
+   GlobalVariableSet(p + "sl0", t.sl0);
+   GlobalVariableSet(p + "r0", t.r0);
+   GlobalVariableSet(p + "tp", t.tp);
+   GlobalVariableSet(p + "best", t.best);
+   GlobalVariableSet(p + "act", t.active ? 1.0 : 0.0);
+   GlobalVariableSet(p + "actms", (double)t.actMsc);
+   GlobalVariablesFlush();
+  }
+
+// restore from the saved values only; SL0 is never taken from the position's current stop
+bool TrailLoad(ulong ticket, TrailPos &t)
+  {
+   string p = TrailGvPrefix(ticket);
+   string need[] = {"dir", "e", "sl0", "r0", "tp"};
+   for(int i = 0; i < ArraySize(need); i++)
+      if(!GlobalVariableCheck(p + need[i])) return false;
+   TrailInit(t);
+   t.ticket = ticket;
+   t.dir    = (int)GlobalVariableGet(p + "dir");
+   t.fill   = GlobalVariableGet(p + "e");
+   t.sl0    = GlobalVariableGet(p + "sl0");
+   t.r0     = GlobalVariableGet(p + "r0");
+   t.tp     = GlobalVariableGet(p + "tp");
+   t.setupId = GlobalVariableCheck(p + "setup") ? (int)GlobalVariableGet(p + "setup") : 0;
+   t.best   = GlobalVariableCheck(p + "best") ? GlobalVariableGet(p + "best") : t.fill;
+   t.active = GlobalVariableCheck(p + "act") && GlobalVariableGet(p + "act") > 0.5;
+   t.actMsc = GlobalVariableCheck(p + "actms") ? (long)GlobalVariableGet(p + "actms") : 0;
+   t.sl     = t.sl0;
+   return (t.dir == 1 || t.dir == -1) && t.r0 > 0;
+  }
+
+void TrailForget(ulong ticket) { GlobalVariablesDeleteAll(TrailGvPrefix(ticket)); }
+
+int TrailFind(ulong ticket)
+  {
+   for(int i = 0; i < ArraySize(gTr); i++)
+      if(gTr[i].ticket == ticket) return i;
+   return -1;
+  }
+
+// at the fill: E from the deal, SL0 and TP read back from the position
+void TrailRegister(const Setup &s)
+  {
+   if(!PositionSelectByTicket(s.posId))
+     {
+      Print("OBM1 trail: position ", s.posId, " not selectable at the fill - not trailed");
+      return;
+     }
+   TrailPos t;
+   TrailInit(t);
+   t.ticket  = s.posId;
+   t.setupId = s.id;
+   t.dir     = s.dir;
+   t.fill    = s.fillPrice;
+   t.sl0     = PositionGetDouble(POSITION_SL);
+   t.tp      = PositionGetDouble(POSITION_TP);
+   t.r0      = MathAbs(t.fill - t.sl0);
+   t.sl      = t.sl0;
+   t.best    = t.fill;
+   if(t.r0 < gTick / 2.0)
+     {
+      Print("OBM1 trail: position ", s.posId, " has no initial risk (SL0 ", Fmt(t.sl0), ") - not trailed");
+      return;
+     }
+   TrailSave(t);
+   TrailPos chk;
+   t.stateOk = TrailLoad(t.ticket, chk) && chk.dir == t.dir && chk.setupId == t.setupId &&
+               MathAbs(chk.fill - t.fill) < gTick / 2.0 && MathAbs(chk.sl0 - t.sl0) < gTick / 2.0 &&
+               MathAbs(chk.r0 - t.r0) < gTick / 2.0 && MathAbs(chk.tp - t.tp) < gTick / 2.0;
+   int n = ArraySize(gTr);
+   ArrayResize(gTr, n + 1);
+   gTr[n] = t;
+  }
+
+// OnInit: rebuild the registry for this EA's open positions from the saved state (no trading call here)
+void TrailRestore()
+  {
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+     {
+      ulong tk = PositionGetTicket(i);
+      if(tk == 0 || !IsOwn(PositionGetString(POSITION_SYMBOL), PositionGetInteger(POSITION_MAGIC))) continue;
+      TrailPos t;
+      if(!TrailLoad(tk, t))
+        {
+         Print("OBM1 trail_state_missing: position ", tk, " has no saved E/SL0/R0 - not trailed ",
+               "(SL0 is never taken from the current stop)");
+         continue;
+        }
+      t.sl = PositionGetDouble(POSITION_SL);
+      t.restored = true;
+      t.stateOk = true;
+      int n = ArraySize(gTr);
+      ArrayResize(gTr, n + 1);
+      gTr[n] = t;
+      Print("OBM1 trail restored: position ", tk, " E ", Fmt(t.fill), " SL0 ", Fmt(t.sl0), " R0 ", Fmt(t.r0),
+            " active ", t.active, " best ", Fmt(t.best), " SL now ", Fmt(t.sl));
+     }
+  }
+
+// a request held back (stops / freeze level): logged once per value and M1 bar, the active stop stays
+void TrailNotSent(TrailPos &t, const MqlTick &tk, double req, double posSl, string reason, datetime bar)
+  {
+   t.notSent++;
+   t.lastFailed = req;
+   t.lastFailedBar = bar;
+#ifdef RESEARCH_LOG
+   RL_SlMove(t, tk, req, posSl, posSl, 0, "not_sent:" + reason);
+#endif
+  }
+
+// KTD3: modify by ticket with the position's own TP; accepted only with retcode DONE and the stop read back from
+// the position equal to the request (TP unchanged) - a true return alone is not enough
+void TrailSend(TrailPos &t, const MqlTick &tk, double req, double posSl, double posTp, datetime bar)
+  {
+   t.requests++;
+   bool ok = trade.PositionModify(t.ticket, req, posTp);
+   uint rc = trade.ResultRetcode();
+   double slRead = posSl, tpRead = posTp;
+   if(PositionSelectByTicket(t.ticket))
+     {
+      slRead = PositionGetDouble(POSITION_SL);
+      tpRead = PositionGetDouble(POSITION_TP);
+     }
+   bool acc = ok && rc == TRADE_RETCODE_DONE && MathAbs(slRead - req) <= gTick / 2.0 + 1e-9 &&
+              MathAbs(tpRead - t.tp) <= gTick / 2.0 + 1e-9;
+   t.sl = slRead;
+   if(acc)
+     {
+      t.accepted++;
+      t.lastFailed = 0;
+      t.lastFailedBar = 0;
+      TrailSave(t);
+     }
+   else
+     {
+      t.rejected++;
+      t.lastFailed = req;
+      t.lastFailedBar = bar;
+      if(rc == TRADE_RETCODE_MARKET_CLOSED) t.closedBar = bar;
+      Print("OBM1 trail: position ", t.ticket, " stop ", Fmt(req), " rejected, retcode ", rc, ", stop on position ",
+            Fmt(slRead), " kept");
+     }
+#ifdef RESEARCH_LOG
+   RL_SlMove(t, tk, req, posSl, slRead, (long)rc, acc ? "accepted" : "rejected");
+#endif
+  }
+
+// tick step 1b: every trailed position of this EA, one by one
+void ManageTrails(const MqlTick &tk)
+  {
+   if(!EnableTrailingStop) return;
+   datetime bar = MinuteOf(tk.time_msc);
+   for(int i = ArraySize(gTr) - 1; i >= 0; i--)
+     {
+      if(!PositionSelectByTicket(gTr[i].ticket))
+        {
+         // closed: tracked positions were already finished in SyncTrades; this is a restored one
+         TrailForget(gTr[i].ticket);
+         ArrayRemove(gTr, i, 1);
+         continue;
+        }
+      if(!IsOwn(PositionGetString(POSITION_SYMBOL), PositionGetInteger(POSITION_MAGIC))) continue;
+      double posSl = PositionGetDouble(POSITION_SL);
+      double posTp = PositionGetDouble(POSITION_TP);
+      gTr[i].sl = posSl;
+      if(gTr[i].dir == 1) gTr[i].best = MathMax(gTr[i].best, tk.bid);
+      else                gTr[i].best = MathMin(gTr[i].best, tk.ask);
+      if(!gTr[i].active)
+        {
+         bool on = (gTr[i].dir == 1) ? tk.bid >= gTr[i].fill + gTr[i].r0 - gTick / 2.0
+                                     : tk.ask <= gTr[i].fill - gTr[i].r0 + gTick / 2.0;
+         if(!on) continue;
+         gTr[i].active = true;
+         gTr[i].actMsc = tk.time_msc;
+         gTr[i].actBid = tk.bid;
+         gTr[i].actAsk = tk.ask;
+         TrailSave(gTr[i]);
+        }
+      if(gTr[i].closedBar == bar) continue;           // market closed in this minute: retry from the next bar
+      double req = (gTr[i].dir == 1) ? RoundTick(gTr[i].best - gTr[i].r0, false)
+                                     : RoundTick(gTr[i].best + gTr[i].r0, true);
+      bool improves = (gTr[i].dir == 1) ? req >= posSl + gTick - 1e-9 : req <= posSl - gTick + 1e-9;
+      if(!improves) continue;
+      if(gTr[i].lastFailedBar == bar && MathAbs(req - gTr[i].lastFailed) < gTick / 2.0) continue;
+      double price = (gTr[i].dir == 1) ? tk.bid : tk.ask;
+      long stops  = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
+      long freeze = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_FREEZE_LEVEL);
+      if((price - req) * gTr[i].dir < stops * _Point - 1e-9)
+        {
+         TrailNotSent(gTr[i], tk, req, posSl, "stops_level", bar);
+         continue;
+        }
+      if(freeze > 0 && ((price - posSl) * gTr[i].dir <= freeze * _Point + 1e-9 ||
+                        (posTp - price) * gTr[i].dir <= freeze * _Point + 1e-9))
+        {
+         TrailNotSent(gTr[i], tk, req, posSl, "freeze_level", bar);
+         continue;
+        }
+      TrailSend(gTr[i], tk, req, posSl, posTp, bar);
+     }
+  }
+
+// exit of a trailed position: its research row; the saved state is deleted only for a closed position
+void TrailClose(int idx, string exitKind, bool positionClosed)
+  {
+#ifdef RESEARCH_LOG
+   RL_TrailRow(gTr[idx], exitKind);
+#endif
+   if(positionClosed) TrailForget(gTr[idx].ticket);
+   ArrayRemove(gTr, idx, 1);
+  }
+
 // exit detection: the position is gone; its closing deal gives time, price and SL/TP kind
 void SyncPosition(Setup &s)
   {
@@ -1270,7 +1571,10 @@ void SyncPosition(Setup &s)
    long rs = HistoryDealGetInteger(last, DEAL_REASON);
    s.exitMsc   = lastMsc;
    s.exitPrice = HistoryDealGetDouble(last, DEAL_PRICE);
-   s.exitKind  = (rs == DEAL_REASON_SL) ? "sl" : (rs == DEAL_REASON_TP) ? "tp" : "end";
+   int ti = TrailFind(s.posId);
+   bool moved = (ti >= 0 && gTr[ti].accepted > 0);           // the stop on the position had been trailed
+   s.exitKind  = (rs == DEAL_REASON_SL) ? (moved ? "trail" : "sl") : (rs == DEAL_REASON_TP) ? "tp" : "end";
+   if(ti >= 0) TrailClose(ti, s.exitKind, true);
    Ev(s.id, "exit", MinuteOf(s.exitMsc), s.exitMsc, s.exitPrice, EMPTY_VALUE, EMPTY_VALUE, 0, 0, s.exitKind);
    CloseSetup(s);
   }
@@ -1505,6 +1809,7 @@ void TryEntry(Setup &s, const MqlTick &tk)
    gCntFilled++;
    RemoveCands(s.id);                               // R22 never applies after a fill
    Ev(s.id, "fill", MinuteOf(fillMsc), fillMsc, fill, sl, tpSet);
+   if(EnableTrailingStop) TrailRegister(s);
    Print("OBM1 setup #", s.id, " ", DirStr(d), " filled ", DoubleToString(vol, gVolDigits), " @", Fmt(fill),
          " SL ", Fmt(sl), " (", anchor, ") TP ", Fmt(tpSet), " position ", pos, " ", cmt);
   }
@@ -1556,7 +1861,7 @@ void ResetState()
    ArrayResize(gO1, 0); ArrayResize(gH1, 0); ArrayResize(gL1, 0); ArrayResize(gC1, 0); ArrayResize(gT1, 0);
    ArrayResize(gO5, 0); ArrayResize(gH5, 0); ArrayResize(gL5, 0); ArrayResize(gC5, 0); ArrayResize(gT5, 0);
    ArrayResize(gPiv, 0); ArrayResize(gSeq, 0); ArrayResize(gNewPiv, 0); ArrayResize(gUsedOb, 0);
-   ArrayResize(gOb, 0); ArrayResize(S, 0); ArrayResize(gCand, 0);
+   ArrayResize(gOb, 0); ArrayResize(S, 0); ArrayResize(gCand, 0); ArrayResize(gTr, 0);
    gM1 = 0;
    gM5 = 0;
    gLast1 = 0;
@@ -1615,6 +1920,7 @@ int OnInit()
    trade.SetTypeFillingBySymbol(_Symbol);
    trade.SetAsyncMode(false);
    trade.LogLevel(LOG_LEVEL_ERRORS);
+   if(EnableTrailingStop) TrailRestore();           // KTD4: positions left open by an earlier run
 
    // KTD8: warm-up replay of closed M1/M5 bars with trading off (no trading side effects here)
    int w1 = 0, w5 = 0;
@@ -1645,6 +1951,8 @@ void OnDeinit(const int reason)
          S[i].exitMsc   = nowMsc;
          S[i].exitPrice = (S[i].dir == 1) ? bid : ask;
          Ev(S[i].id, "exit", MinuteOf(nowMsc), nowMsc, S[i].exitPrice, EMPTY_VALUE, EMPTY_VALUE, 0, 0, "end");
+         int ti = TrailFind(S[i].posId);
+         if(ti >= 0) TrailClose(ti, "end", false);   // the position stays open: its saved state is kept
          CloseSetup(S[i]);
         }
      }
@@ -1664,6 +1972,7 @@ void OnTick()
    MqlTick tk;
    if(!SymbolInfoTick(_Symbol, tk)) return;
    SyncTrades(tk.time_msc);    // 1. fills and exits
+   ManageTrails(tk);           // 1b. 1R trailing stop (EnableTrailingStop; off = baseline)
    ProcessNewM1Bars(tk);       // 2. newly closed M1 bars: pivots, R6-R8, R22, R13, R10, R12, R11, R14
    ProcessNewM5Bars(tk);       // 3. newly closed M5 bars: new candidates (R3)
    TickChecks(tk);             // 4. touch (R5) and return (R7)

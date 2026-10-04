@@ -1,0 +1,7 @@
+id,timestamp,purpose,role,expert,period,from,to,deposit,status,net_profit,trades,equity_dd_pct,notes
+tr1_off_a,2026-10-05T00:37:25,1R trailing development run off_a,trail_dev,ob_m1_structure_research.ex5,M1,2026.03.01,2026.03.31,10000.0,ok,1805.7,180,14.46,
+tr1_off_b,2026-10-05T00:37:39,1R trailing development run off_b,trail_dev,ob_m1_structure_research.ex5,M1,2026.03.01,2026.03.31,10000.0,ok,657.23,54,10.99,
+tr1_on_a,2026-10-05T00:37:55,1R trailing development run on_a,trail_dev,ob_m1_structure_research.ex5,M1,2026.03.01,2026.03.31,10000.0,ok,1231.09,191,14.97,
+tr1_on_b,2026-10-05T00:38:10,1R trailing development run on_b,trail_dev,ob_m1_structure_research.ex5,M1,2026.03.01,2026.03.31,10000.0,ok,233.75,56,11.68,
+tr1_on_a_delivered,2026-10-05T00:38:25,,trail_twin,ob_m1_structure.ex5,,2026.03.01,2026.03.31,,ok,,,,
+tr1_on_b_delivered,2026-10-05T00:38:38,,trail_twin,ob_m1_structure.ex5,,2026.03.01,2026.03.31,,ok,,,,
