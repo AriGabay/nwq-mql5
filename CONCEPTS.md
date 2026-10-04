@@ -70,6 +70,8 @@ The distance between a position's actual fill price and the stop accepted on it 
 ### 1R trailing stop
 The optional exit change behind `EnableTrailingStop` (default off). From +1R on Bid (long) or Ask (short), the stop follows the best Bid or Ask since the fill at a distance of one Original risk, on every tick and only in the trade's favour; the 2R target does not move. An exit at a stop that had moved is the exit kind `trail`, which is not necessarily a loss.
 
+A rejected stop update is retried only after a fixed wait, and a too-many-requests answer pauses every trail request of the EA for a growing interval, so under rejections the stop on the position can lag the trail rule's level.
+
 ### Recovery attempt
 A new try of an optimization window that failed verification, under its own attempt ID, run IDs and folders. Earlier attempts' records stay as they are, a verified window is never retried, and the tester cache is not deleted.
 
