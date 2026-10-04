@@ -26,11 +26,10 @@ import pandas as pd
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import cli  # noqa: E402
-from mt5r import conformance_m1 as cm, evaluate, reports, trades  # noqa: E402
+from mt5r import conformance_m1 as cm, evaluate, reports, stats, trades  # noqa: E402
 
 OUT = cli.RESULTS / "diagnostics"
-SEED, P = 20260930, 60
-CONTRACT = evaluate.CONTRACT_SIZE
+SEED = stats.SEED
 
 
 def series_runs():
@@ -59,7 +58,7 @@ def run_positions(folder: str, run_id: str):
     tab["position_id"] = pd.to_numeric(tab["position_id"]).astype(float)
     t = tab.merge(s[["position_id", "fill_msc", "exit_msc"]], on="position_id", how="left")
     spread = evaluate.spread_by_day(days)
-    B = cm._Bars(run["bars_m1"], P)
+    B = cm._Bars(run["bars_m1"], cm.M1_S)
     t_ms = np.asarray(B.t, dtype=np.int64) * 1000
     hi_b, lo_b = np.asarray(B.h), np.asarray(B.l)
     rows = []

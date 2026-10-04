@@ -104,7 +104,6 @@ SKIPS = [k for k in mc.SKIP_EVENTS if k != "lost_competition"]
 OUTCOME_KINDS = {"fill", *SKIPS}
 DECISION_KINDS = {"entry_attempt", *OUTCOME_KINDS}
 
-BAR_INT = ["time", "warmup"]
 BAR_FLOAT = ["open", "high", "low", "close", "tick_volume", "spread"]
 PIVOT_INT = ["pivot_id", "peak_time", "conf_time", "replaced_by", "outside_bar"]
 PIVOT_FLOAT = ["level"]
@@ -1083,7 +1082,7 @@ class _Replay:
 
     # ------------------------------------------------------------------
     def _compare(self, s: _Sim):
-        B, sid, tol = self.B, s.sid, self.tol
+        B, sid = self.B, s.sid
         logged = self.ev_by.get(s.sid, [])
         exp_by: dict[str, list[dict]] = {}
         for x in s.exp:

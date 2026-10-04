@@ -24,10 +24,11 @@ def main():
         for who in cli.SERIES:
             o = f["oos"][who]
             rows.append(check("wfo", o["run_id"], o["params"]))
-    acc = cli.RESULTS / "acceptance.json"
-    if acc.exists():
-        cand = json.loads(acc.read_text())["candidate"]
-        for r in json.loads(acc.read_text())["stability"]["rows"]:
+    acc_path = cli.RESULTS / "acceptance.json"
+    if acc_path.exists():
+        acc = json.loads(acc_path.read_text())
+        cand = acc["candidate"]
+        for r in acc["stability"]["rows"]:
             rows.append(check("robustness", r["run_id"], {**cand, **r["perturbation"]}))
     for who, name in cli.HOLDOUT_SETS.items():
         if (cli.RESULTS / "aug_sep_check" / f"holdout_{who}").exists():

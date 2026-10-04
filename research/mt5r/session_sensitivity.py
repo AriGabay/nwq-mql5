@@ -22,7 +22,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-CONTRACT = 100.0
+from .trades import CONTRACT_SIZE as CONTRACT
 QUOTE_ONLY_S = 60
 
 

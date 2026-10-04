@@ -23,6 +23,7 @@ import pandas as pd
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from mt5r import compile as compmod, conformance_m1 as cm, env, explog, ini, runner  # noqa: E402
+from mt5r.session_sensitivity import trigger as _trigger  # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 RUN = json.loads((REPO / "research" / "run_constants.json").read_text())
@@ -121,11 +122,8 @@ def _t(ms):
 
 
 def trigger(dir_, sl, tp, bid, ask):
-    """MT5 position exits: a buy closes on Bid (SL: Bid <= SL, TP: Bid >= TP); a sell on Ask (SL: Ask >= SL,
-    TP: Ask <= TP)."""
-    if dir_ == "L":
-        return "sl" if bid <= sl + 1e-9 else "tp" if bid >= tp - 1e-9 else None
-    return "sl" if ask >= sl - 1e-9 else "tp" if ask <= tp + 1e-9 else None
+    """MT5 position exits for side "L"/"S" (session_sensitivity.trigger: a buy on Bid, a sell on Ask)."""
+    return _trigger(1 if dir_ == "L" else -1, sl, tp, bid, ask)
 
 
 def cmd_analyze(tag=RUN_ID, out=OUT):
@@ -255,8 +253,7 @@ def cmd_charts(tag=RUN_ID, out=OUT, picks=("A #4368", "A #2916", "A #5617", "A #
         ax.axvline(60, color="#6b6a64", lw=0.8, ls=":")
         for lvl, col, lab in ((c.sl, "#e34948", "SL"), (c.tp, "#008300", "TP")):
             ax.axhline(lvl, color=col, ls="--", lw=1.1)
-            ax.text(ax.get_xlim()[1] if False else x(g0 + PAD_S * 1000), lvl, f" {lab} {lvl:.2f}", color=col, fontsize=8,
-                    va="center")
+            ax.text(x(g0 + PAD_S * 1000), lvl, f" {lab} {lvl:.2f}", color=col, fontsize=8, va="center")
         o = orders[(orders.tick_msc >= g0) & (orders.tick_msc < g0 + 120_000)]
         notes = []
         for r in o.itertuples():

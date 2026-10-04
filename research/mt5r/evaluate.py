@@ -12,7 +12,6 @@ from . import limits, metrics, montecarlo, reports, stats, stress, trades
 REPO = pathlib.Path(__file__).resolve().parents[2]
 CONTRACT_SIZE = 100.0   # XAUUSD.s (run_constants symbol_spec.contract_size)
 POINT = 0.01            # XAUUSD.s, 2 digits: slippage points -> price
-bar_minutes = metrics.bar_minutes
 RECOMMENDED_NOTE = ("R33: no recommended .set in this research - no independent period exists (August-September is "
                     "a non-independent historical check, R31); at most candidate.set with a forward-test protocol.")
 
@@ -43,6 +42,11 @@ def window_days(start: str, end: str) -> int:
     """Calendar days in an inclusive YYYY.MM.DD window."""
     f = lambda s: dt.datetime.strptime(s, "%Y.%m.%d").date()
     return (f(end) - f(start)).days + 1
+
+
+def fills_per_month(n: int, start: str, end: str, per_month: float = 30.44) -> float:
+    """Fills per `per_month` days over an inclusive YYYY.MM.DD window (KTD14 frequency)."""
+    return round(n / window_days(start, end) * per_month, 4)
 
 
 def daily_pnl(days: pd.DataFrame) -> pd.Series:
@@ -126,7 +130,7 @@ def evaluate(series: dict, base, fold_rows: list, stability_share, var_sr: float
     August-September is not a criterion (R31). An empty series fails every evaluated criterion.
     """
     A, S = prereg["acceptance"], prereg["stats"]
-    bm = bar_minutes(A.get("event_bar", prereg.get("chart_period", "M1")))
+    bm = metrics.bar_minutes(A.get("event_bar", prereg.get("chart_period", "M1")))
     tr, days = series["trades"], series["days"]
     empty = len(tr) == 0
     crit = {}

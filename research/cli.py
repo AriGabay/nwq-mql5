@@ -7,8 +7,8 @@ Order: setup (once per machine, then one manual GUI login by the user) -> instal
 
 Guards: every step that runs the tester refuses while the live terminal runs (runner.run). wfo, freeze, holdout,
 robustness and deliver refuse on a missing or uncommitted pre-registration (git errors count as uncommitted).
-holdout also refuses unless the frozen .set files are committed, and runs at most once per EA source hash
-and .set hash (a run without a report may be repeated).
+holdout also refuses unless the frozen .set files are committed, and runs once per variant: any logged run
+with a report counts, whatever its EA or .set hash; only a run without a report may be repeated.
 """
 import argparse
 import hashlib
@@ -37,9 +37,8 @@ PILOT = RESULTS / "pilot" / "pilot_summary.json"
 PREREG_REL = "research/preregistration.json"
 ORIG_SET, A_SET, B_SET, CAND_SET = ("ob_m1_structure_original.set", "ob_m1_structure_variant_a.set",
                                     "ob_m1_structure_variant_b.set", "ob_m1_structure_candidate.set")
-BASE_SET = A_SET                                                  # the baseline is variant A as tested
 WFO_WINDOW = list(RUN["windows"]["wfo"])
-DAYS_PER_MONTH, FILL_TARGET = 30.44, 15          # R20 / KTD12
+DAYS_PER_MONTH, FILL_TARGET = 30.44, 15          # R28 pilot target; the frozen values live in the prereg
 CHART_PERIOD = m1_contract.CHART_PERIOD                          # the EA runs on the M1 chart (KTD1)
 VARIANTS = {"A": 0, "B": 1}                                     # StructureVariant (R11)
 
@@ -64,12 +63,12 @@ def committed(path: str) -> bool:
 
 
 def prereg_committed() -> dict:
-    """The committed pre-registration, refused when the EA source differs from the one it registered (R21)."""
+    """The committed pre-registration, refused when the EA source differs from the one it registered (R29)."""
     if not committed(PREREG_REL):
         raise SystemExit("research/preregistration.json is missing or has uncommitted changes; refusing to run")
     P = pipeline.prereg()
     if P.get("ea_source_sha256") != ea_sha():
-        raise SystemExit("the EA source differs from the pre-registered ea_source_sha256; refusing to run (R21)")
+        raise SystemExit("the EA source differs from the pre-registered ea_source_sha256; refusing to run (R29)")
     return P
 
 
@@ -244,7 +243,7 @@ def pilot_summary(per_variant: dict, window: list) -> dict:
         fills = int((dl["type"].isin([0, 1]) & (dl["entry"] == 0)).sum())
         reasons = x["setups"]["reason"].astype(str).value_counts() if "reason" in x["setups"] else {}
         runs[name] = {"run_id": x["run_id"], "fills": fills, "days": days,
-                      "fills_per_month": round(fills / days * DAYS_PER_MONTH, 4),
+                      "fills_per_month": evaluate.fills_per_month(fills, *window),
                       "funnel": {k: int(v) for k, v in x["funnel"].items()},
                       "reasons": {str(k): int(v) for k, v in dict(reasons).items()}}
     return {"window": list(window), "days_per_month": DAYS_PER_MONTH, "target_fills_per_month": FILL_TARGET,
@@ -310,8 +309,8 @@ def cmd_tickcov(args) -> None:
         y, mo = map(int, m.split("."))
         start, end = f"{m}.01", f"{m}.{calendar.monthrange(y, mo)[1]:02d}"
         run_id = f"tickcov_{y}{mo:02d}"
-        res, rep = pipeline.run_single(cfg, run_id, "research", CHART_PERIOD, start, end,
-                                       overrides={"StructureVariant": 0}, role="tick_coverage",
+        pipeline.run_single(cfg, run_id, "research", CHART_PERIOD, start, end,
+                            overrides={"StructureVariant": 0}, role="tick_coverage",
                                        purpose="real-tick coverage per month (journal tick lines only)")
         f = journal.run_facts(runner.RUNS / run_id)
         per_month[m] = {k: f[k] for k in ("discarded_days", "discarded_minutes", "total_minute_bars",
@@ -446,7 +445,7 @@ def tested_values(params: dict) -> dict:
 
 def cmd_freeze(args) -> None:
     """Write the original (code defaults), variant A, variant B and candidate .set files before August-September."""
-    P = prereg_committed()
+    prereg_committed()                 # the guards (committed prereg, registered EA source)
     if (DELIV / CAND_SET).exists() and committed(_rel(DELIV / CAND_SET)):
         raise SystemExit(f"{CAND_SET} is already frozen and committed (R31)")
     sel = json.loads(FINAL.read_text())
@@ -504,7 +503,7 @@ def cmd_holdout(args) -> None:
                     "input_mismatches": pipeline.check_inputs_loaded(rep, vals),
                     "conformance_violations": conformance_report(run_id, "aug_sep_check")["violations"],
                     "net_profit": x["summary"]["net_profit"], "fills": len(x["trades"]),
-                    "fills_per_month": round(len(x["trades"]) / evaluate.window_days(start, end) * DAYS_PER_MONTH, 4),
+                    "fills_per_month": evaluate.fills_per_month(len(x["trades"]), start, end),
                     "tester_equity_dd_pct": x["summary"]["equity_dd_pct"],
                     "tester_balance_dd_pct": x["summary"]["balance_dd_pct"], **evaluate.drawdowns(st),
                     "first_breach": limits.first_breach(x["days"], initial=x["deposit"])}
@@ -527,7 +526,7 @@ def _stitch_runs(run_ids: list, root) -> dict:
 def _series_view(s: dict, start: str, end: str) -> dict:
     tab = s["table"]
     return {"net": round(float(s["net_profit"]), 2), "fills": int(len(s["trades"])),
-            "fills_per_month": round(len(s["trades"]) / evaluate.window_days(start, end) * DAYS_PER_MONTH, 4),
+            "fills_per_month": evaluate.fills_per_month(len(s["trades"]), start, end),
             "win_rate": round(float((tab["net"] > 0).mean()), 4) if len(tab) else 0.0,
             **evaluate.drawdowns(s)}
 
@@ -573,8 +572,15 @@ def cmd_robustness(args) -> None:
     series = {w: _stitch_runs(ids[w], root) for w in SERIES}
     win = [P["folds"][0]["test"][0], P["folds"][-1]["test"][1]]
     G, R = P["reporting"]["generated_ticks"]["folds_group_G"], P["reporting"]["generated_ticks"]["folds_group_R"]
-    pick = lambda w, grp: [f["oos"][w]["run_id"] for f in folds if f["fold"] in grp]  # noqa: E731
-    span = lambda grp: [P["folds"][grp[0] - 1]["test"][0], P["folds"][grp[-1] - 1]["test"][1]]  # noqa: E731
+
+    def pick(w, grp):
+        return [f["oos"][w]["run_id"] for f in folds if f["fold"] in grp]
+
+    def span(grp):
+        return [P["folds"][grp[0] - 1]["test"][0], P["folds"][grp[-1] - 1]["test"][1]]
+
+    def fold_net(w, grp=None):
+        return [{"fold": f["fold"], "net": f["oos"][w]["net_profit"]} for f in folds if grp is None or f["fold"] in grp]
 
     # KTD15 stability: the candidate and one constant moved at a time, March-July; never used for selection
     st = P["stability"]
@@ -592,25 +598,21 @@ def cmd_robustness(args) -> None:
     share = float(np.mean([r["net"] > 0 for r in rows[1:]]))
 
     tv = evaluate.trial_sharpe_variance(sorted(root.glob("*_selection/scored_grid.csv")))
-    fold_net = lambda w, grp=None: [{"fold": f["fold"], "net": f["oos"][w]["net_profit"]} for f in folds  # noqa: E731
-                                    if grp is None or f["fold"] in grp]
-    acc = {"procedure": evaluate.evaluate(series["procedure"], series["fixed_a"], fold_net("procedure"), share,
-                                          tv["var_sr"], P),
-           "fixed_a": evaluate.evaluate(series["fixed_a"], None, fold_net("fixed_a"),
-                                        share if cand_series == "fixed_a" else None, tv["var_sr"], P),
-           "fixed_b": evaluate.evaluate(series["fixed_b"], series["fixed_a"], fold_net("fixed_b"),
-                                        share if cand_series == "fixed_b" else None, tv["var_sr"], P)}
+    # fixed A is the baseline (base None); stability belongs to the procedure and the candidate's own series
+    acc = {w: evaluate.evaluate(series[w], None if w == "fixed_a" else series["fixed_a"], fold_net(w),
+                                share if w in ("procedure", cand_series) else None, tv["var_sr"], P)
+           for w in SERIES}
     group_r = {w: _stitch_runs(pick(w, R), root) for w in SERIES}
     acc_r = evaluate.evaluate(group_r["procedure"], group_r["fixed_a"], fold_net("procedure", R), share,
                               tv["var_sr"], P, window=span(R))
-    groups = {}
-    for w in SERIES:
-        for name, grp in (("all", None), ("G", G), ("R", R)):
-            s = series[w] if grp is None else (group_r[w] if name == "R" else _stitch_runs(pick(w, grp), root))
-            groups.setdefault(w, {})[name] = _series_view(s, *(win if grp is None else span(grp)))
+    groups = {w: {"all": _series_view(series[w], *win),
+                  "G": _series_view(_stitch_runs(pick(w, G), root), *span(G)),
+                  "R": _series_view(group_r[w], *span(R))} for w in SERIES}
+    train_generated = {x["fold"]: x["train_cov"]["generated_pct"]
+                       for x in json.loads(TICKCOV.read_text())["folds"]}
     fold_rows = [{"fold": f["fold"], "test": f["test"], "selected": f["selection"]["params"],
                   "status": f["selection"]["status"],
-                  "train_generated_pct": {1: 39.06, 2: 4.15}.get(f["fold"], 0.0),
+                  "train_generated_pct": train_generated[f["fold"]],
                   **{f"{w}_net": f["oos"][w]["net_profit"] for w in SERIES},
                   **{f"{w}_fills": f["oos"][w]["trades"] for w in SERIES},
                   **{f"{w}_tester_equity_dd_pct": f["oos"][w]["equity_dd_pct"] for w in SERIES},
@@ -743,7 +745,7 @@ def main() -> None:
     s.add_argument("--run-id")
     sub.add_parser("freeze-rules", help="write research/preregistration.json (R29, KTD14)")
     for name, text in (("wfo", "walk-forward folds and final selection"), ("freeze", "write the .set files"),
-                       ("holdout", "run the frozen holdout once"), ("robustness", "R25 evidence and R29 evaluation"),
+                       ("holdout", "run the frozen holdout once"), ("robustness", "R32 robustness and KTD14 acceptance"),
                        ("deliver", "validate .set files, tables and charts")):
         sub.add_parser(name, help=text)
     args = ap.parse_args()
