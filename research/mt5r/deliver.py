@@ -11,7 +11,6 @@ from .textio import read_text  # noqa: E402
 
 BLUE, ORANGE, AQUA = "#2a78d6", "#eb6834", "#1baf7a"   # validated categorical slots 1-3 (light surface)
 INK, MUTED, SURFACE = "#1f1f1e", "#6b6a64", "#fcfcfb"
-CODE_DEFAULT_TF = "M15"   # SignalTF default in mql5/Experts/ob_fvg_retest.mq5 (interface contract)
 
 
 def parameter_table(prereg: dict, candidate: dict) -> str:
@@ -21,12 +20,10 @@ def parameter_table(prereg: dict, candidate: dict) -> str:
     for p, values in grid.items():
         rng = ", ".join(str(v) for v in values) + (" (categorical)" if p in cat else "")
         why = ("unchanged: selected value equals the default" if candidate[p] == defaults[p]
-               else "pre-registered selection on the final train window (KTD12)")
+               else "pre-registered selection on the final train window (KTD14)")
         rows.append(f"| `{p}` | {defaults[p]} | {candidate[p]} | {rng} | {why} |")
-    rows.append(f"| `SignalTF` | {CODE_DEFAULT_TF} | {prereg['period']} | M5, M15 (pilot) | "
-                "frequency pilot rule (R20) |")
-    rows.append("| all other inputs | code defaults | code defaults | not optimized | fixed by KTD12 "
-                "(risk 1%, 3 exposures, RR 2.0) |")
+    rows.append("| all other inputs | code defaults | code defaults | not optimized | fixed by KTD14 "
+                "(N = 3, buffer 20 points, risk 1%, 3 positions, RR 2.0, warm-up 30 days) |")
     return "\n".join(rows)
 
 
@@ -109,11 +106,11 @@ def _save(fig, out, name) -> str:
 
 
 def should_write_recommended(acc_json: dict) -> bool:
-    """Always False in this research (R30).
+    """Always False in this research (R33).
 
     A recommended .set needs validation on an independent period. Every real-tick period is exposed
-    (R24: the holdout is labelled non-independent), so even a full R29 pass yields only the candidate
-    with a forward-test protocol. Kept as a function so the deliver step has one place that decides.
+    (R31: August-September is a non-independent historical check), so even a full acceptance pass yields only
+    the candidate with a forward-test protocol. Kept as a function so the deliver step has one place that decides.
     """
     return False
 

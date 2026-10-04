@@ -105,3 +105,20 @@ def test_check_inputs_loaded_float_tolerant():
     assert pipeline.check_inputs_loaded(rep, {"RiskPercent": 1.0, "StructureVariant": 1}) == []
     assert pipeline.check_inputs_loaded(rep, {"StructureVariant": 0, "Missing": 1}) == [
         ("StructureVariant", 0, "1"), ("Missing", 1, None)]
+
+
+def test_preregistration_freezes_the_two_variant_protocol():
+    """U8: grid exactly StructureVariant {0, 1}; DSR trials = 2 x 5 folds + the 2 pilot runs; August-September
+    is not an acceptance criterion; KTD15 stability moves one constant at a time; fixed constants from the EA."""
+    p = pipeline.build_prereg(["pilot_a", "pilot_b"], "sha", pipeline.GATE_RECORD)
+    assert p["grid"] == {"StructureVariant": [0, 1]} and p["defaults"] == {"StructureVariant": 0}
+    assert p["passes_per_fold"] == 2 and len(p["folds"]) == 5
+    assert p["stats"]["dsr_trials"] == 12 and p["stats"]["pilot_runs"] == ["pilot_a", "pilot_b"]
+    assert not any("holdout" in k for k in p["acceptance"]) and p["holdout_independent"] is False
+    assert p["holdout"] == ["2026.08.01", "2026.09.29"] and "לא עצמאית" in p["holdout_label"]
+    assert p["stability"]["runs"] == [{"SwingStrengthM1": 2}, {"SwingStrengthM1": 4}, {"StopBufferPoints": 10},
+                                      {"StopBufferPoints": 40}]
+    assert p["fixed_constants"]["SwingStrengthM1"] == "3" and p["fixed_constants"]["StopBufferPoints"] == "20"
+    assert p["acceptance"]["entry_slippage_points"] == 10 and p["selection"]["max_equity_dd_pct"] == 10.0
+    assert p["reporting"]["generated_ticks"]["folds_group_R"] == [3, 4, 5]
+    assert p["final_train"] == ["2026.05.01", "2026.07.31"] and p["chart_period"] == "M1"

@@ -90,3 +90,10 @@ def test_trade_table_without_setups_file(tmp_path):
 def test_exit_kind_falls_back_to_exit_deal_comment(tmp_path):
     t = trades.trade_table(pd.DataFrame(columns=["position_id"]), _deals(tmp_path))
     assert list(t["exit_kind"]) == ["tp", "sl", "tp"]
+
+
+def test_m1_log_request_price_is_the_intended_entry(tmp_path):
+    """The M5/M1 EA logs the Market request price as request_price (m1_contract); it is the intended entry."""
+    setups = pd.read_csv(io.StringIO(SETUPS)).rename(columns={"entry": "request_price"})
+    t = trades.trade_table(setups, _deals(tmp_path)).set_index("setup_id")
+    assert t.loc[1, "intended_entry"] == 2000.0 and t.loc[1, "planned_rr"] == pytest.approx(2.0)

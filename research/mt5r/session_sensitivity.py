@@ -61,9 +61,8 @@ def _max_dd_pct(times, nets, deposit) -> float:
     return float(np.max((peak - bal) / peak) * 100)
 
 
-def evaluate(setups: pd.DataFrame, deals: pd.DataFrame, alt: pd.DataFrame) -> dict:
-    """Primary vs sensitivity: net and closed-balance max drawdown of one run. setups: rl_setups (filled rows with
-    position_id, exit_msc, exit_price, exit_kind, dir, volume); deals: rl_deals; alt: alt_exits() for this run."""
+def _positions(setups: pd.DataFrame, deals: pd.DataFrame, alt: pd.DataFrame):
+    """(deposit, primary positions, re-priced positions, outcome flips) of one run. Each frame: net, t (exit ms)."""
     d = deals.copy()
     for c in ("type", "position_id", "profit", "commission", "swap"):
         d[c] = pd.to_numeric(d[c], errors="coerce")
@@ -82,8 +81,25 @@ def evaluate(setups: pd.DataFrame, deals: pd.DataFrame, alt: pd.DataFrame) -> di
     g.loc[hit, "net"] = g.loc[hit, "net"] + delta[hit]
     g.loc[hit, "t"] = g.loc[hit, "setup_id"].map(alt["alt_msc"]).astype("int64")
     flips = int((g.loc[hit, "setup_id"].map(alt["alt_kind"]) != g.loc[hit, "exit_kind"]).sum())
-    return {"deposit": deposit, "positions": int(len(f)), "affected": int(hit.sum()), "outcome_flips": flips,
+    return deposit, f, g, int(hit.sum()), flips
+
+
+def evaluate_series(parts: list) -> dict:
+    """Primary vs sensitivity over chained runs [(setups, deals, alt), ...] in time order: the first run's
+    deposit starts one closed-balance curve through all of them."""
+    got = [_positions(*p) for p in parts]
+    deposit = got[0][0]
+    f = pd.concat([x[1][["net", "t"]] for x in got], ignore_index=True)
+    g = pd.concat([x[2][["net", "t"]] for x in got], ignore_index=True)
+    return {"deposit": deposit, "positions": int(len(f)), "affected": sum(x[3] for x in got),
+            "outcome_flips": sum(x[4] for x in got),
             "net_primary": round(float(f["net"].sum()), 2), "net_sensitivity": round(float(g["net"].sum()), 2),
             "net_delta": round(float(g["net"].sum() - f["net"].sum()), 2),
             "max_dd_closed_pct_primary": round(_max_dd_pct(f["t"], f["net"], deposit), 3),
             "max_dd_closed_pct_sensitivity": round(_max_dd_pct(g["t"], g["net"], deposit), 3)}
+
+
+def evaluate(setups: pd.DataFrame, deals: pd.DataFrame, alt: pd.DataFrame) -> dict:
+    """Primary vs sensitivity: net and closed-balance max drawdown of one run. setups: rl_setups (filled rows with
+    position_id, exit_msc, exit_price, exit_kind, dir, volume); deals: rl_deals; alt: alt_exits() for this run."""
+    return evaluate_series([(setups, deals, alt)])

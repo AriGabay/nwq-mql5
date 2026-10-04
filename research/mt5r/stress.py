@@ -1,4 +1,4 @@
-"""R25 cost stress applied to closed trades: wider spread and adverse slippage on stop exits."""
+"""Cost stress applied to closed trades: wider spread, adverse slippage on stop exits and on Market entries."""
 import pandas as pd
 
 
@@ -30,6 +30,11 @@ def stop_slippage_cost(trades_df, contract_size, points, point) -> pd.Series:
     """
     is_sl = trades_df["exit_kind"].astype(str).str.lower().eq("sl")
     return (float(points) * float(point) * float(contract_size) * trades_df["volume"].astype(float)).where(is_sl, 0.0)
+
+
+def entry_slippage_cost(trades_df, contract_size, points, point) -> pd.Series:
+    """Adverse slippage on every Market entry: points * point * contract_size * volume (USD) per trade."""
+    return float(points) * float(point) * float(contract_size) * trades_df["volume"].astype(float)
 
 
 def apply(trades_df, extra, commission_scale=1.0) -> pd.DataFrame:

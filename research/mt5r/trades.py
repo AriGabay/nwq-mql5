@@ -36,6 +36,8 @@ def trade_table(setups: pd.DataFrame, deals: pd.DataFrame, contract_size: float 
     pos["net"] = pos["gross_profit"] + pos["commission"] + pos["swap"]
 
     keep = ["setup_id", "dir", "entry", "sl", "tp", "volume", "fill_price", "exit_kind", "reason", "position_id"]
+    if "entry" not in setups.columns and "request_price" in setups.columns:   # M5/M1 EA log contract
+        setups = setups.rename(columns={"request_price": "entry"})
     s = setups.reindex(columns=keep)
     s["position_id"] = _num(s["position_id"])
     s = s[s["position_id"].notna()]

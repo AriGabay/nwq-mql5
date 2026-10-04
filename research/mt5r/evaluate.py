@@ -1,4 +1,4 @@
-"""Evidence assembly and the R29 acceptance evaluation (KTD12 thresholds from the pre-registration)."""
+"""Evidence assembly and the acceptance evaluation (KTD14 thresholds from the pre-registration)."""
 import datetime as dt
 import json
 import math
@@ -13,8 +13,8 @@ REPO = pathlib.Path(__file__).resolve().parents[2]
 CONTRACT_SIZE = 100.0   # XAUUSD.s (run_constants symbol_spec.contract_size)
 POINT = 0.01            # XAUUSD.s, 2 digits: slippage points -> price
 bar_minutes = metrics.bar_minutes
-RECOMMENDED_NOTE = ("R30: no recommended .set in this research - no independent period exists (the holdout is "
-                    "non-independent, R24); the candidate is delivered as not validated with a forward-test protocol.")
+RECOMMENDED_NOTE = ("R33: no recommended .set in this research - no independent period exists (August-September is "
+                    "a non-independent historical check, R31); at most candidate.set with a forward-test protocol.")
 
 
 def load_run(run_id: str, root: pathlib.Path = None) -> dict:
@@ -56,15 +56,37 @@ def spread_by_day(days: pd.DataFrame) -> pd.Series:
     return pd.Series(days["spread_median"].values, index=days["date"].dt.normalize())
 
 
-def cost_stress(stitched: dict, k_spread: float, slippage_points: float) -> dict:
-    """Net after +k x the day's median spread on every trade and adverse slippage on every SL exit."""
+def cost_stress(stitched: dict, k_spread: float, slippage_points: float, entry_points: float = 0.0) -> dict:
+    """Net after +k x the day's median spread on every trade, adverse slippage on every SL exit and on every
+    Market entry (KTD14)."""
     tab = stitched["table"]
     if tab.empty:
-        return {"stressed_net": 0.0, "spread_cost": 0.0, "slippage_cost": 0.0, "stop_exits": 0}
+        return {"stressed_net": 0.0, "spread_cost": 0.0, "slippage_cost": 0.0, "entry_slippage_cost": 0.0,
+                "stop_exits": 0}
     extra = stress.extra_cost(tab, CONTRACT_SIZE, k_spread, spread_by_day(stitched["days"]))
     slip = stress.stop_slippage_cost(tab, CONTRACT_SIZE, slippage_points, POINT)
-    return {"stressed_net": float(tab["net"].sum() - extra.sum() - slip.sum()), "spread_cost": float(extra.sum()),
-            "slippage_cost": float(slip.sum()), "stop_exits": int((slip > 0).sum())}
+    entry = stress.entry_slippage_cost(tab, CONTRACT_SIZE, entry_points, POINT)
+    return {"stressed_net": float(tab["net"].sum() - extra.sum() - slip.sum() - entry.sum()),
+            "spread_cost": float(extra.sum()), "slippage_cost": float(slip.sum()),
+            "entry_slippage_cost": float(entry.sum()), "stop_exits": int((slip > 0).sum())}
+
+
+def drawdowns(stitched: dict) -> dict:
+    """Two drawdowns of one (stitched) series, reported apart (gate decision): the closed-trade balance drawdown
+    from the position results in exit order, and the equity drawdown from the daily equity records (running
+    peak of daily equity high vs each day's equity low). Percent of the running peak."""
+    out = {"balance_dd_pct": 0.0, "equity_dd_pct": 0.0}
+    tab, days, init = stitched["table"], stitched["days"], float(stitched["initial"])
+    if not tab.empty:
+        bal = init + tab.sort_values("close_time", kind="mergesort")["net"].cumsum().to_numpy(float)
+        bal = np.concatenate([[init], bal])
+        peak = np.maximum.accumulate(bal)
+        out["balance_dd_pct"] = _f(float(np.max((peak - bal) / peak) * 100), 3)
+    if not days.empty:
+        hi = np.maximum.accumulate(np.concatenate([[init], days["eq_max"].to_numpy(float)]))[:-1]
+        hi = np.maximum(hi, days["eq_open"].to_numpy(float))
+        out["equity_dd_pct"] = _f(float(np.max((hi - days["eq_min"].to_numpy(float)) / hi) * 100), 3)
+    return out
 
 
 def _f(x, nd=4) -> float:
@@ -93,29 +115,38 @@ def trial_sharpe_variance(scored_grid_paths) -> dict:
                                               "training grids, passes with trades, variance averaged over grids"}
 
 
-def evaluate(proc: dict, base: dict, fold_rows: list, neighbors: dict, var_sr: float, holdout, prereg: dict) -> dict:
-    """R29 criteria on the chained OOS (proc) and the holdout; thresholds come from the pre-registration.
+def evaluate(series: dict, base, fold_rows: list, stability_share, var_sr: float, prereg: dict,
+             window: list = None) -> dict:
+    """KTD14 criteria on one chained OOS series; thresholds come from the pre-registration.
 
-    proc/base/holdout are stitched dicts (days, trades, table, initial, net_profit); fold_rows carry
-    procedure_net per fold; neighbors carries profitable_share. Empty OOS fails every criterion.
+    series/base are stitched dicts (days, trades, table, initial, net_profit); base None means the series is the
+    baseline itself. fold_rows carry "net" per fold used; the positive-fold rule is a strict majority of them.
+    stability_share None means not run for this series: the criterion is reported as not evaluated and left
+    out of passed_all (evaluated_all says so). window: the OOS span [start, end] (default: all folds).
+    August-September is not a criterion (R31). An empty series fails every evaluated criterion.
     """
     A, S = prereg["acceptance"], prereg["stats"]
-    bm = bar_minutes(prereg["period"])
-    tr, days = proc["trades"], proc["days"]
+    bm = bar_minutes(A.get("event_bar", prereg.get("chart_period", "M1")))
+    tr, days = series["trades"], series["days"]
     empty = len(tr) == 0
     crit = {}
 
-    def c(key, value, threshold, ok, note=""):
-        crit[key] = {"value": value, "threshold": threshold, "pass": bool(ok) and not (empty and key != "holdout"),
-                     "note": note}
+    def c(key, value, threshold, ok, note="", evaluated=True):
+        crit[key] = {"value": value, "threshold": threshold, "evaluated": evaluated,
+                     "pass": (bool(ok) and not empty) if evaluated else None, "note": note}
 
-    oos_days = window_days(prereg["folds"][0]["test"][0], prereg["folds"][-1]["test"][1])
-    fq = _frequency(len(tr), oos_days, A["days_per_month"])
+    window = window or [prereg["folds"][0]["test"][0], prereg["folds"][-1]["test"][1]]
+    fq = _frequency(len(tr), window_days(*window), A["days_per_month"])
     c("oos_frequency", fq, f">= {A['min_fills_per_month']} fills per {A['days_per_month']} days",
       fq["fills_per_month"] >= A["min_fills_per_month"])
 
-    net, bnet = float(proc["net_profit"]), float(base["net_profit"])
-    c("oos_net", {"net": _f(net, 2), "baseline_net": _f(bnet, 2)}, "> 0 and > baseline net", net > 0 and net > bnet)
+    net = float(series["net_profit"])
+    if base is None:
+        c("oos_net", {"net": _f(net, 2), "baseline_net": _f(net, 2)}, "> 0 (this series is the baseline)", net > 0)
+    else:
+        bnet = float(base["net_profit"])
+        c("oos_net", {"net": _f(net, 2), "baseline_net": _f(bnet, 2)}, "> 0 and > baseline net",
+          net > 0 and net > bnet)
 
     pnl = daily_pnl(days).to_numpy(float)
     lo = hi = 0.0
@@ -126,8 +157,8 @@ def evaluate(proc: dict, base: dict, fold_rows: list, neighbors: dict, var_sr: f
       f"{1 - A['bootstrap_alpha']:.0%} lower bound > 0 (block {S['mean_block_days']}, "
       f"{S['bootstrap_resamples']} resamples, seed {S['seed']})", lo > 0)
 
-    k = sum(1 for r in fold_rows if r["procedure_net"] > 0)
-    c("positive_folds", k, f">= {A['min_positive_folds']} of {len(fold_rows)}", k >= A["min_positive_folds"])
+    k, n = sum(1 for r in fold_rows if r["net"] > 0), len(fold_rows)
+    c("positive_folds", k, f"strict majority: >= {n // 2 + 1} of {n}", k >= n // 2 + 1)
 
     ev = metrics.trade_events(tr, bm) if not empty else pd.DataFrame({"profit_net": []})
     top = int(A["remove_top_events"])
@@ -135,9 +166,9 @@ def evaluate(proc: dict, base: dict, fold_rows: list, neighbors: dict, var_sr: f
     c("top_events_removed", {"n_events": len(ev), "bar_minutes": bm, "net_without_top": _f(wo, 2)},
       f"net after removing the top {top} trade events > 0", wo > 0)
 
-    breach = limits.first_breach(days, initial=proc["initial"]) if not days.empty else None
+    breach = limits.first_breach(days, initial=series["initial"]) if not days.empty else None
     mc = (montecarlo.block_bootstrap_paths(days, horizon=S["mc_horizon_days"], n_paths=S["mc_paths"],
-                                           mean_block=S["mean_block_days"], seed=S["seed"], initial=proc["initial"])
+                                           mean_block=S["mean_block_days"], seed=S["seed"], initial=series["initial"])
           if len(days) >= 2 else {"breach_prob": 1.0})
     mc_view = {k2: (int(v) if isinstance(v, (int, np.integer)) else _f(v)) for k2, v in mc.items()
                if k2 != "breach_day" and isinstance(v, (int, float, np.integer, np.floating))}
@@ -146,17 +177,20 @@ def evaluate(proc: dict, base: dict, fold_rows: list, neighbors: dict, var_sr: f
       breach is None and mc["breach_prob"] <= A["mc_breach_prob_max"],
       f"first breach {breach}" if breach else ("no daily records" if len(days) < 2 else ""))
 
-    cs = cost_stress(proc, A["spread_stress_k"], A["stop_slippage_points"])
+    cs = cost_stress(series, A["spread_stress_k"], A["stop_slippage_points"], A.get("entry_slippage_points", 0))
     c("cost_stress", {k2: _f(v, 2) if isinstance(v, float) else v for k2, v in cs.items()},
-      f"> 0 after +{A['spread_stress_k']}x spread and {A['stop_slippage_points']} points on every SL exit",
-      cs["stressed_net"] > 0)
+      f"> 0 after +{A['spread_stress_k']}x spread, {A['stop_slippage_points']} points on every SL exit and "
+      f"{A.get('entry_slippage_points', 0)} points on every Market entry", cs["stressed_net"] > 0)
 
-    share = neighbors.get("profitable_share", math.nan) if neighbors else math.nan
-    share = float(share) if share is not None else math.nan
-    c("neighbors", _f(share), f">= {A['min_neighbor_profitable_share']}",
-      math.isfinite(share) and share >= A["min_neighbor_profitable_share"])
+    if stability_share is None:
+        c("stability", 0.0, f">= {A['min_stability_profitable_share']}", False, "not run for this series",
+          evaluated=False)
+    else:
+        share = float(stability_share)
+        c("stability", _f(share), f">= {A['min_stability_profitable_share']} of the 4 KTD15 perturbations",
+          math.isfinite(share) and share >= A["min_stability_profitable_share"])
 
-    r = pnl / proc["initial"]
+    r = pnl / series["initial"]
     if empty or len(r) < 2:
         c("dsr", {"n_days": len(r), "psr_value": 0.0}, A["dsr_min"], False, "no trades")
     elif len(r) < A["dsr_min_days"]:
@@ -167,19 +201,9 @@ def evaluate(proc: dict, base: dict, fold_rows: list, neighbors: dict, var_sr: f
                   "trials": S["dsr_trials"], "var_sr": _f(var_sr, 8)}, A["dsr_min"],
           math.isfinite(d["psr_value"]) and d["psr_value"] >= A["dsr_min"])
 
-    hd = window_days(*prereg["holdout"])
-    if holdout is None:
-        c("holdout", {**_frequency(0, hd, A["days_per_month"]), "net": 0.0, "breach": 0}, "", False, "not run")
-    else:
-        hf = _frequency(len(holdout["trades"]), hd, A["days_per_month"])
-        hb = limits.first_breach(holdout["days"], initial=holdout["initial"]) if not holdout["days"].empty else None
-        hn = float(holdout["net_profit"])
-        c("holdout", {**hf, "net": _f(hn, 2), "breach": int(hb is not None)},
-          f">= {A['holdout_min_fills_per_month']} fills/month, net > 0, no breach (non-independent)",
-          len(holdout["trades"]) > 0 and hf["fills_per_month"] >= A["holdout_min_fills_per_month"] and hn > 0
-          and hb is None, f"first breach {hb}" if hb else "")
-
-    return {"criteria": crit, "passed_all": all(v["pass"] for v in crit.values()),
+    done = [v for v in crit.values() if v["evaluated"]]
+    return {"criteria": crit, "passed_all": all(v["pass"] for v in done),
+            "evaluated_all": len(done) == len(crit), "drawdowns": drawdowns(series),
             "recommended": False, "recommended_note": RECOMMENDED_NOTE}
 
 

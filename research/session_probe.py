@@ -79,7 +79,7 @@ def windows(cs: pd.DataFrame) -> list:
     return merged
 
 
-def cmd_run(run_ids=PILOT_RUNS, tag=RUN_ID, out=OUT):
+def cmd_run(run_ids=PILOT_RUNS, tag=RUN_ID, out=OUT, window=None):
     if runner.live_terminal_running():
         raise SystemExit("live MT5 terminal is running; research runs only while it is closed")
     cfg = env.load_config()
@@ -99,7 +99,7 @@ def cmd_run(run_ids=PILOT_RUNS, tag=RUN_ID, out=OUT):
     (out / "compile.log").write_text(c["log"])
     if c["errors"] != 0 or not c["ex5_exists"]:
         raise SystemExit(f"probe compile failed: {c['errors']} errors")
-    start, end = RUN["windows"]["wfo"]
+    start, end = window or RUN["windows"]["wfo"]
     text = ini.render(expert="session_probe.ex5", symbol=RUN["symbol"], period="M1", from_date=start,
                       to_date_inclusive=end, deposit=RUN["deposit"], report=f"reports\\{tag}",
                       set_lines=[f"ResearchRunTag={tag}"], leverage=RUN["leverage"], currency=RUN["currency"],

@@ -1,6 +1,6 @@
-"""R26 input-load check, after the fact, of every curated single run whose intended inputs are known: WFO OOS
-(procedure = the fold's selected params, baseline = pre-registered defaults), the static candidate and neighbour
-runs of robustness, and the holdout. Reads only the archived MT5 reports; runs nothing.
+"""Input-load check, after the fact, of every curated single run whose intended inputs are known: WFO OOS
+(procedure = the fold's selected variant, fixed A, fixed B), the KTD15 stability runs, and August-September.
+Reads only the archived MT5 reports; runs nothing.
 
 python research/verify_inputs.py -> results/input_checks.json (exit 1 on any mismatch)
 """
@@ -19,18 +19,19 @@ def check(folder: str, run_id: str, expected: dict) -> dict:
 
 
 def main():
-    P = pipeline.prereg()
     rows = []
     for f in json.loads(cli.FOLDS.read_text()) if cli.FOLDS.exists() else []:
-        rows.append(check("wfo", f["oos"]["procedure"]["run_id"], f["selection"]["params"]))
-        rows.append(check("wfo", f["oos"]["baseline"]["run_id"], dict(P["defaults"])))
+        for who in cli.SERIES:
+            o = f["oos"][who]
+            rows.append(check("wfo", o["run_id"], o["params"]))
     acc = cli.RESULTS / "acceptance.json"
     if acc.exists():
-        for r in json.loads(acc.read_text())["neighbors"]["rows"]:
-            rows.append(check("robustness", r["run_id"], r["params"]))
-    for who, name in (("candidate", cli.CAND_SET), ("baseline", cli.BASE_SET)):
-        if (cli.RESULTS / "holdout" / f"holdout_{who}").exists():
-            rows.append(check("holdout", f"holdout_{who}", setfile.read_set(cli.DELIV / name)))
+        cand = json.loads(acc.read_text())["candidate"]
+        for r in json.loads(acc.read_text())["stability"]["rows"]:
+            rows.append(check("robustness", r["run_id"], {**cand, **r["perturbation"]}))
+    for who, name in cli.HOLDOUT_SETS.items():
+        if (cli.RESULTS / "aug_sep_check" / f"holdout_{who}").exists():
+            rows.append(check("aug_sep_check", f"holdout_{who}", setfile.read_set(cli.DELIV / name)))
     bad = [r for r in rows if r["mismatches"]]
     out = {"runs_checked": len(rows), "runs_with_mismatches": len(bad), "rows": rows}
     evaluate.save(out, cli.RESULTS / "input_checks.json")

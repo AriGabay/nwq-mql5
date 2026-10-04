@@ -55,13 +55,14 @@ def test_protocol_steps_refuse_on_uncommitted_prereg(monkeypatch, cmd):
 @pytest.fixture
 def frozen(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "DELIV", tmp_path)
-    (tmp_path / cli.CAND_SET).write_text("ObMode=1")
-    (tmp_path / cli.BASE_SET).write_text("ObMode=0")
+    (tmp_path / cli.CAND_SET).write_text("StructureVariant=1")
+    (tmp_path / cli.A_SET).write_text("StructureVariant=0")
+    (tmp_path / cli.B_SET).write_text("StructureVariant=1")
     monkeypatch.setattr(cli, "ea_sha", lambda: "EA1")
-    monkeypatch.setattr(pipeline, "prereg", lambda: {"ea_source_sha256": "EA1", "holdout": ["2026.08.01", "2026.09.29"]})
+    monkeypatch.setattr(pipeline, "prereg", lambda: {"ea_source_sha256": "EA1", "holdout": ["2026.08.01", "2026.09.29"],
+                                                     "holdout_label": "x"})
     monkeypatch.setattr(env, "load_config", _boom)
-    shas = {"candidate": cli.sha(tmp_path / cli.CAND_SET), "baseline": cli.sha(tmp_path / cli.BASE_SET)}
-    return shas
+    return {"variant_a": cli.sha(tmp_path / cli.A_SET), "variant_b": cli.sha(tmp_path / cli.B_SET)}
 
 
 def _entry(who, status, has_report, ea="EA1", set_sha="S"):
@@ -78,8 +79,8 @@ def test_holdout_refuses_without_committed_candidate_freeze(monkeypatch, frozen)
 
 def test_holdout_refuses_second_completed_run_with_same_hashes(monkeypatch, frozen):
     monkeypatch.setattr(cli, "committed", lambda path: True)
-    log = [_entry("candidate", "ok", True, set_sha=frozen["candidate"]),
-           _entry("baseline", "ok", True, set_sha=frozen["baseline"])]
+    log = [_entry("variant_a", "ok", True, set_sha=frozen["variant_a"]),
+           _entry("variant_b", "ok", True, set_sha=frozen["variant_b"])]
     monkeypatch.setattr(explog, "read", lambda: log)
     with pytest.raises(SystemExit, match="already"):
         cli.cmd_holdout(argparse.Namespace())
@@ -87,26 +88,26 @@ def test_holdout_refuses_second_completed_run_with_same_hashes(monkeypatch, froz
 
 def test_holdout_allows_rerun_after_infra_failure_without_report(monkeypatch, frozen):
     monkeypatch.setattr(cli, "committed", lambda path: True)
-    log = [_entry("candidate", "infra_failure", False, set_sha=frozen["candidate"]),
-           _entry("baseline", "failed", False, set_sha=frozen["baseline"])]
+    log = [_entry("variant_a", "infra_failure", False, set_sha=frozen["variant_a"]),
+           _entry("variant_b", "failed", False, set_sha=frozen["variant_b"])]
     monkeypatch.setattr(explog, "read", lambda: log)
     with pytest.raises(Boom):                      # got past every guard to env.load_config
         cli.cmd_holdout(argparse.Namespace())
 
 
 def test_holdout_pending_logic():
-    """R24: the holdout runs exactly once per side. Any run that produced a report counts, whatever its status
-    and whatever the EA or .set hash (an edited EA or a re-committed .set must not buy a second look)."""
-    shas = {"candidate": "C", "baseline": "B"}
-    done_c = _entry("candidate", "ok", True, set_sha="C")
-    assert cli.holdout_pending([], "EA1", shas) == ["candidate", "baseline"]
-    assert cli.holdout_pending([done_c], "EA1", shas) == ["baseline"]
-    assert cli.holdout_pending([_entry("candidate", "ok", True, ea="EA0", set_sha="C")], "EA1", shas) == ["baseline"]
-    assert cli.holdout_pending([_entry("candidate", "ok", True, set_sha="C0")], "EA1", shas) == ["baseline"]
-    assert cli.holdout_pending([_entry("candidate", "timeout", True, set_sha="C")], "EA1", shas) == ["baseline"]
+    """R31: August-September runs exactly once per variant. Any run that produced a report counts, whatever its
+    status and whatever the EA or .set hash (an edited EA or a re-committed .set must not buy a second look)."""
+    shas = {"variant_a": "A", "variant_b": "B"}
+    done_a = _entry("variant_a", "ok", True, set_sha="A")
+    assert cli.holdout_pending([], "EA1", shas) == ["variant_a", "variant_b"]
+    assert cli.holdout_pending([done_a], "EA1", shas) == ["variant_b"]
+    assert cli.holdout_pending([_entry("variant_a", "ok", True, ea="EA0", set_sha="A")], "EA1", shas) == ["variant_b"]
+    assert cli.holdout_pending([_entry("variant_a", "ok", True, set_sha="A0")], "EA1", shas) == ["variant_b"]
+    assert cli.holdout_pending([_entry("variant_a", "timeout", True, set_sha="A")], "EA1", shas) == ["variant_b"]
     # a run without a report is not a completed run
-    assert cli.holdout_pending([_entry("candidate", "ok", False, set_sha="C")], "EA1", shas) == [
-        "candidate", "baseline"]
+    assert cli.holdout_pending([_entry("variant_a", "ok", False, set_sha="A")], "EA1", shas) == [
+        "variant_a", "variant_b"]
 
 
 def test_protocol_steps_refuse_when_the_ea_differs_from_the_preregistered_source(monkeypatch):
@@ -160,14 +161,18 @@ def test_install_turns_mcp_off_before_the_trade_safety_check(monkeypatch):
     assert calls == ["disable_mcp", "assert_trade_safety"]
 
 
-def test_freeze_rules_refuses_period_other_than_pilot_choice(tmp_path, monkeypatch):
+def test_freeze_rules_needs_both_pilot_runs(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, "PREREG_PATH", tmp_path / "preregistration.json")
-    pilot = tmp_path / "pilot_summary.json"
-    pilot.write_text(json.dumps({"chosen_period": "M15"}))
-    monkeypatch.setattr(cli, "PILOT", pilot)
-    with pytest.raises(SystemExit, match="M15"):
-        cli.cmd_freeze_rules(argparse.Namespace(period="M5", gate_change=[]))
+    monkeypatch.setattr(explog, "read", lambda: [{"id": "pilot_a", "role": "pilot", "status": "ok"}])
+    with pytest.raises(SystemExit, match="pilot_b"):
+        cli.cmd_freeze_rules(argparse.Namespace())
     assert not (tmp_path / "preregistration.json").exists()
+    monkeypatch.setattr(explog, "read", lambda: [{"id": r, "role": "pilot", "status": "ok"} for r in ("pilot_a", "pilot_b")])
+    monkeypatch.setattr(cli, "ea_sha", lambda: "EA1")
+    cli.cmd_freeze_rules(argparse.Namespace())
+    p = json.loads((tmp_path / "preregistration.json").read_text(encoding="utf-8"))
+    assert p["grid"] == {"StructureVariant": [0, 1]} and p["stats"]["dsr_trials"] == 12
+    assert p["holdout_label"] == "בדיקה היסטורית לא עצמאית" and p["ea_source_sha256"] == "EA1"
 
 
 def test_freeze_rules_refuses_when_prereg_exists(tmp_path, monkeypatch):
@@ -175,7 +180,7 @@ def test_freeze_rules_refuses_when_prereg_exists(tmp_path, monkeypatch):
     p.write_text("{}")
     monkeypatch.setattr(pipeline, "PREREG_PATH", p)
     with pytest.raises(SystemExit, match="exists"):
-        cli.cmd_freeze_rules(argparse.Namespace(period="M15", gate_change=[]))
+        cli.cmd_freeze_rules(argparse.Namespace())
     assert p.read_text() == "{}"
 
 
@@ -220,7 +225,7 @@ def test_pilot_summary_reports_fills_per_variant_without_profit_fields():
 def test_help_lists_subcommands():
     out = subprocess.run([sys.executable, str(CLI), "--help"], capture_output=True, text=True, check=True).stdout
     for name in ["install", "smoke", "optsmoke", "pilot", "charts", "conformance", "freeze-rules", "wfo", "freeze",
-                 "holdout", "robustness", "deliver"]:
+                 "holdout", "augsep-sensitivity", "robustness", "deliver", "tickcov"]:
         assert name in out, name
 
 

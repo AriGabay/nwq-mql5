@@ -1,6 +1,7 @@
 """Pre-registered quote-only-minute sensitivity (gate review 2026-10-03): primary results untouched, affected
 positions re-priced at the first trigger tick of the quote-only minute on the trigger side."""
 import pandas as pd
+import pytest
 
 from mt5r import session_sensitivity as ss
 
@@ -45,3 +46,19 @@ def test_evaluate_keeps_primary_and_reprices_only_affected_positions():
     # short: (4638.07 - 4566.85) x -1 x 0.10 x 100 = -712.20 on top of the primary 685.10
     assert r["net_delta"] == -712.2 and r["net_sensitivity"] == round(585.1 - 712.2, 2)
     assert r["max_dd_closed_pct_sensitivity"] > r["max_dd_closed_pct_primary"]
+
+
+def test_evaluate_series_chains_runs_from_the_first_deposit():
+    one = pd.DataFrame([dict(setup_id=1, reason="filled", position_id=1, dir="L", volume=0.1, exit_msc=1000,
+                             exit_price=100.0, exit_kind="sl")])
+    two = pd.DataFrame([dict(setup_id=1, reason="filled", position_id=1, dir="L", volume=0.1, exit_msc=2000,
+                             exit_price=100.0, exit_kind="tp")])
+    d1 = pd.DataFrame([dict(type=2, position_id=0, profit=10000.0, commission=0, swap=0),
+                       dict(type=1, position_id=1, profit=-500.0, commission=0, swap=0)])
+    d2 = pd.DataFrame([dict(type=2, position_id=0, profit=9500.0, commission=0, swap=0),
+                       dict(type=1, position_id=1, profit=200.0, commission=0, swap=0)])
+    none = pd.DataFrame(columns=["case_id", "setup_id", "alt_msc", "alt_price", "alt_kind"])
+    r = ss.evaluate_series([(one, d1, none), (two, d2, none)])
+    assert r["deposit"] == 10000.0 and r["positions"] == 2 and r["affected"] == 0
+    assert r["net_primary"] == -300.0 and r["net_delta"] == 0.0
+    assert r["max_dd_closed_pct_primary"] == pytest.approx(5.0)

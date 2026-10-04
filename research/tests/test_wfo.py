@@ -168,3 +168,21 @@ def test_categorical_no_eligible_pass_returns_defaults():
                      {"EntryMode": 0, "ObMaxAgeBars": 96}, 45, categorical=["EntryMode"])
     assert res["status"] == "no_eligible_pass"
     assert res["params"] == {"EntryMode": 0, "ObMaxAgeBars": 96}
+
+
+def _variants(profit_a, profit_b, trades=(60, 60), dd=(5.0, 5.0)):
+    return pd.DataFrame({"StructureVariant": [0, 1], "profit": [profit_a, profit_b], "trades": list(trades),
+                         "eq_dd_pct": list(dd), "eq_dd_money": [100.0, 100.0]})
+
+
+def test_two_variant_selection_ties_and_fallback_go_to_a():
+    """U9: equal scores pick A; no eligible pass falls back to A; otherwise the higher recovery factor wins."""
+    cols, d = ["StructureVariant"], {"StructureVariant": 0}
+    tie = wfo.select(_variants(200.0, 200.0), cols, d, 45, 10.0, categorical=cols)
+    assert tie["params"] == {"StructureVariant": 0} and tie["status"] == "selected"
+    none = wfo.select(_variants(200.0, 300.0, trades=(44, 30)), cols, d, 45, 10.0, categorical=cols)
+    assert none["params"] == {"StructureVariant": 0} and none["status"] == "no_eligible_pass"
+    b = wfo.select(_variants(200.0, 300.0), cols, d, 45, 10.0, categorical=cols)
+    assert b["params"] == {"StructureVariant": 1}
+    dd = wfo.select(_variants(200.0, 300.0, dd=(5.0, 10.5)), cols, d, 45, 10.0, categorical=cols)
+    assert dd["params"] == {"StructureVariant": 0}                 # B over the 10% equity DD limit
