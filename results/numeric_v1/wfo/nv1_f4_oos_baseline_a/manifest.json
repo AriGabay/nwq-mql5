@@ -1,0 +1,26 @@
+{
+ "run_id": "nv1_f4_oos_baseline_a",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "02a44b32bae4246d6e68f21f284851f985bd628dc7e5f51ace8ee4ada5fed666",
+ "ini_sha256": "248369bb790f5cb4145d476718a029126129337a588deac7c2e1ecb5401dc218",
+ "meta": {
+  "kind": "research",
+  "role": "oos_baseline_a",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "ImpulseWindowBars": 2,
+   "WarmupDays": 30,
+   "StructureVariant": 0,
+   "SwingStrengthM1": 3,
+   "StopBufferPoints": 20,
+   "ResearchRunTag": "nv1_f4_oos_baseline_a"
+  }
+ },
+ "started": "2026-10-04T19:26:18",
+ "status": "ok",
+ "seconds": 13.0,
+ "report": "nv1_f4_oos_baseline_a.htm",
+ "exit_code": 0
+}

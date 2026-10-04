@@ -120,7 +120,7 @@ def trial_sharpe_variance(scored_grid_paths) -> dict:
 
 
 def evaluate(series: dict, base, fold_rows: list, stability_share, var_sr: float, prereg: dict,
-             window: list = None) -> dict:
+             window: list = None, bases: dict = None) -> dict:
     """KTD14 criteria on one chained OOS series; thresholds come from the pre-registration.
 
     series/base are stitched dicts (days, trades, table, initial, net_profit); base None means the series is the
@@ -128,6 +128,7 @@ def evaluate(series: dict, base, fold_rows: list, stability_share, var_sr: float
     stability_share None means not run for this series: the criterion is reported as not evaluated and left
     out of passed_all (evaluated_all says so). window: the OOS span [start, end] (default: all folds).
     August-September is not a criterion (R31). An empty series fails every evaluated criterion.
+    bases: named baseline series (numeric_v1 KTD10); when given, oos_net needs net > 0 and > every baseline's net.
     """
     A, S = prereg["acceptance"], prereg["stats"]
     bm = metrics.bar_minutes(A.get("event_bar", prereg.get("chart_period", "M1")))
@@ -145,7 +146,11 @@ def evaluate(series: dict, base, fold_rows: list, stability_share, var_sr: float
       fq["fills_per_month"] >= A["min_fills_per_month"])
 
     net = float(series["net_profit"])
-    if base is None:
+    if bases:
+        bn = {k: _f(float(b["net_profit"]), 2) for k, b in bases.items()}
+        c("oos_net", {"net": _f(net, 2), "baselines": bn, "margins": {k: _f(net - v, 2) for k, v in bn.items()}},
+          "> 0 and > the net of every baseline (" + ", ".join(bn) + ")", net > 0 and all(net > v for v in bn.values()))
+    elif base is None:
         c("oos_net", {"net": _f(net, 2), "baseline_net": _f(net, 2)}, "> 0 (this series is the baseline)", net > 0)
     else:
         bnet = float(base["net_profit"])
@@ -191,7 +196,8 @@ def evaluate(series: dict, base, fold_rows: list, stability_share, var_sr: float
           evaluated=False)
     else:
         share = float(stability_share)
-        c("stability", _f(share), f">= {A['min_stability_profitable_share']} of the 4 KTD15 perturbations",
+        c("stability", _f(share), f">= {A['min_stability_profitable_share']} "
+                                  f"{A.get('stability_label', 'of the 4 KTD15 perturbations')}",
           math.isfinite(share) and share >= A["min_stability_profitable_share"])
 
     r = pnl / series["initial"]
@@ -201,9 +207,13 @@ def evaluate(series: dict, base, fold_rows: list, stability_share, var_sr: float
         c("dsr", {"n_days": len(r)}, f"gates only with >= {A['dsr_min_days']} days", True, "not gating")
     else:
         d = stats.dsr(r, S["dsr_trials"], var_sr)
-        c("dsr", {"n_days": len(r), "psr_value": _f(d["psr_value"]), "sr": _f(d["sr"]), "sr0": _f(d["sr0"]),
-                  "trials": S["dsr_trials"], "var_sr": _f(var_sr, 8)}, A["dsr_min"],
-          math.isfinite(d["psr_value"]) and d["psr_value"] >= A["dsr_min"])
+        value = {"n_days": len(r), "psr_value": _f(d["psr_value"]), "sr": _f(d["sr"]), "sr0": _f(d["sr0"]),
+                 "trials": S["dsr_trials"], "var_sr": _f(var_sr, 8)}
+        if "dsr_trials_sensitivity" in S:            # reported only, never gating (numeric_v1 KTD9)
+            ds = stats.dsr(r, S["dsr_trials_sensitivity"], var_sr)
+            value["sensitivity"] = {"trials": S["dsr_trials_sensitivity"], "psr_value": _f(ds["psr_value"]),
+                                    "sr0": _f(ds["sr0"])}
+        c("dsr", value, A["dsr_min"], math.isfinite(d["psr_value"]) and d["psr_value"] >= A["dsr_min"])
 
     done = [v for v in crit.values() if v["evaluated"]]
     return {"criteria": crit, "passed_all": all(v["pass"] for v in done),

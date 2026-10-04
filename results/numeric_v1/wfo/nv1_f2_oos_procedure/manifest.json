@@ -1,0 +1,26 @@
+{
+ "run_id": "nv1_f2_oos_procedure",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "02a44b32bae4246d6e68f21f284851f985bd628dc7e5f51ace8ee4ada5fed666",
+ "ini_sha256": "928c682a3e0fb5c9948714702d7a4efc2129cc7cd4df04480ec30bf50644270b",
+ "meta": {
+  "kind": "research",
+  "role": "oos_procedure_fallback",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "ImpulseWindowBars": 2,
+   "WarmupDays": 30,
+   "StructureVariant": 0,
+   "SwingStrengthM1": 3,
+   "StopBufferPoints": 20,
+   "ResearchRunTag": "nv1_f2_oos_procedure"
+  }
+ },
+ "started": "2026-10-04T19:22:28",
+ "status": "ok",
+ "seconds": 11.8,
+ "report": "nv1_f2_oos_procedure.htm",
+ "exit_code": 0
+}

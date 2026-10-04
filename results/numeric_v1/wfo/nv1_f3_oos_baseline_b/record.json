@@ -1,0 +1,19 @@
+{
+ "net_profit": -318.02,
+ "trades": 58,
+ "profit_factor": 0.91,
+ "recovery_factor": -0.17,
+ "equity_dd_money": 1914.24,
+ "equity_dd_pct": 17.76,
+ "balance_dd_pct": 16.75,
+ "run_id": "nv1_f3_oos_baseline_b",
+ "params": {
+  "StructureVariant": 1,
+  "SwingStrengthM1": 3,
+  "StopBufferPoints": 20
+ },
+ "deposit": 9761,
+ "final_balance": 9442.98,
+ "input_mismatches": [],
+ "conformance_violations": 0
+}

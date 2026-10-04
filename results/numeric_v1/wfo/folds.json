@@ -1,0 +1,697 @@
+[
+ {
+  "fold": 1,
+  "train": [
+   "2025.12.01",
+   "2026.02.28"
+  ],
+  "test": [
+   "2026.03.01",
+   "2026.03.31"
+  ],
+  "window": {
+   "tag": "f1",
+   "train": [
+    "2025.12.01",
+    "2026.02.28"
+   ],
+   "status": "verified",
+   "runs": [
+    {
+     "run_id": "nv1_f1_grid_lo",
+     "status": "ok",
+     "expected": 12,
+     "completed": 12,
+     "failed": 0,
+     "cached": 0,
+     "log_total_passes": 12,
+     "new_cache_records": 12,
+     "xml_rows": 12,
+     "seconds": 26.6,
+     "exit_code": 0,
+     "problems": [],
+     "status_runner": "ok"
+    },
+    {
+     "run_id": "nv1_f1_grid_hi",
+     "status": "ok",
+     "expected": 6,
+     "completed": 6,
+     "failed": 0,
+     "cached": 0,
+     "log_total_passes": 6,
+     "new_cache_records": 6,
+     "xml_rows": 6,
+     "seconds": 20.4,
+     "exit_code": 0,
+     "problems": [],
+     "status_runner": "ok"
+    }
+   ],
+   "expected": 18,
+   "completed": 18,
+   "failed": 0,
+   "cached": 0,
+   "seconds": 47.0,
+   "trade_floor": 45,
+   "selection_status": "no_eligible_pass",
+   "label": "fallback",
+   "params": {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 3,
+    "StopBufferPoints": 20
+   },
+   "reason": {
+    "eligible_passes": 0,
+    "below_trade_floor": 0,
+    "above_dd_limit": 18,
+    "note": "no pass met trades >= 45 and tester equity DD <= 10.0%; the defaults are carried forward as a fallback, not as a selected candidate"
+   }
+  },
+  "deposits": {
+   "procedure": 10000.0,
+   "baseline_a": 10000.0,
+   "baseline_b": 10000.0
+  },
+  "oos": {
+   "procedure": {
+    "net_profit": 1805.7,
+    "trades": 180,
+    "profit_factor": 1.19,
+    "recovery_factor": 1.21,
+    "equity_dd_money": 1492.45,
+    "equity_dd_pct": 14.46,
+    "balance_dd_pct": 14.33,
+    "run_id": "nv1_f1_oos_procedure",
+    "params": {
+     "StructureVariant": 0,
+     "SwingStrengthM1": 3,
+     "StopBufferPoints": 20
+    },
+    "deposit": 10000,
+    "final_balance": 11805.7,
+    "input_mismatches": [],
+    "conformance_violations": 0
+   },
+   "baseline_a": {
+    "net_profit": 1805.7,
+    "trades": 180,
+    "profit_factor": 1.19,
+    "recovery_factor": 1.21,
+    "equity_dd_money": 1492.45,
+    "equity_dd_pct": 14.46,
+    "balance_dd_pct": 14.33,
+    "run_id": "nv1_f1_oos_baseline_a",
+    "params": {
+     "StructureVariant": 0,
+     "SwingStrengthM1": 3,
+     "StopBufferPoints": 20
+    },
+    "deposit": 10000,
+    "final_balance": 11805.7,
+    "input_mismatches": [],
+    "conformance_violations": 0
+   },
+   "baseline_b": {
+    "net_profit": 657.23,
+    "trades": 54,
+    "profit_factor": 1.24,
+    "recovery_factor": 0.59,
+    "equity_dd_money": 1112.15,
+    "equity_dd_pct": 10.99,
+    "balance_dd_pct": 9.97,
+    "run_id": "nv1_f1_oos_baseline_b",
+    "params": {
+     "StructureVariant": 1,
+     "SwingStrengthM1": 3,
+     "StopBufferPoints": 20
+    },
+    "deposit": 10000,
+    "final_balance": 10657.23,
+    "input_mismatches": [],
+    "conformance_violations": 0
+   }
+  },
+  "next_deposits": {
+   "procedure": 11805.7,
+   "baseline_a": 11805.7,
+   "baseline_b": 10657.23
+  }
+ },
+ {
+  "fold": 2,
+  "train": [
+   "2026.01.01",
+   "2026.03.31"
+  ],
+  "test": [
+   "2026.04.01",
+   "2026.04.30"
+  ],
+  "window": {
+   "tag": "f2",
+   "train": [
+    "2026.01.01",
+    "2026.03.31"
+   ],
+   "status": "verified",
+   "runs": [
+    {
+     "run_id": "nv1_f2_grid_lo",
+     "status": "ok",
+     "expected": 12,
+     "completed": 12,
+     "failed": 0,
+     "cached": 0,
+     "log_total_passes": 12,
+     "new_cache_records": 12,
+     "xml_rows": 12,
+     "seconds": 30.4,
+     "exit_code": 0,
+     "problems": [],
+     "status_runner": "ok"
+    },
+    {
+     "run_id": "nv1_f2_grid_hi",
+     "status": "ok",
+     "expected": 6,
+     "completed": 6,
+     "failed": 0,
+     "cached": 0,
+     "log_total_passes": 6,
+     "new_cache_records": 6,
+     "xml_rows": 6,
+     "seconds": 22.3,
+     "exit_code": 0,
+     "problems": [],
+     "status_runner": "ok"
+    }
+   ],
+   "expected": 18,
+   "completed": 18,
+   "failed": 0,
+   "cached": 0,
+   "seconds": 52.7,
+   "trade_floor": 45,
+   "selection_status": "no_eligible_pass",
+   "label": "fallback",
+   "params": {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 3,
+    "StopBufferPoints": 20
+   },
+   "reason": {
+    "eligible_passes": 0,
+    "below_trade_floor": 0,
+    "above_dd_limit": 18,
+    "note": "no pass met trades >= 45 and tester equity DD <= 10.0%; the defaults are carried forward as a fallback, not as a selected candidate"
+   }
+  },
+  "deposits": {
+   "procedure": 11805.7,
+   "baseline_a": 11805.7,
+   "baseline_b": 10657.23
+  },
+  "oos": {
+   "procedure": {
+    "net_profit": -1608.69,
+    "trades": 172,
+    "profit_factor": 0.86,
+    "recovery_factor": -0.5,
+    "equity_dd_money": 3220.58,
+    "equity_dd_pct": 26.21,
+    "balance_dd_pct": 24.64,
+    "run_id": "nv1_f2_oos_procedure",
+    "params": {
+     "StructureVariant": 0,
+     "SwingStrengthM1": 3,
+     "StopBufferPoints": 20
+    },
+    "deposit": 11805,
+    "final_balance": 10196.31,
+    "input_mismatches": [],
+    "conformance_violations": 0
+   },
+   "baseline_a": {
+    "net_profit": -1608.69,
+    "trades": 172,
+    "profit_factor": 0.86,
+    "recovery_factor": -0.5,
+    "equity_dd_money": 3220.58,
+    "equity_dd_pct": 26.21,
+    "balance_dd_pct": 24.64,
+    "run_id": "nv1_f2_oos_baseline_a",
+    "params": {
+     "StructureVariant": 0,
+     "SwingStrengthM1": 3,
+     "StopBufferPoints": 20
+    },
+    "deposit": 11805,
+    "final_balance": 10196.31,
+    "input_mismatches": [],
+    "conformance_violations": 0
+   },
+   "baseline_b": {
+    "net_profit": -895.91,
+    "trades": 47,
+    "profit_factor": 0.72,
+    "recovery_factor": -0.72,
+    "equity_dd_money": 1244.92,
+    "equity_dd_pct": 11.53,
+    "balance_dd_pct": 9.94,
+    "run_id": "nv1_f2_oos_baseline_b",
+    "params": {
+     "StructureVariant": 1,
+     "SwingStrengthM1": 3,
+     "StopBufferPoints": 20
+    },
+    "deposit": 10657,
+    "final_balance": 9761.09,
+    "input_mismatches": [],
+    "conformance_violations": 0
+   }
+  },
+  "next_deposits": {
+   "procedure": 10196.31,
+   "baseline_a": 10196.31,
+   "baseline_b": 9761.09
+  }
+ },
+ {
+  "fold": 3,
+  "train": [
+   "2026.02.01",
+   "2026.04.30"
+  ],
+  "test": [
+   "2026.05.01",
+   "2026.05.31"
+  ],
+  "window": {
+   "tag": "f3",
+   "train": [
+    "2026.02.01",
+    "2026.04.30"
+   ],
+   "status": "verified",
+   "runs": [
+    {
+     "run_id": "nv1_f3_grid_lo",
+     "status": "ok",
+     "expected": 12,
+     "completed": 12,
+     "failed": 0,
+     "cached": 0,
+     "log_total_passes": 12,
+     "new_cache_records": 12,
+     "xml_rows": 12,
+     "seconds": 32.8,
+     "exit_code": 0,
+     "problems": [],
+     "status_runner": "ok"
+    },
+    {
+     "run_id": "nv1_f3_grid_hi",
+     "status": "ok",
+     "expected": 6,
+     "completed": 6,
+     "failed": 0,
+     "cached": 0,
+     "log_total_passes": 6,
+     "new_cache_records": 6,
+     "xml_rows": 6,
+     "seconds": 23.2,
+     "exit_code": 0,
+     "problems": [],
+     "status_runner": "ok"
+    }
+   ],
+   "expected": 18,
+   "completed": 18,
+   "failed": 0,
+   "cached": 0,
+   "seconds": 56.0,
+   "trade_floor": 45,
+   "selection_status": "no_eligible_pass",
+   "label": "fallback",
+   "params": {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 3,
+    "StopBufferPoints": 20
+   },
+   "reason": {
+    "eligible_passes": 0,
+    "below_trade_floor": 0,
+    "above_dd_limit": 18,
+    "note": "no pass met trades >= 45 and tester equity DD <= 10.0%; the defaults are carried forward as a fallback, not as a selected candidate"
+   }
+  },
+  "deposits": {
+   "procedure": 10196.31,
+   "baseline_a": 10196.31,
+   "baseline_b": 9761.09
+  },
+  "oos": {
+   "procedure": {
+    "net_profit": 304.64,
+    "trades": 138,
+    "profit_factor": 1.03,
+    "recovery_factor": 0.15,
+    "equity_dd_money": 2027.91,
+    "equity_dd_pct": 17.84,
+    "balance_dd_pct": 16.13,
+    "run_id": "nv1_f3_oos_procedure",
+    "params": {
+     "StructureVariant": 0,
+     "SwingStrengthM1": 3,
+     "StopBufferPoints": 20
+    },
+    "deposit": 10196,
+    "final_balance": 10500.64,
+    "input_mismatches": [],
+    "conformance_violations": 0
+   },
+   "baseline_a": {
+    "net_profit": 304.64,
+    "trades": 138,
+    "profit_factor": 1.03,
+    "recovery_factor": 0.15,
+    "equity_dd_money": 2027.91,
+    "equity_dd_pct": 17.84,
+    "balance_dd_pct": 16.13,
+    "run_id": "nv1_f3_oos_baseline_a",
+    "params": {
+     "StructureVariant": 0,
+     "SwingStrengthM1": 3,
+     "StopBufferPoints": 20
+    },
+    "deposit": 10196,
+    "final_balance": 10500.64,
+    "input_mismatches": [],
+    "conformance_violations": 0
+   },
+   "baseline_b": {
+    "net_profit": -318.02,
+    "trades": 58,
+    "profit_factor": 0.91,
+    "recovery_factor": -0.17,
+    "equity_dd_money": 1914.24,
+    "equity_dd_pct": 17.76,
+    "balance_dd_pct": 16.75,
+    "run_id": "nv1_f3_oos_baseline_b",
+    "params": {
+     "StructureVariant": 1,
+     "SwingStrengthM1": 3,
+     "StopBufferPoints": 20
+    },
+    "deposit": 9761,
+    "final_balance": 9442.98,
+    "input_mismatches": [],
+    "conformance_violations": 0
+   }
+  },
+  "next_deposits": {
+   "procedure": 10500.64,
+   "baseline_a": 10500.64,
+   "baseline_b": 9442.98
+  }
+ },
+ {
+  "fold": 4,
+  "train": [
+   "2026.03.01",
+   "2026.05.31"
+  ],
+  "test": [
+   "2026.06.01",
+   "2026.06.30"
+  ],
+  "window": {
+   "tag": "f4",
+   "train": [
+    "2026.03.01",
+    "2026.05.31"
+   ],
+   "status": "verified",
+   "runs": [
+    {
+     "run_id": "nv1_f4_grid_lo",
+     "status": "ok",
+     "expected": 12,
+     "completed": 12,
+     "failed": 0,
+     "cached": 0,
+     "log_total_passes": 12,
+     "new_cache_records": 12,
+     "xml_rows": 12,
+     "seconds": 38.1,
+     "exit_code": 0,
+     "problems": [],
+     "status_runner": "ok"
+    },
+    {
+     "run_id": "nv1_f4_grid_hi",
+     "status": "ok",
+     "expected": 6,
+     "completed": 6,
+     "failed": 0,
+     "cached": 0,
+     "log_total_passes": 6,
+     "new_cache_records": 6,
+     "xml_rows": 6,
+     "seconds": 26.4,
+     "exit_code": 0,
+     "problems": [],
+     "status_runner": "ok"
+    }
+   ],
+   "expected": 18,
+   "completed": 18,
+   "failed": 0,
+   "cached": 0,
+   "seconds": 64.5,
+   "trade_floor": 45,
+   "selection_status": "no_eligible_pass",
+   "label": "fallback",
+   "params": {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 3,
+    "StopBufferPoints": 20
+   },
+   "reason": {
+    "eligible_passes": 0,
+    "below_trade_floor": 0,
+    "above_dd_limit": 18,
+    "note": "no pass met trades >= 45 and tester equity DD <= 10.0%; the defaults are carried forward as a fallback, not as a selected candidate"
+   }
+  },
+  "deposits": {
+   "procedure": 10500.64,
+   "baseline_a": 10500.64,
+   "baseline_b": 9442.98
+  },
+  "oos": {
+   "procedure": {
+    "net_profit": -757.4,
+    "trades": 169,
+    "profit_factor": 0.93,
+    "recovery_factor": -0.35,
+    "equity_dd_money": 2147.3,
+    "equity_dd_pct": 19.6,
+    "balance_dd_pct": 18.2,
+    "run_id": "nv1_f4_oos_procedure",
+    "params": {
+     "StructureVariant": 0,
+     "SwingStrengthM1": 3,
+     "StopBufferPoints": 20
+    },
+    "deposit": 10500,
+    "final_balance": 9742.6,
+    "input_mismatches": [],
+    "conformance_violations": 0
+   },
+   "baseline_a": {
+    "net_profit": -757.4,
+    "trades": 169,
+    "profit_factor": 0.93,
+    "recovery_factor": -0.35,
+    "equity_dd_money": 2147.3,
+    "equity_dd_pct": 19.6,
+    "balance_dd_pct": 18.2,
+    "run_id": "nv1_f4_oos_baseline_a",
+    "params": {
+     "StructureVariant": 0,
+     "SwingStrengthM1": 3,
+     "StopBufferPoints": 20
+    },
+    "deposit": 10500,
+    "final_balance": 9742.6,
+    "input_mismatches": [],
+    "conformance_violations": 0
+   },
+   "baseline_b": {
+    "net_profit": 874.11,
+    "trades": 45,
+    "profit_factor": 1.37,
+    "recovery_factor": 1.02,
+    "equity_dd_money": 859.29,
+    "equity_dd_pct": 8.83,
+    "balance_dd_pct": 7.44,
+    "run_id": "nv1_f4_oos_baseline_b",
+    "params": {
+     "StructureVariant": 1,
+     "SwingStrengthM1": 3,
+     "StopBufferPoints": 20
+    },
+    "deposit": 9442,
+    "final_balance": 10316.11,
+    "input_mismatches": [],
+    "conformance_violations": 0
+   }
+  },
+  "next_deposits": {
+   "procedure": 9742.6,
+   "baseline_a": 9742.6,
+   "baseline_b": 10316.11
+  }
+ },
+ {
+  "fold": 5,
+  "train": [
+   "2026.04.01",
+   "2026.06.30"
+  ],
+  "test": [
+   "2026.07.01",
+   "2026.07.31"
+  ],
+  "window": {
+   "tag": "f5",
+   "train": [
+    "2026.04.01",
+    "2026.06.30"
+   ],
+   "status": "verified",
+   "runs": [
+    {
+     "run_id": "nv1_f5_grid_lo",
+     "status": "ok",
+     "expected": 12,
+     "completed": 12,
+     "failed": 0,
+     "cached": 0,
+     "log_total_passes": 12,
+     "new_cache_records": 12,
+     "xml_rows": 12,
+     "seconds": 39.0,
+     "exit_code": 0,
+     "problems": [],
+     "status_runner": "ok"
+    },
+    {
+     "run_id": "nv1_f5_grid_hi",
+     "status": "ok",
+     "expected": 6,
+     "completed": 6,
+     "failed": 0,
+     "cached": 0,
+     "log_total_passes": 6,
+     "new_cache_records": 6,
+     "xml_rows": 6,
+     "seconds": 27.3,
+     "exit_code": 0,
+     "problems": [],
+     "status_runner": "ok"
+    }
+   ],
+   "expected": 18,
+   "completed": 18,
+   "failed": 0,
+   "cached": 0,
+   "seconds": 66.3,
+   "trade_floor": 45,
+   "selection_status": "no_eligible_pass",
+   "label": "fallback",
+   "params": {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 3,
+    "StopBufferPoints": 20
+   },
+   "reason": {
+    "eligible_passes": 0,
+    "below_trade_floor": 0,
+    "above_dd_limit": 18,
+    "note": "no pass met trades >= 45 and tester equity DD <= 10.0%; the defaults are carried forward as a fallback, not as a selected candidate"
+   }
+  },
+  "deposits": {
+   "procedure": 9742.6,
+   "baseline_a": 9742.6,
+   "baseline_b": 10316.11
+  },
+  "oos": {
+   "procedure": {
+    "net_profit": -212.76,
+    "trades": 196,
+    "profit_factor": 0.98,
+    "recovery_factor": -0.11,
+    "equity_dd_money": 2026.0,
+    "equity_dd_pct": 19.39,
+    "balance_dd_pct": 18.82,
+    "run_id": "nv1_f5_oos_procedure",
+    "params": {
+     "StructureVariant": 0,
+     "SwingStrengthM1": 3,
+     "StopBufferPoints": 20
+    },
+    "deposit": 9742,
+    "final_balance": 9529.24,
+    "input_mismatches": [],
+    "conformance_violations": 0
+   },
+   "baseline_a": {
+    "net_profit": -212.76,
+    "trades": 196,
+    "profit_factor": 0.98,
+    "recovery_factor": -0.11,
+    "equity_dd_money": 2026.0,
+    "equity_dd_pct": 19.39,
+    "balance_dd_pct": 18.82,
+    "run_id": "nv1_f5_oos_baseline_a",
+    "params": {
+     "StructureVariant": 0,
+     "SwingStrengthM1": 3,
+     "StopBufferPoints": 20
+    },
+    "deposit": 9742,
+    "final_balance": 9529.24,
+    "input_mismatches": [],
+    "conformance_violations": 0
+   },
+   "baseline_b": {
+    "net_profit": 812.12,
+    "trades": 52,
+    "profit_factor": 1.25,
+    "recovery_factor": 0.8,
+    "equity_dd_money": 1019.41,
+    "equity_dd_pct": 9.3,
+    "balance_dd_pct": 7.74,
+    "run_id": "nv1_f5_oos_baseline_b",
+    "params": {
+     "StructureVariant": 1,
+     "SwingStrengthM1": 3,
+     "StopBufferPoints": 20
+    },
+    "deposit": 10316,
+    "final_balance": 11128.12,
+    "input_mismatches": [],
+    "conformance_violations": 0
+   }
+  },
+  "next_deposits": {
+   "procedure": 9529.24,
+   "baseline_a": 9529.24,
+   "baseline_b": 11128.12
+  }
+ }
+]

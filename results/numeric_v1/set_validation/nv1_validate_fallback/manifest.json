@@ -1,0 +1,15 @@
+{
+ "run_id": "nv1_validate_fallback",
+ "ex5": "ob_m1_structure.ex5",
+ "ex5_sha256": "5cba969a17f64e6bbbea5dc98e608d0e36c54807f4a9d72625a8d0a7c275d719",
+ "ini_sha256": "247bad8eef6366d47ab5dc9a50307d316767432e26895b650d0b70bc89fe8e83",
+ "meta": {
+  "role": "set_validation",
+  "set": "ob_m1_structure_nv1_fallback.set"
+ },
+ "started": "2026-10-04T19:36:58",
+ "status": "ok",
+ "seconds": 13.2,
+ "report": "nv1_validate_fallback.htm",
+ "exit_code": 0
+}

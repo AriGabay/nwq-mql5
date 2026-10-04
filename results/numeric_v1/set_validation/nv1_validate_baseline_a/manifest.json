@@ -1,0 +1,15 @@
+{
+ "run_id": "nv1_validate_baseline_a",
+ "ex5": "ob_m1_structure.ex5",
+ "ex5_sha256": "5cba969a17f64e6bbbea5dc98e608d0e36c54807f4a9d72625a8d0a7c275d719",
+ "ini_sha256": "88fefa1faeb7f1b93311caac8c1c8c4f04752f064fbca92b10af8602b11b7c47",
+ "meta": {
+  "role": "set_validation",
+  "set": "ob_m1_structure_nv1_baseline_a.set"
+ },
+ "started": "2026-10-04T19:36:33",
+ "status": "ok",
+ "seconds": 12.0,
+ "report": "nv1_validate_baseline_a.htm",
+ "exit_code": 0
+}

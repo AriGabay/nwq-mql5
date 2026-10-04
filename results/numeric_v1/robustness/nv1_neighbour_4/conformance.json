@@ -1,0 +1,268 @@
+{
+ "run_id": "nv1_neighbour_4",
+ "setups": 4564,
+ "bars_m1": 178340,
+ "bars_m5": 35723,
+ "violations": 0,
+ "violation_rows": [],
+ "coverage": {
+  "rules": {
+   "ob_r3": {
+    "checked": 9128,
+    "failed": 0,
+    "passed": 9128
+   },
+   "touch_r5": {
+    "checked": 4564,
+    "failed": 0,
+    "passed": 4564
+   },
+   "break_r6": {
+    "checked": 1668,
+    "failed": 0,
+    "passed": 1668
+   },
+   "return_r7": {
+    "checked": 1250,
+    "failed": 0,
+    "passed": 1250
+   },
+   "second_break_r8": {
+    "checked": 2142,
+    "failed": 0,
+    "passed": 2142
+   },
+   "pivot_causality_r9": {
+    "checked": 71472,
+    "failed": 0,
+    "passed": 71472
+   },
+   "sc_r10": {
+    "checked": 4430,
+    "failed": 0,
+    "passed": 4430
+   },
+   "hl_r11": {
+    "checked": 696,
+    "failed": 0,
+    "passed": 696
+   },
+   "fvg_r12": {
+    "checked": 6786,
+    "failed": 0,
+    "passed": 6786
+   },
+   "fvg_lapse_r13": {
+    "checked": 1329,
+    "failed": 0,
+    "passed": 1329
+   },
+   "reaction_r14": {
+    "checked": 1569,
+    "failed": 0,
+    "passed": 1569
+   },
+   "entry_r15": {
+    "checked": 2161,
+    "failed": 0,
+    "passed": 2161
+   },
+   "competition_r16": {
+    "checked": 249,
+    "failed": 0,
+    "passed": 249
+   },
+   "one_trade_r17": {
+    "checked": 4564,
+    "failed": 0,
+    "passed": 4564
+   },
+   "sl_r18": {
+    "checked": 841,
+    "failed": 0,
+    "passed": 841
+   },
+   "tp_r19": {
+    "checked": 841,
+    "failed": 0,
+    "passed": 841
+   },
+   "exit_sltp": {
+    "checked": 839,
+    "failed": 0,
+    "passed": 839
+   },
+   "risk_r20": {
+    "checked": 842,
+    "failed": 0,
+    "passed": 842
+   },
+   "cap_r21": {
+    "checked": 1319,
+    "failed": 0,
+    "passed": 1319
+   },
+   "cancel_r22": {
+    "checked": 3838,
+    "failed": 0,
+    "passed": 3838
+   },
+   "tf_sync": {
+    "checked": 35723,
+    "failed": 0,
+    "passed": 35723
+   }
+  },
+  "unverifiable": {
+   "short_entry_ask": {
+    "cases": 429,
+    "why": "short SL spread: Ask - Bid at the entry tick is the EA's own log (bars carry Bid only); the checker verifies SL = anchor + buffer + that logged spread and the Bid against the bar open",
+    "example_setups": [
+     698,
+     700,
+     5,
+     714,
+     722
+    ]
+   },
+   "entry_price_ask": {
+    "cases": 413,
+    "why": "long request/fill price is an Ask (not in the bars); the volume check uses the logged price",
+    "example_setups": [
+     696,
+     730,
+     740,
+     691,
+     531
+    ]
+   },
+   "touch_after_last_logged_bar": {
+    "cases": 1,
+    "why": "touch tick inside the final M1 bar, which never closes and is never logged",
+    "example_setups": [
+     4561
+    ]
+   },
+   "tick_within_minute": {
+    "cases": 5081,
+    "why": "touch/return: the minute and a Bid inside that bar at the zone edge are verified; which tick of the minute (tick_msc) is the EA's claim - the bars carry minute OHLC only",
+    "example_setups": [
+     7,
+     698,
+     701,
+     699,
+     700
+    ]
+   },
+   "short_exit_ask": {
+    "cases": 428,
+    "why": "short exits trigger on Ask: only the necessary Bid conditions are checked (no earlier bar whose Bid high reaches the SL; exit-bar Bid low at/below the TP)",
+    "example_setups": [
+     698,
+     700,
+     5,
+     714,
+     722
+    ]
+   },
+   "level_in_session_open_bar": {
+    "cases": 13,
+    "why": "SL/TP level reached only inside the first M1 bar after a quote gap (daily break, weekend). Quotes start 01:00, the trade session 01:01, so nothing executes in that minute (research/session_probe.py: Market orders refused 169/169 at 01:00, filled 169/169 at 01:01; replicas exit as the EA did). The later exit needs the tick log; results/pilot/gate_decisions.md holds the pre-registered sensitivity",
+    "example_setups": [
+     763,
+     1701,
+     1746,
+     1744,
+     1972
+    ]
+   },
+   "exit_same_bar_as_fill": {
+    "cases": 1,
+    "why": "fill and exit in one M1 bar: tick order inside the bar is not in the logs",
+    "example_setups": [
+     1223
+    ]
+   }
+  }
+ },
+ "occurrences": {
+  "long": 2266,
+  "short": 2298,
+  "touched": 3831,
+  "touch_bar_opens_in_zone": 333,
+  "warmup_dropped": 668,
+  "run_end_untouched": 64,
+  "run_end_waiting": 1,
+  "break": 1668,
+  "touch_bar_break": 159,
+  "return": 1250,
+  "return_and_break_same_bar": 578,
+  "cancelled_second_break": 1071,
+  "cancelled_opposing_structure": 1919,
+  "lh_candidates": 4576,
+  "lh_voided": 1982,
+  "sc_hh": 3690,
+  "sc_on_touch_bar": 105,
+  "sc_superseded": 740,
+  "fvg_fixed": 3110,
+  "fvg_c3_before_k1": 850,
+  "fvg_skipped_closed_beyond": 135,
+  "fvg_none": 566,
+  "fvg_lapsed": 1329,
+  "hl": 696,
+  "hl_failed": 0,
+  "hl_failed_variant_a": 1,
+  "reaction": 1569,
+  "reaction_at_k1": 26,
+  "reaction_on_return_bar": 0,
+  "competition": 186,
+  "lost_competition": 249,
+  "filled": 841,
+  "skipped_stop_crossed": 0,
+  "skipped_stops_level": 0,
+  "skipped_volume": 1,
+  "skipped_margin": 0,
+  "skipped_cap": 478,
+  "skipped_broker_reject": 0,
+  "market_closed_retry": 0,
+  "retry_dropped": 0,
+  "sl_anchor_ob": 779,
+  "sl_anchor_hl": 0,
+  "sl_anchor_pivot": 62,
+  "pivots": 30867,
+  "pivots_replaced": 3224,
+  "outside_bar_pivots": 432,
+  "candidates_m5": 4564
+ },
+ "journal": {
+  "warmup_bars": 28785,
+  "stops_level_pts": 20,
+  "tick": 0.01,
+  "discarded_days": 0,
+  "discarded_minutes": 0,
+  "total_minute_bars": 149556,
+  "funnel": {
+   "identified": 4564,
+   "touched": 3832,
+   "structure_changes": 3690,
+   "fvg_fixed": 3110,
+   "ready": 3110,
+   "reactions": 1569,
+   "entries": 1320,
+   "filled": 841,
+   "cancelled_second_break": 1071,
+   "cancelled_opposing_structure": 1919,
+   "skipped_stop_crossed": 0,
+   "skipped_stops_level": 0,
+   "skipped_volume": 1,
+   "skipped_margin": 0,
+   "skipped_cap": 478,
+   "skipped_broker_reject": 0,
+   "lost_competition": 249,
+   "warmup_dropped": 668,
+   "run_end_waiting": 1,
+   "run_end_untouched": 64,
+   "market_closed_retries": 0
+  }
+ }
+}

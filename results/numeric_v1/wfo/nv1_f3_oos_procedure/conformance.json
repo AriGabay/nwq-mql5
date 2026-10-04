@@ -1,0 +1,250 @@
+{
+ "run_id": "nv1_f3_oos_procedure",
+ "setups": 1496,
+ "bars_m1": 57716,
+ "bars_m5": 11561,
+ "violations": 0,
+ "violation_rows": [],
+ "coverage": {
+  "rules": {
+   "ob_r3": {
+    "checked": 2992,
+    "failed": 0,
+    "passed": 2992
+   },
+   "touch_r5": {
+    "checked": 1497,
+    "failed": 0,
+    "passed": 1497
+   },
+   "break_r6": {
+    "checked": 329,
+    "failed": 0,
+    "passed": 329
+   },
+   "return_r7": {
+    "checked": 251,
+    "failed": 0,
+    "passed": 251
+   },
+   "second_break_r8": {
+    "checked": 440,
+    "failed": 0,
+    "passed": 440
+   },
+   "pivot_causality_r9": {
+    "checked": 22275,
+    "failed": 0,
+    "passed": 22275
+   },
+   "sc_r10": {
+    "checked": 869,
+    "failed": 0,
+    "passed": 869
+   },
+   "hl_r11": {
+    "checked": 144,
+    "failed": 0,
+    "passed": 144
+   },
+   "fvg_r12": {
+    "checked": 1329,
+    "failed": 0,
+    "passed": 1329
+   },
+   "fvg_lapse_r13": {
+    "checked": 271,
+    "failed": 0,
+    "passed": 271
+   },
+   "reaction_r14": {
+    "checked": 317,
+    "failed": 0,
+    "passed": 317
+   },
+   "entry_r15": {
+    "checked": 399,
+    "failed": 0,
+    "passed": 399
+   },
+   "competition_r16": {
+    "checked": 56,
+    "failed": 0,
+    "passed": 56
+   },
+   "one_trade_r17": {
+    "checked": 1496,
+    "failed": 0,
+    "passed": 1496
+   },
+   "sl_r18": {
+    "checked": 138,
+    "failed": 0,
+    "passed": 138
+   },
+   "tp_r19": {
+    "checked": 138,
+    "failed": 0,
+    "passed": 138
+   },
+   "exit_sltp": {
+    "checked": 137,
+    "failed": 0,
+    "passed": 137
+   },
+   "risk_r20": {
+    "checked": 138,
+    "failed": 0,
+    "passed": 138
+   },
+   "cap_r21": {
+    "checked": 261,
+    "failed": 0,
+    "passed": 261
+   },
+   "cancel_r22": {
+    "checked": 784,
+    "failed": 0,
+    "passed": 784
+   },
+   "tf_sync": {
+    "checked": 11561,
+    "failed": 0,
+    "passed": 11561
+   }
+  },
+  "unverifiable": {
+   "entry_price_ask": {
+    "cases": 65,
+    "why": "long request/fill price is an Ask (not in the bars); the volume check uses the logged price",
+    "example_setups": [
+     751,
+     787,
+     796,
+     708,
+     810
+    ]
+   },
+   "short_entry_ask": {
+    "cases": 73,
+    "why": "short SL spread: Ask - Bid at the entry tick is the EA's own log (bars carry Bid only); the checker verifies SL = anchor + buffer + that logged spread and the Bid against the bar open",
+    "example_setups": [
+     752,
+     760,
+     759,
+     753,
+     754
+    ]
+   },
+   "tick_within_minute": {
+    "cases": 1002,
+    "why": "touch/return: the minute and a Bid inside that bar at the zone edge are verified; which tick of the minute (tick_msc) is the EA's claim - the bars carry minute OHLC only",
+    "example_setups": [
+     737,
+     741,
+     742,
+     740,
+     743
+    ]
+   },
+   "short_exit_ask": {
+    "cases": 72,
+    "why": "short exits trigger on Ask: only the necessary Bid conditions are checked (no earlier bar whose Bid high reaches the SL; exit-bar Bid low at/below the TP)",
+    "example_setups": [
+     752,
+     760,
+     759,
+     764,
+     754
+    ]
+   },
+   "level_in_session_open_bar": {
+    "cases": 1,
+    "why": "SL/TP level reached only inside the first M1 bar after a quote gap (daily break, weekend). Quotes start 01:00, the trade session 01:01, so nothing executes in that minute (research/session_probe.py: Market orders refused 169/169 at 01:00, filled 169/169 at 01:01; replicas exit as the EA did). The later exit needs the tick log; results/pilot/gate_decisions.md holds the pre-registered sensitivity",
+    "example_setups": [
+     771
+    ]
+   }
+  }
+ },
+ "occurrences": {
+  "long": 738,
+  "short": 758,
+  "touched": 751,
+  "touch_bar_opens_in_zone": 65,
+  "warmup_dropped": 718,
+  "run_end_untouched": 27,
+  "run_end_waiting": 1,
+  "break": 329,
+  "touch_bar_break": 32,
+  "return": 251,
+  "return_and_break_same_bar": 107,
+  "cancelled_second_break": 220,
+  "cancelled_opposing_structure": 392,
+  "lh_candidates": 906,
+  "lh_voided": 388,
+  "sc_hh": 724,
+  "sc_on_touch_bar": 27,
+  "sc_superseded": 145,
+  "fvg_fixed": 609,
+  "fvg_c3_before_k1": 174,
+  "fvg_skipped_closed_beyond": 22,
+  "fvg_none": 111,
+  "fvg_lapsed": 271,
+  "hl": 144,
+  "hl_failed": 0,
+  "hl_failed_variant_a": 1,
+  "reaction": 317,
+  "reaction_at_k1": 6,
+  "reaction_on_return_bar": 0,
+  "competition": 40,
+  "lost_competition": 56,
+  "filled": 138,
+  "skipped_stop_crossed": 0,
+  "skipped_stops_level": 0,
+  "skipped_volume": 0,
+  "skipped_margin": 0,
+  "skipped_cap": 123,
+  "skipped_broker_reject": 0,
+  "market_closed_retry": 0,
+  "retry_dropped": 0,
+  "sl_anchor_ob": 125,
+  "sl_anchor_hl": 0,
+  "sl_anchor_pivot": 13,
+  "pivots": 10005,
+  "pivots_replaced": 1088,
+  "outside_bar_pivots": 146,
+  "candidates_m5": 1496
+ },
+ "journal": {
+  "warmup_bars": 28932,
+  "stops_level_pts": 20,
+  "tick": 0.01,
+  "discarded_days": 0,
+  "discarded_minutes": 0,
+  "total_minute_bars": 28785,
+  "funnel": {
+   "identified": 1496,
+   "touched": 751,
+   "structure_changes": 724,
+   "fvg_fixed": 609,
+   "ready": 609,
+   "reactions": 317,
+   "entries": 261,
+   "filled": 138,
+   "cancelled_second_break": 220,
+   "cancelled_opposing_structure": 392,
+   "skipped_stop_crossed": 0,
+   "skipped_stops_level": 0,
+   "skipped_volume": 0,
+   "skipped_margin": 0,
+   "skipped_cap": 123,
+   "skipped_broker_reject": 0,
+   "lost_competition": 56,
+   "warmup_dropped": 718,
+   "run_end_waiting": 1,
+   "run_end_untouched": 27,
+   "market_closed_retries": 0
+  }
+ }
+}

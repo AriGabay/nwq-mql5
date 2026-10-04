@@ -1,0 +1,22 @@
+{
+ "tag": "smoke",
+ "train": [
+  "2026.02.02",
+  "2026.02.06"
+ ],
+ "trade_floor": 45,
+ "params": {
+  "StructureVariant": 0,
+  "SwingStrengthM1": 3,
+  "StopBufferPoints": 20
+ },
+ "reason": {
+  "eligible_passes": 0,
+  "below_trade_floor": 12,
+  "above_dd_limit": 6,
+  "note": "no pass met trades >= 45 and tester equity DD <= 10.0%; the defaults are carried forward as a fallback, not as a selected candidate"
+ },
+ "label": "fallback",
+ "status": "no_eligible_pass",
+ "eligible_passes": 0
+}

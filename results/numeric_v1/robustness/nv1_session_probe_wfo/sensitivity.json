@@ -1,0 +1,205 @@
+{
+ "method": "re-pricing of a fixed trade list; closed-trade balance drawdown on the corrected timeline",
+ "per_run": {
+  "nv1_f1_oos_procedure": {
+   "deposit": 10000.0,
+   "positions": 180,
+   "affected": 1,
+   "outcome_flips": 0,
+   "net_primary": 1805.7,
+   "net_sensitivity": 1821.24,
+   "net_delta": 15.54,
+   "max_dd_closed_pct_primary": 14.328,
+   "max_dd_closed_pct_sensitivity": 14.177
+  },
+  "nv1_f2_oos_procedure": {
+   "deposit": 11805.0,
+   "positions": 172,
+   "affected": 6,
+   "outcome_flips": 0,
+   "net_primary": -1608.69,
+   "net_sensitivity": -1622.19,
+   "net_delta": -13.5,
+   "max_dd_closed_pct_primary": 24.642,
+   "max_dd_closed_pct_sensitivity": 24.712
+  },
+  "nv1_f3_oos_procedure": {
+   "deposit": 10196.0,
+   "positions": 138,
+   "affected": 1,
+   "outcome_flips": 1,
+   "net_primary": 304.64,
+   "net_sensitivity": 19.76,
+   "net_delta": -284.88,
+   "max_dd_closed_pct_primary": 16.134,
+   "max_dd_closed_pct_sensitivity": 16.553
+  },
+  "nv1_f4_oos_procedure": {
+   "deposit": 10500.0,
+   "positions": 169,
+   "affected": 3,
+   "outcome_flips": 0,
+   "net_primary": -757.4,
+   "net_sensitivity": -780.67,
+   "net_delta": -23.27,
+   "max_dd_closed_pct_primary": 18.199,
+   "max_dd_closed_pct_sensitivity": 18.166
+  },
+  "nv1_f5_oos_procedure": {
+   "deposit": 9742.0,
+   "positions": 196,
+   "affected": 2,
+   "outcome_flips": 0,
+   "net_primary": -212.76,
+   "net_sensitivity": -213.47,
+   "net_delta": -0.71,
+   "max_dd_closed_pct_primary": 18.825,
+   "max_dd_closed_pct_sensitivity": 18.782
+  },
+  "nv1_f1_oos_baseline_a": {
+   "deposit": 10000.0,
+   "positions": 180,
+   "affected": 1,
+   "outcome_flips": 0,
+   "net_primary": 1805.7,
+   "net_sensitivity": 1821.24,
+   "net_delta": 15.54,
+   "max_dd_closed_pct_primary": 14.328,
+   "max_dd_closed_pct_sensitivity": 14.177
+  },
+  "nv1_f2_oos_baseline_a": {
+   "deposit": 11805.0,
+   "positions": 172,
+   "affected": 6,
+   "outcome_flips": 0,
+   "net_primary": -1608.69,
+   "net_sensitivity": -1622.19,
+   "net_delta": -13.5,
+   "max_dd_closed_pct_primary": 24.642,
+   "max_dd_closed_pct_sensitivity": 24.712
+  },
+  "nv1_f3_oos_baseline_a": {
+   "deposit": 10196.0,
+   "positions": 138,
+   "affected": 1,
+   "outcome_flips": 1,
+   "net_primary": 304.64,
+   "net_sensitivity": 19.76,
+   "net_delta": -284.88,
+   "max_dd_closed_pct_primary": 16.134,
+   "max_dd_closed_pct_sensitivity": 16.553
+  },
+  "nv1_f4_oos_baseline_a": {
+   "deposit": 10500.0,
+   "positions": 169,
+   "affected": 3,
+   "outcome_flips": 0,
+   "net_primary": -757.4,
+   "net_sensitivity": -780.67,
+   "net_delta": -23.27,
+   "max_dd_closed_pct_primary": 18.199,
+   "max_dd_closed_pct_sensitivity": 18.166
+  },
+  "nv1_f5_oos_baseline_a": {
+   "deposit": 9742.0,
+   "positions": 196,
+   "affected": 2,
+   "outcome_flips": 0,
+   "net_primary": -212.76,
+   "net_sensitivity": -213.47,
+   "net_delta": -0.71,
+   "max_dd_closed_pct_primary": 18.825,
+   "max_dd_closed_pct_sensitivity": 18.782
+  },
+  "nv1_f1_oos_baseline_b": {
+   "deposit": 10000.0,
+   "positions": 54,
+   "affected": 0,
+   "outcome_flips": 0,
+   "net_primary": 657.23,
+   "net_sensitivity": 657.23,
+   "net_delta": 0.0,
+   "max_dd_closed_pct_primary": 9.966,
+   "max_dd_closed_pct_sensitivity": 9.966
+  },
+  "nv1_f2_oos_baseline_b": {
+   "deposit": 10657.0,
+   "positions": 47,
+   "affected": 3,
+   "outcome_flips": 0,
+   "net_primary": -895.91,
+   "net_sensitivity": -903.45,
+   "net_delta": -7.54,
+   "max_dd_closed_pct_primary": 9.939,
+   "max_dd_closed_pct_sensitivity": 10.01
+  },
+  "nv1_f3_oos_baseline_b": {
+   "deposit": 9761.0,
+   "positions": 58,
+   "affected": 2,
+   "outcome_flips": 1,
+   "net_primary": -318.02,
+   "net_sensitivity": -701.63,
+   "net_delta": -383.61,
+   "max_dd_closed_pct_primary": 16.748,
+   "max_dd_closed_pct_sensitivity": 17.366
+  },
+  "nv1_f4_oos_baseline_b": {
+   "deposit": 9442.0,
+   "positions": 45,
+   "affected": 1,
+   "outcome_flips": 0,
+   "net_primary": 874.11,
+   "net_sensitivity": 896.15,
+   "net_delta": 22.04,
+   "max_dd_closed_pct_primary": 7.443,
+   "max_dd_closed_pct_sensitivity": 7.214
+  },
+  "nv1_f5_oos_baseline_b": {
+   "deposit": 10316.0,
+   "positions": 52,
+   "affected": 1,
+   "outcome_flips": 0,
+   "net_primary": 812.12,
+   "net_sensitivity": 817.72,
+   "net_delta": 5.6,
+   "max_dd_closed_pct_primary": 7.744,
+   "max_dd_closed_pct_sensitivity": 7.692
+  }
+ },
+ "per_group": {
+  "procedure": {
+   "deposit": 10000.0,
+   "positions": 855,
+   "affected": 13,
+   "outcome_flips": 1,
+   "net_primary": -468.51,
+   "net_sensitivity": -775.33,
+   "net_delta": -306.82,
+   "max_dd_closed_pct_primary": 30.682,
+   "max_dd_closed_pct_sensitivity": 33.256
+  },
+  "baseline_a": {
+   "deposit": 10000.0,
+   "positions": 855,
+   "affected": 13,
+   "outcome_flips": 1,
+   "net_primary": -468.51,
+   "net_sensitivity": -775.33,
+   "net_delta": -306.82,
+   "max_dd_closed_pct_primary": 30.682,
+   "max_dd_closed_pct_sensitivity": 33.256
+  },
+  "baseline_b": {
+   "deposit": 10000.0,
+   "positions": 256,
+   "affected": 7,
+   "outcome_flips": 1,
+   "net_primary": 1129.53,
+   "net_sensitivity": 766.02,
+   "net_delta": -363.51,
+   "max_dd_closed_pct_primary": 17.943,
+   "max_dd_closed_pct_sensitivity": 21.343
+  }
+ }
+}

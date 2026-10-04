@@ -1,0 +1,19 @@
+{
+ "net_profit": 1000.96,
+ "trades": 42,
+ "profit_factor": 1.5,
+ "recovery_factor": 1.08,
+ "equity_dd_money": 922.92,
+ "equity_dd_pct": 8.51,
+ "balance_dd_pct": 6.62,
+ "run_id": "nv1_behaviour_0_2_20",
+ "params": {
+  "StructureVariant": 0,
+  "SwingStrengthM1": 2,
+  "StopBufferPoints": 20
+ },
+ "deposit": 10000,
+ "final_balance": 11000.96,
+ "input_mismatches": [],
+ "conformance_violations": 0
+}

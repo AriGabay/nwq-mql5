@@ -1,0 +1,58 @@
+{
+ "ob_m1_structure_nv1_original.set": {
+  "run_id": "nv1_validate_original",
+  "params": [
+   0,
+   3,
+   20
+  ],
+  "mismatches": [],
+  "status": "ok",
+  "research_twin": "nv1_f1_oos_baseline_a",
+  "same_deals_as_research_build": true,
+  "delivered_net": 1805.7,
+  "research_net": 1805.7
+ },
+ "ob_m1_structure_nv1_baseline_a.set": {
+  "run_id": "nv1_validate_baseline_a",
+  "params": [
+   0,
+   3,
+   20
+  ],
+  "mismatches": [],
+  "status": "ok",
+  "research_twin": "nv1_f1_oos_baseline_a",
+  "same_deals_as_research_build": true,
+  "delivered_net": 1805.7,
+  "research_net": 1805.7
+ },
+ "ob_m1_structure_nv1_baseline_b.set": {
+  "run_id": "nv1_validate_baseline_b",
+  "params": [
+   1,
+   3,
+   20
+  ],
+  "mismatches": [],
+  "status": "ok",
+  "research_twin": "nv1_f1_oos_baseline_b",
+  "same_deals_as_research_build": true,
+  "delivered_net": 657.23,
+  "research_net": 657.23
+ },
+ "ob_m1_structure_nv1_fallback.set": {
+  "run_id": "nv1_validate_fallback",
+  "params": [
+   0,
+   3,
+   20
+  ],
+  "mismatches": [],
+  "status": "ok",
+  "research_twin": "nv1_f1_oos_baseline_a",
+  "same_deals_as_research_build": true,
+  "delivered_net": 1805.7,
+  "research_net": 1805.7
+ }
+}

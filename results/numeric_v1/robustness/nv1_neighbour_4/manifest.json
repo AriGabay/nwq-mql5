@@ -1,0 +1,26 @@
+{
+ "run_id": "nv1_neighbour_4",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "02a44b32bae4246d6e68f21f284851f985bd628dc7e5f51ace8ee4ada5fed666",
+ "ini_sha256": "190913c3647433f59cb465caf72937d69164a76efc42c8ea9c599ad53f248dc0",
+ "meta": {
+  "kind": "research",
+  "role": "neighbour",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "ImpulseWindowBars": 2,
+   "WarmupDays": 30,
+   "StructureVariant": 0,
+   "SwingStrengthM1": 3,
+   "StopBufferPoints": 40,
+   "ResearchRunTag": "nv1_neighbour_4"
+  }
+ },
+ "started": "2026-10-04T19:34:17",
+ "status": "ok",
+ "seconds": 34.5,
+ "report": "nv1_neighbour_4.htm",
+ "exit_code": 0
+}

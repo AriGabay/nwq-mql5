@@ -543,12 +543,13 @@ def _series_view(s: dict, start: str, end: str) -> dict:
             **evaluate.drawdowns(s)}
 
 
-def session_sensitivity(tag: str, run_ids: list, groups: dict, window: list) -> dict:
+def session_sensitivity(tag: str, run_ids: list, groups: dict, window: list, out_root: pathlib.Path = None) -> dict:
     """The pre-registered quote-only-minute sensitivity: one probe run over the given runs, then the fixed trade
-    list re-priced per run and per group of chained runs (results/pilot/gate_decisions.md)."""
+    list re-priced per run and per group of chained runs (results/pilot/gate_decisions.md). out_root defaults to
+    this research's results/robustness; another study passes its own root."""
     import session_probe as sp
     from mt5r import session_sensitivity as ss
-    out_dir = ROBUST / tag
+    out_dir = (out_root or ROBUST) / tag
     sp.cmd_run(run_ids, tag, out_dir, window=window)
     cs = sp.cases(run_ids)
     ticks = pd.read_csv(runner.RUNS / tag / f"rl_ticks_{tag}.csv")

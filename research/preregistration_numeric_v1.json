@@ -1,0 +1,314 @@
+{
+ "study": "numeric_v1",
+ "protocol": "docs/plans/2026-10-04-1851-feat-ob-m1-numeric-grid-research-plan.md (R1-R28, KTD1-KTD13)",
+ "frozen_note": "Committed and pushed before the first research run of numeric_v1. Nothing here changes afterwards. The previous research's protocol (research/preregistration.json) is unchanged.",
+ "strategy": "M5 OB + M1 structure change + M1 FVG retest with a reaction candle (ob_m1_structure.mq5)",
+ "chart_period": "M1",
+ "zone_period": "M5",
+ "deposit": 10000,
+ "leverage": "1:100",
+ "fixed_inputs": {
+  "ImpulseWindowBars": 2,
+  "RiskRR": 2.0,
+  "RiskPercent": 1.0,
+  "MaxExposures": 3,
+  "WarmupDays": 30
+ },
+ "grid": {
+  "StructureVariant": [
+   0,
+   1
+  ],
+  "SwingStrengthM1": [
+   2,
+   3,
+   4
+  ],
+  "StopBufferPoints": [
+   10,
+   20,
+   40
+  ]
+ },
+ "grid_combinations": 18,
+ "categorical": [
+  "StructureVariant"
+ ],
+ "defaults": {
+  "StructureVariant": 0,
+  "SwingStrengthM1": 3,
+  "StopBufferPoints": 20
+ },
+ "optimization_runs_per_window": [
+  {
+   "part": "lo",
+   "ranges": {
+    "StructureVariant": [
+     0,
+     1,
+     1
+    ],
+    "SwingStrengthM1": [
+     2,
+     1,
+     4
+    ],
+    "StopBufferPoints": [
+     10,
+     10,
+     20
+    ]
+   },
+   "fixed": {},
+   "expected_passes": 12
+  },
+  {
+   "part": "hi",
+   "ranges": {
+    "StructureVariant": [
+     0,
+     1,
+     1
+    ],
+    "SwingStrengthM1": [
+     2,
+     1,
+     4
+    ]
+   },
+   "fixed": {
+    "StopBufferPoints": 40
+   },
+   "expected_passes": 6
+  }
+ ],
+ "pass_verification": "per optimization run: frames P-rows = XML rows = the manager log's 'total passes N' = 'N new records saved to cache' (this run's log section) = expected; every pass's inputs inside the grid; the merged lo+hi table holds each of the 18 tuples exactly once (KTD3, KTD4)",
+ "baselines": {
+  "baseline_a": {
+   "StructureVariant": 0,
+   "SwingStrengthM1": 3,
+   "StopBufferPoints": 20
+  },
+  "baseline_b": {
+   "StructureVariant": 1,
+   "SwingStrengthM1": 3,
+   "StopBufferPoints": 20
+  }
+ },
+ "series": {
+  "procedure": "per fold, the train selection, or the defaults labelled fallback when no pass is eligible",
+  "baseline_a": "(0, 3, 20) in every fold",
+  "baseline_b": "(1, 3, 20) in every fold",
+  "identity": "a series is named by its full parameter tuple; a candidate is never merged into a baseline because its variant matches (KTD7)"
+ },
+ "folds": [
+  {
+   "fold": 1,
+   "train": [
+    "2025.12.01",
+    "2026.02.28"
+   ],
+   "test": [
+    "2026.03.01",
+    "2026.03.31"
+   ]
+  },
+  {
+   "fold": 2,
+   "train": [
+    "2026.01.01",
+    "2026.03.31"
+   ],
+   "test": [
+    "2026.04.01",
+    "2026.04.30"
+   ]
+  },
+  {
+   "fold": 3,
+   "train": [
+    "2026.02.01",
+    "2026.04.30"
+   ],
+   "test": [
+    "2026.05.01",
+    "2026.05.31"
+   ]
+  },
+  {
+   "fold": 4,
+   "train": [
+    "2026.03.01",
+    "2026.05.31"
+   ],
+   "test": [
+    "2026.06.01",
+    "2026.06.30"
+   ]
+  },
+  {
+   "fold": 5,
+   "train": [
+    "2026.04.01",
+    "2026.06.30"
+   ],
+   "test": [
+    "2026.07.01",
+    "2026.07.31"
+   ]
+  }
+ ],
+ "final_train": [
+  "2026.05.01",
+  "2026.07.31"
+ ],
+ "excluded_window": [
+  "2026.08.01",
+  "2026.09.29"
+ ],
+ "excluded_window_rule": "August-September 2026 is not run by this study and is not a holdout (R23)",
+ "oos_label": "outside the train window, not blind and not independent: all of December-July was seen in earlier research and pilots (R23)",
+ "selection": {
+  "trade_floor_per_month": 15,
+  "train_months": 3,
+  "trade_floor": 45,
+  "max_equity_dd_pct": 10.0,
+  "drawdown_metric": "the tester's maximum equity drawdown of the train pass",
+  "score": "recovery factor (net profit / max equity DD in money) of eligible passes, 0 for ineligible passes",
+  "smoothing": "mean of the pass and its existing one-step neighbours on SwingStrengthM1 and StopBufferPoints (grid index steps) within the same StructureVariant",
+  "tie_break": "smallest distance to the defaults (index steps on ordinal axes, 1 for a different variant), then the lowest axis indices in the order StructureVariant, SwingStrengthM1, StopBufferPoints",
+  "fallback": "no eligible pass: status no_eligible_pass, the defaults (0, 3, 20) carried into the OOS month labelled fallback, never a selected or improved candidate (KTD6)",
+  "uses": "train data only; OOS results and robustness runs never change a choice"
+ },
+ "acceptance": {
+  "gating_series": "procedure",
+  "reported_series": [
+   "baseline_a",
+   "baseline_b"
+  ],
+  "min_fills_per_month": 15,
+  "days_per_month": 30.44,
+  "bootstrap_alpha": 0.05,
+  "min_positive_folds": 3,
+  "positive_folds_rule": "strict majority of the folds evaluated (3 of 5; 2 of 3 for group R)",
+  "remove_top_events": 2,
+  "event_bar": "M1",
+  "mc_breach_prob_max": 0.1,
+  "spread_stress_k": 1.0,
+  "stop_slippage_points": 10,
+  "entry_slippage_points": 10,
+  "min_stability_profitable_share": 0.6,
+  "dsr_min": 0.9,
+  "dsr_min_days": 60,
+  "net_vs_baseline": "the procedure's OOS net must be > 0 and exceed the OOS net of baseline_a AND of baseline_b (KTD10)",
+  "risk_metric": "loss limits on the daily equity records (eq_min) and MC on daily equity; the train selection uses the tester's maximum equity drawdown",
+  "stability_label": "of the final candidate's (or fallback's) grid neighbours (KTD8)"
+ },
+ "stability": {
+  "neighbours": "every one-step move on SwingStrengthM1 or StopBufferPoints inside the grid around the final candidate or fallback; the variant is categorical and is not a neighbour axis; a tuple equal to the candidate is never a neighbour",
+  "window": [
+   "2026.03.01",
+   "2026.07.31"
+  ],
+  "deposit": 10000,
+  "criterion": "share of neighbours with net > 0 >= 0.60: an acceptance criterion of the procedure; never read by selection (KTD8)"
+ },
+ "loss_limits": {
+  "daily_loss_pct_of_initial": 5.0,
+  "total_floor": 9000.0,
+  "trailing": false
+ },
+ "stats": {
+  "seed": 20260930,
+  "bootstrap_resamples": 10000,
+  "mean_block_days": 5,
+  "mc_paths": 10000,
+  "mc_horizon_days": 252,
+  "dsr_trials": 126,
+  "dsr_trials_note": "every evaluation of a configuration of this strategy on December-July: this research's 108 train passes (18 x 6 windows), the previous research's 12 train passes, 2 pilot runs and 4 stability perturbations. Excluded: the previous OOS runs, the August-September runs, the tick-coverage runs and the session probe (re-runs of counted configurations, or not strategy evaluations). Trials share data and overlapping configurations, so the effective number is lower; 126 overstates it, which makes the DSR stricter. Sensitivity: the 18 distinct configurations.",
+  "dsr_trials_sensitivity": 18,
+  "dsr_trials_components": {
+   "this_research_train_passes": 108,
+   "previous_train_passes": 12,
+   "previous_pilot_runs": 2,
+   "previous_stability_runs": 4
+  },
+  "var_sr": "evaluate.trial_sharpe_variance over this research's six merged scored_grid.csv files: the per-window sample variance of the OnTester daily Sharpe (Custom column) over passes with trades, averaged over the six windows"
+ },
+ "drawdowns_reported": [
+  "the tester's maximum equity and balance drawdown per run (maximum across folds)",
+  "the drawdown rebuilt from the daily equity records",
+  "the closed-trade balance drawdown"
+ ],
+ "reporting": {
+  "groups": {
+   "G": [
+    1,
+    2
+   ],
+   "R": [
+    3,
+    4,
+    5
+   ],
+   "rule": "all folds, group G (train includes generated ticks) and group R (train real ticks only) reported apart; acceptance also evaluated on group R for the report"
+  },
+  "session_minute": {
+   "finding": "quotes 01:00, trade session 01:01: SL/TP reached only in the quote-only minute execute from 01:01 (results/pilot/session_probe)",
+   "primary": "tester results unchanged",
+   "sensitivity": "research/mt5r/session_sensitivity.py: re-pricing of a fixed trade list at the first trigger tick of the quote-only minute; balance drawdown on the corrected timeline, closed trades only; later sizes, cap slots and signals are not re-simulated; reported for every OOS fold, the WFO aggregate and August-September; never used for a choice"
+  },
+  "pnl_exposure": "all of December-July and August-September were seen in earlier research"
+ },
+ "behaviour_checks": {
+  "window": [
+   "2026.02.02",
+   "2026.02.06"
+  ],
+  "runs": [
+   {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 3,
+    "StopBufferPoints": 20
+   },
+   {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 2,
+    "StopBufferPoints": 20
+   },
+   {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 4,
+    "StopBufferPoints": 20
+   },
+   {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 3,
+    "StopBufferPoints": 10
+   },
+   {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 3,
+    "StopBufferPoints": 40
+   }
+  ],
+  "criterion": "zero conformance violations and checked cases > 0 for the checker's pivot_causality_r9 and sl_r18 rules in every run; pivot sets differ across N; logged stop-to-anchor distances equal the buffer (KTD11)"
+ },
+ "run_budget": {
+  "train_passes": 108,
+  "train_optimization_runs": 12,
+  "smoke_optimization_runs": 2,
+  "smoke_passes": 18,
+  "behaviour_single_runs": 5,
+  "oos_single_runs": 15,
+  "robustness_single_runs": "3 to 5 (the static candidate or fallback plus 2-4 neighbours, KTD8)",
+  "session_probe_runs": 1,
+  "delivery_validation_runs": "4 on the delivered build plus at most 1 research-build twin (KTD13)"
+ },
+ "deliverables": "at most a candidate .set (only when the final selection is 'selected') and a forward-test protocol on new data; a fallback .set otherwise; never a recommended .set (R24)",
+ "pre_freeze_evidence": {
+  "results/numeric_v1/smoke/optsmoke.json": "23b086232e0bcafdb8d1d9b81ce6d560ffe50fd933a75091ab890afe38fd3934",
+  "results/numeric_v1/smoke/behaviour.json": "05e6bf71eb331831ffc3444ca8ef3de4731019ef9abe88fd5f34408f6f4f6d69"
+ },
+ "ea_source_sha256": "6dbea8e784aa7b979bdf7b9fe1f72eb889d2099888179001bd8dd8e58e7417fa"
+}
