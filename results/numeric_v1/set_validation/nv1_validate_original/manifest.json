@@ -1,0 +1,15 @@
+{
+ "run_id": "nv1_validate_original",
+ "ex5": "ob_m1_structure.ex5",
+ "ex5_sha256": "5cba969a17f64e6bbbea5dc98e608d0e36c54807f4a9d72625a8d0a7c275d719",
+ "ini_sha256": "58fd0494cffeb39783b076e5750f5d36d7b64af704faf82da1a68481392f5315",
+ "meta": {
+  "role": "set_validation",
+  "set": "ob_m1_structure_nv1_original.set"
+ },
+ "started": "2026-10-04T19:36:18",
+ "status": "ok",
+ "seconds": 12.9,
+ "report": "nv1_validate_original.htm",
+ "exit_code": 0
+}

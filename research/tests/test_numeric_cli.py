@@ -122,3 +122,28 @@ def test_freeze_writes_candidate_only_when_selected(tmp_path, monkeypatch, statu
     assert (int(vals["SwingStrengthM1"]), int(vals["StopBufferPoints"])) == params[1:]
     head = (tmp_path / "deliv" / nc.SETS[kind]).read_bytes().decode("utf-16")
     assert ("FALLBACK" in head) == (kind == "fallback")
+
+
+def _acc(passed: bool) -> dict:
+    crit = {k: {"pass": passed, "evaluated": True, "value": 0, "threshold": "t"} for k in
+            ("oos_frequency", "oos_net", "bootstrap_ci", "positive_folds", "top_events_removed", "loss_limits",
+             "cost_stress", "stability", "dsr")}
+    crit["oos_net"]["value"] = {"net": 1.0, "baselines": {"baseline_a": 0.0, "baseline_b": 0.0},
+                                "margins": {"baseline_a": 1.0, "baseline_b": 1.0}}
+    crit["dsr"]["value"] = {"psr_value": 0.5, "trials": 126, "sensitivity": {"trials": 18, "psr_value": 0.6}}
+    a = {"criteria": crit, "passed_all": passed, "drawdowns": {"balance_dd_pct": 1.0, "equity_dd_pct": 1.0}}
+    view = {"net": 1.0, "fills": 1, "fills_per_month": 1.0, "win_rate": 0.5, "dd_tester_equity_max_pct": 1.0,
+            "dd_tester_balance_max_pct": 1.0, "dd_daily_records_pct": 1.0, "dd_closed_trades_pct": 1.0}
+    return {"final": {"params": nv.DEFAULTS, "kind": "fallback", "series": "baseline_a"},
+            "acceptance": {"procedure": a, "baseline_a": a, "baseline_b": a},
+            "acceptance_group_R_report_only": a, "passed_all": passed, "fold_rows": [],
+            "groups": {w: {"all": view, "G": view, "R": view} for w in nc.SERIES},
+            "stability": {"profitable_share": 0.5, "rows": [], "window": nv.STABILITY_WINDOW},
+            "var_sr": 0.001, "shuffle_mc": {}, "session_sensitivity": {}}
+
+
+@pytest.mark.parametrize("passed", [False, True])
+def test_report_verdict_states_no_improvement_unless_every_criterion_passes(passed):
+    text = nc.build_report(_acc(passed), [], [], {})
+    assert ("לא נמצא שיפור במסגרת הגריד שנבדק" in text) == (not passed)
+    assert "recommended" not in text.lower() or "אין recommended.set" in text

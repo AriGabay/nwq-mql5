@@ -251,8 +251,11 @@ def window_table() -> pd.DataFrame:
     recs = [(f"fold {f['fold']}", f["window"]) for f in folds]
     if (FINAL_DIR / "window.json").exists():
         recs.append(("final", json.loads((FINAL_DIR / "window.json").read_text())))
+    dirs = {f"fold {f['fold']}": WFO / f"f{f['fold']}_selection" for f in folds} | {"final": FINAL_DIR}
     for name, w in recs:
+        sc = pd.read_csv(dirs[name] / "scored_grid.csv")
         rows.append({"window": name, "train": f"{w['train'][0]}-{w['train'][1]}", "expected": w["expected"],
+                     "min_train_eq_dd_pct": round(float(sc["eq_dd_pct"].min()), 2),
                      "completed": w["completed"], "failed": w["failed"], "cached": w["cached"],
                      "seconds": w["seconds"], "eligible": w["reason"]["eligible_passes"],
                      "status": w["selection_status"], "label": w["label"],
@@ -443,10 +446,147 @@ def cmd_deliver(args) -> None:
                        "status": "ok" if rep and not mism and same else "mismatch", "has_report": rep is not None})
         curate.curate(rid, _dest(nv.RESULTS / "set_validation"))
     save(checks, nv.RESULTS / "set_validation.json")
+    write_deliverables(json.loads((nv.RESULTS / "acceptance.json").read_text()), checks)
     if any(nv.DELIV.glob("*recommended*")):
         raise SystemExit("a recommended .set must not exist (R24)")
     print(json.dumps({k: {"mismatches": len(v["mismatches"]), "same_deals": v["same_deals_as_research_build"]}
                       for k, v in checks.items()}, indent=1))
+
+
+CRIT_HE = {"oos_frequency": "תדירות (עסקאות בחודש)", "oos_net": "נטו > 0 ומעל שני ה־baselines",
+           "bootstrap_ci": "CI של ה־PnL היומי > 0", "positive_folds": "רוב folds חיוביים",
+           "top_events_removed": "נטו בלי 2 האירועים הגדולים", "loss_limits": "מגבלות הפסד + MC",
+           "cost_stress": "לחץ עלויות", "stability": "יציבות שכנים", "dsr": "DSR"}
+SERIES_HE = {"procedure": "הליך הבחירה", "baseline_a": "baseline A (0,3,20)", "baseline_b": "baseline B (1,3,20)"}
+
+
+def _md(rows: list, cols: list) -> str:
+    out = ["| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
+    for r in rows:
+        out.append("| " + " | ".join("" if r.get(c) is None else str(r.get(c)) for c in cols) + " |")
+    return "\n".join(out)
+
+
+def _ok(c: dict) -> str:
+    return "לא נבדק" if not c.get("evaluated", True) else ("עובר" if c["pass"] else "נכשל")
+
+
+FOLD_COLS = ["fold", "series", "params", "label", "net", "fills", "tester eq DD %", "conformance", "inputs"]
+COMP_COLS = ["series", "group", "net", "fills/month", "DD tester eq max %", "DD daily records %", "DD closed trades %"]
+
+
+def fold_rows_table(acc: dict) -> list:
+    rows = []
+    for r in acc["fold_rows"]:
+        for w in SERIES:
+            rows.append({"fold": r["fold"], "series": SERIES_HE[w], "params": r[f"{w}_params"],
+                         "label": r["label"] if w == "procedure" else "קבוע", "net": r[f"{w}_net"],
+                         "fills": r[f"{w}_fills"], "tester eq DD %": r[f"{w}_tester_equity_dd_pct"],
+                         "conformance": r[f"{w}_conformance_violations"], "inputs": r[f"{w}_input_mismatches"]})
+    return rows
+
+
+def comparison_table(acc: dict) -> list:
+    rows = []
+    for w in SERIES:
+        for g in ("all", "G", "R"):
+            v = acc["groups"][w][g]
+            rows.append({"series": SERIES_HE[w], "group": g, "net": v["net"], "fills/month": v["fills_per_month"],
+                         "DD tester eq max %": v["dd_tester_equity_max_pct"],
+                         "DD daily records %": v["dd_daily_records_pct"], "DD closed trades %": v["dd_closed_trades_pct"]})
+    return rows
+
+
+def build_report(acc: dict, windows: list, folds: list, checks: dict) -> str:
+    """The Hebrew report of numeric_v1 (U10): verdict first, then windows, folds, comparison and robustness."""
+    proc = acc["acceptance"]["procedure"]
+    passed = bool(acc["passed_all"])
+    final = acc["final"]
+    t = "/".join(str(final["params"][a]) for a in nv.AXES)
+    verdict = ("**המסקנה: ההליך עמד בכל הקריטריונים שנקבעו מראש.** גם כך, לכל היותר candidate.set ופרוטוקול forward "
+               "על נתונים חדשים. אין recommended.set." if passed else
+               "**המסקנה: לא נמצא שיפור במסגרת הגריד שנבדק.** אין מועמד, אין המלצה ואין recommended.set.")
+    lines = ["# מחקר numeric_v1: בחירה מספרית מבוקרת ל־M5 OB + M1 structure", "", verdict, ""]
+    if final["kind"] == "fallback":
+        lines += [f"בכל חלונות האימון, כולל הבחירה הסופית על מאי–יולי, אף מעבר לא עמד בתנאי הבחירה (`no_eligible_pass`). "
+                  f"לכן ההליך הריץ בכל חודש OOS את ברירת המחדל ({t}) כ־**fallback**. זו לא בחירה ולא שיפור, "
+                  "והקובץ שנמסר הוא `ob_m1_structure_nv1_fallback.set` ולא candidate.", ""]
+    lines += ["## מה נבדק", "",
+              "- **הגריד:** ‏StructureVariant {0,1} × ‏SwingStrengthM1 {2,3,4} × ‏StopBufferPoints {10,20,40}, כלומר 18 "
+              "צירופים בכל חלון. שאר הקלטים קבועים: ImpulseWindowBars=2, ‏2R, סיכון 1%, עד 3 פוזיציות, 30 ימי חימום, "
+              "10,000$, ‏1:100.",
+              "- **חלונות:** 5 folds של 3 חודשי אימון וחודש OOS (מרץ–יולי 2026), ובחירה סופית על מאי–יולי. סך הכול "
+              "108 מעברי אימון.",
+              "- **כלל הבחירה:** ‏recovery factor עם החלקת שכנים, על אימון בלבד. מעבר כשיר רק עם לפחות 45 עסקאות "
+              "ו־equity DD של עד 10%. הכלל הוקפא ונדחף לפני ההרצות (`research/preregistration_numeric_v1.json`).",
+              "- **‏baselines קבועים:** ‏A (0,3,20) ו־B (1,3,20) בכל fold, עם שרשור הון.",
+              "- **מגבלות האימות:** כל דצמבר–יולי כבר נחשף במחקרים קודמים. לכן ה־OOS הוא מחוץ לחלון האימון, אבל לא "
+              "עיוור ולא עצמאי. אוגוסט–ספטמבר לא הורצו ולא מוצגים כ־holdout.", "",
+              "## חלונות האימון", ""]
+    lines.append(_md(windows, ["window", "train", "expected", "completed", "failed", "cached", "seconds", "eligible",
+                               "min_train_eq_dd_pct", "status", "label", "params"]))
+    lines += ["", "‏`min_train_eq_dd_pct` הוא ה־equity DD הנמוך ביותר מבין 18 המעברים של החלון. הסף לכשירות הוא 10%. "
+              "הטבלה המלאה: `results/numeric_v1/wfo/*_selection/scored_grid.csv`.", "", "## תוצאות OOS לכל fold", ""]
+    frows = fold_rows_table(acc)
+    lines.append(_md(frows, FOLD_COLS))
+    lines += ["", "## השוואה מצטברת (מרץ–יולי; קבוצות G=folds 1–2 עם טיקים שנוצרו באימון, R=folds 3–5)", ""]
+    lines.append(_md(comparison_table(acc), COMP_COLS))
+    lines += ["", "שלושת ה־DD מדווחים בנפרד: של הטסטר (המקסימום בין ה־folds), משוחזר מהרשומות היומיות, ועל עסקאות "
+              "סגורות.", "", "## קריטריוני קבלה", ""]
+    rows = []
+    for k, label in CRIT_HE.items():
+        rows.append({"criterion": label, **{SERIES_HE[w]: _ok(acc["acceptance"][w]["criteria"][k]) for w in SERIES},
+                     "group R (דיווח)": _ok(acc["acceptance_group_R_report_only"]["criteria"][k])})
+    lines.append(_md(rows, ["criterion"] + [SERIES_HE[w] for w in SERIES] + ["group R (דיווח)"]))
+    net = proc["criteria"]["oos_net"]["value"]
+    dsr = proc["criteria"]["dsr"]["value"]
+    lines += ["", f"- **נטו של ההליך:** {net.get('net')}. ‏baselines: {net.get('baselines')}. פערים: {net.get('margins')}.",
+              f"- **DSR:** {dsr.get('psr_value')} עם {dsr.get('trials')} ניסויים. כרגישות: "
+              f"{(dsr.get('sensitivity') or {}).get('psr_value')} עם {(dsr.get('sensitivity') or {}).get('trials')} "
+              "צירופים שונים. ‏126 = 108 מעברי אימון במחקר הזה + 12 מעברים, 2 pilots ו־4 הרצות יציבות מהמחקר הקודם. "
+              "הניסויים תלויים זה בזה, ולכן המספר האפקטיבי נמוך יותר וה־DSR מחמיר.",
+              f"- **‏var_sr:** {acc['var_sr']:.6g}, לפי השונות של ה־Sharpe היומי (Custom) בכל חלון, בממוצע על 6 חלונות.", "",
+              "## יציבות שכנים (לא שימשה לבחירה)", ""]
+    st = acc["stability"]
+    lines.append(_md([{"run": r["run_id"], "params": "/".join(map(str, r["params"])), "net": r["net"],
+                       "fills": r["fills"], "tester eq DD %": r["tester_equity_dd_pct"],
+                       "conformance": r["conformance_violations"]} for r in st["rows"]],
+                     ["run", "params", "net", "fills", "tester eq DD %", "conformance"]))
+    lines += ["", f"שיעור השכנים הרווחיים: {st['profitable_share']}. הסף הוא 0.60. השורה הראשונה היא ה־fallback "
+                  "עצמו, ולא נספרת.", "", "## רגישות לדקת 01:00 (לא שימשה לבחירה)", "",
+              "```json", json.dumps(acc["session_sensitivity"], ensure_ascii=False, indent=1), "```", "",
+              "## קובצי .set ואימות על גרסת המסירה", ""]
+    lines.append(_md([{"set": k, "params": "/".join(map(str, v["params"])), "inputs mismatches": len(v["mismatches"]),
+                       "same deals as research build": v["same_deals_as_research_build"],
+                       "delivered net": v["delivered_net"], "research net": v["research_net"]}
+                      for k, v in checks.items()],
+                     ["set", "params", "inputs mismatches", "same deals as research build", "delivered net",
+                      "research net"]))
+    lines += ["", "## מה נמסר", "",
+              "- קובצי `.set` ב־`deliverables/numeric_v1/`: המקור, שני ה־baselines, ו־" +
+              ("candidate." if final["kind"] == "candidate" else "fallback (לא candidate)."),
+              "- אין recommended.set. אין פרוטוקול forward, כי אין מועמד שעבר את הקריטריונים." if not passed else
+              "- אין recommended.set. פרוטוקול forward: `deliverables/numeric_v1/forward_test_protocol.md`.",
+              "- ראיות: `results/numeric_v1/` (חלונות, folds, עמידות, `acceptance.json`, `set_validation.json`).", ""]
+    return "\n".join(lines) + "\n"
+
+
+def write_deliverables(acc: dict, checks: dict) -> None:
+    folds = json.loads(FOLDS_JSON.read_text())
+    windows = window_table().to_dict("records")
+    nv.DELIV.mkdir(parents=True, exist_ok=True)
+    (nv.DELIV / "report_he.md").write_text(build_report(acc, windows, folds, checks), encoding="utf-8")
+    params = [{"input": k, "role": "grid", "values": "/".join(map(str, v)), "default": nv.DEFAULTS[k]}
+              for k, v in nv.GRID.items()] + [{"input": k, "role": "fixed", "values": v, "default": v}
+                                              for k, v in nv.FIXED_INPUTS.items()]
+    (nv.DELIV / "folds.md").write_text("# numeric_v1 OOS results per fold" + chr(10) * 2
+                                       + _md(fold_rows_table(acc), FOLD_COLS) + chr(10), encoding="utf-8")
+    (nv.DELIV / "comparison.md").write_text("# numeric_v1 series comparison, March-July (groups G and R)"
+                                            + chr(10) * 2 + _md(comparison_table(acc), COMP_COLS) + chr(10),
+                                            encoding="utf-8")
+    (nv.DELIV / "parameter_table.md").write_text("# numeric_v1 parameters\n\n" +
+                                                 _md(params, ["input", "role", "values", "default"]) + "\n",
+                                                 encoding="utf-8")
 
 
 COMMANDS = {"optsmoke-nv1": cmd_optsmoke, "behaviour-nv1": cmd_behaviour, "freeze-rules-nv1": cmd_freeze_rules,
