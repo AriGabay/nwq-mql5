@@ -3,6 +3,7 @@ and the frozen .set naming (plan 2026-10-04-1851, U2, U7, U8)."""
 import json
 import subprocess
 
+import pandas as pd
 import pytest
 
 import numeric_cli as nc
@@ -85,6 +86,91 @@ def test_resume_reuses_a_verified_window_and_starts_no_optimization(tmp_path, mo
                         lambda *a, **k: (_ for _ in ()).throw(AssertionError("optimization must not re-run")))
     rec = nc.run_window(None, "f3", "2026.02.01", "2026.04.30", out, "fold 3")
     assert rec["params"] == dict(zip(nv.AXES, (1, 2, 40)))
+
+
+# ------------------------------------------------------------------ recovery attempts (plan 2026-10-04-2133, U3, KTD9)
+@pytest.fixture
+def attempt_env(tmp_path, monkeypatch):
+    """run_window with the tester, curation and the cache replaced; `verdicts` decides each run's verification."""
+    runs_dir = tmp_path / "runs"
+    runs_dir.mkdir()
+    monkeypatch.setattr(nc.runner, "RUNS", runs_dir)
+    monkeypatch.setattr(nc, "_dest", lambda path: str(path))
+    calls, verdicts = [], {}
+
+    def fake_opt(cfg, rid, *a, **k):
+        calls.append(rid)
+        (runs_dir / rid).mkdir()
+        return type("R", (), {"status": "ok"})(), None
+
+    def fake_verify(run_dir, rid, expected, grid, fixed, cache=None):
+        prov = verdicts.get(rid, "computed")
+        return {"run_id": rid, "status": "ok" if prov == "computed" else "failed", "provenance": prov,
+                "expected": expected, "completed": expected, "failed": 0, "cached": 0, "seconds": 1.0,
+                "problems": [] if prov == "computed" else [f"provenance {prov}"]}
+
+    monkeypatch.setattr(nc.pipeline, "run_optimization", fake_opt)
+    monkeypatch.setattr(nc.gridrun, "verify_optimization", fake_verify)
+    monkeypatch.setattr(nc.gridrun, "cache_snapshot", lambda *a, **k: {})
+    monkeypatch.setattr(nc.curate, "curate", lambda rid, dest: None)
+    rows = [dict(zip(nv.AXES, nv.tuple_of(c))) | {"profit": 1.0, "trades": 10, "eq_dd_pct": 20.0,
+                                                   "recovery_factor": 0.1, "custom": 0.0, "sharpe": 0.0}
+            for c in nv.combos()]
+    monkeypatch.setattr(nc.gridrun, "run_table", lambda d, rid, grid, fixed: pd.DataFrame(
+        [r for r in rows if ("_lo" in rid) == (r["StopBufferPoints"] != 40)]).assign(run_id=rid, **{"pass": 0}))
+    cfg = type("C", (), {"mt5_dir": tmp_path})()
+    out = tmp_path / "f1_selection"
+    return cfg, out, calls, verdicts, runs_dir
+
+
+def test_a_failed_attempt_is_kept_and_the_retry_uses_its_own_run_ids(attempt_env):     # Covers AE3
+    cfg, out, calls, verdicts, _ = attempt_env
+    verdicts["nv1_f1_grid_lo"] = "reused"
+    with pytest.raises(SystemExit, match="reused"):
+        nc.run_window(cfg, "f1", "2025.12.01", "2026.02.28", out, "fold 1")
+    assert calls == ["nv1_f1_grid_lo"] and not (out / "window.json").exists()
+    a1 = {f.name: f.read_bytes() for f in (out / "attempts").iterdir()}
+    assert json.loads(a1["a1.json"])["status"] == "failed"
+    assert json.loads(a1["a1.json"])["runs"][0]["provenance"] == "reused"
+    rec = nc.run_window(cfg, "f1", "2025.12.01", "2026.02.28", out, "fold 1")
+    assert calls[1:] == ["nv1_f1_grid_lo_a2", "nv1_f1_grid_hi_a2"]
+    assert rec["status"] == "verified" and rec["attempt"] == 2
+    assert all((out / "attempts" / n).read_bytes() == b for n, b in a1.items())
+    assert json.loads((out / "attempts" / "a2.json").read_text())["status"] == "verified"
+
+
+def test_an_interrupted_attempt_does_not_block_the_next(attempt_env):
+    cfg, out, calls, _, runs_dir = attempt_env
+    (out / "attempts").mkdir(parents=True)
+    (out / "attempts" / "a1.started.json").write_text('{"attempt": 1}')
+    (runs_dir / "nv1_f1_grid_lo").mkdir()                      # the runner created it, then the process died
+    rec = nc.run_window(cfg, "f1", "2025.12.01", "2026.02.28", out, "fold 1")
+    assert calls == ["nv1_f1_grid_lo_a2", "nv1_f1_grid_hi_a2"] and rec["attempt"] == 2
+    assert (out / "attempts" / "a1.started.json").read_text() == '{"attempt": 1}'
+    assert not (out / "attempts" / "a1.json").exists()
+
+
+def test_the_first_attempt_keeps_todays_run_ids(attempt_env):
+    cfg, out, calls, _, _ = attempt_env
+    rec = nc.run_window(cfg, "f1", "2025.12.01", "2026.02.28", out, "fold 1")
+    assert calls == ["nv1_f1_grid_lo", "nv1_f1_grid_hi"] and rec["attempt"] == 1
+
+
+def test_an_existing_run_id_stops_before_any_tester_call(attempt_env):
+    cfg, out, calls, _, runs_dir = attempt_env
+    (runs_dir / "nv1_f1_grid_hi").mkdir()
+    with pytest.raises(SystemExit, match="already exist"):
+        nc.run_window(cfg, "f1", "2025.12.01", "2026.02.28", out, "fold 1")
+    assert calls == [] and not (out / "attempts").exists()
+
+
+def test_a_non_verified_legacy_window_record_stops_untouched(attempt_env):
+    cfg, out, calls, _, _ = attempt_env
+    out.mkdir()
+    (out / "window.json").write_text('{"status": "failed"}')
+    with pytest.raises(SystemExit, match="manual"):
+        nc.run_window(cfg, "f1", "2025.12.01", "2026.02.28", out, "fold 1")
+    assert calls == [] and (out / "window.json").read_text() == '{"status": "failed"}'
 
 
 def test_resume_skips_a_completed_oos_run(tmp_path, monkeypatch):

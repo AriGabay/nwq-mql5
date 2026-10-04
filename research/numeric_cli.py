@@ -132,43 +132,77 @@ def oos_run(cfg, name: str, start: str, end: str, deposit: float, params: dict, 
 
 
 # ------------------------------------------------------------------ U3: one train window
+def _create(path: pathlib.Path, obj) -> None:
+    """Write a JSON record that must never be overwritten (attempt evidence, KTD9)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "x", encoding="utf-8") as f:
+        f.write(json.dumps(evaluate.jsonable(obj), indent=1, default=str))
+
+
 def run_window(cfg, tag: str, start: str, end: str, out_dir: pathlib.Path, purpose: str) -> dict:
     """The window's split optimizations, their verification, the merged 18-row grid and the selection record.
-    A verified record is reused on resume and its optimization never re-run (a re-run would come from the cache)."""
+
+    A verified record is reused and its optimization never re-run. Otherwise this is a new recovery attempt
+    (plan 2026-10-04-2133, KTD9):
+    - it is reserved in attempts/a<n>.started.json before any tester call, and its outcome is written to
+      attempts/a<n>.json; neither file is ever overwritten;
+    - attempt n >= 2 uses run IDs ending _a<n>, which must not exist yet;
+    - each run is verified with a before/after snapshot of the tester cache, so only a fresh computation verifies
+      (KTD8).
+    The tester cache is never deleted."""
     nv.check_window(start, end)
     rec_path = out_dir / "window.json"
     if rec_path.exists():
         rec = json.loads(rec_path.read_text())
         if rec.get("status") == "verified":
             return rec
+        raise SystemExit(f"{cli._rel(rec_path)} holds a non-verified record; decide manually before a new attempt "
+                         "(it is not overwritten, KTD9)")
+    att_dir = out_dir / "attempts"
+    n = len(list(att_dir.glob("a*.started.json"))) + 1
+    parts = nv.split_runs()
+    rids = {r["part"]: nv.grid_run_id(tag, r["part"], n) for r in parts}
+    taken = [rid for rid in rids.values() if (runner.RUNS / rid).exists() or (out_dir / rid).exists()]
+    if taken:
+        raise SystemExit(f"attempt {n}: run IDs {taken} already exist; refusing to reuse them (KTD9)")
+    _create(att_dir / f"a{n}.started.json", {"attempt": n, "tag": tag, "train": [start, end], "run_ids": rids,
+                                             "started": pd.Timestamp.now().isoformat(timespec="seconds")})
     tables, runs = [], []
-    for r in nv.split_runs():
-        rid = nv.run_id(f"{tag}_grid_{r['part']}")
+    for r in parts:
+        rid = rids[r["part"]]
         vals = {**nv.FIXED_INPUTS, **r["fixed"]}
+        before = gridrun.cache_snapshot(cfg.mt5_dir, start, end)
         res, _ = pipeline.run_optimization(cfg, rid, "research", cli.CHART_PERIOD, start, end, vals, r["ranges"],
-                                           role="train", purpose=f"{purpose} ({r['part']})")
-        v = gridrun.verify_optimization(runner.RUNS / rid, rid, r["expected"], nv.GRID, r["fixed"])
+                                           role="train", purpose=f"{purpose} ({r['part']}, attempt {n})")
+        after = gridrun.cache_snapshot(cfg.mt5_dir, start, end)
+        v = gridrun.verify_optimization(runner.RUNS / rid, rid, r["expected"], nv.GRID, r["fixed"],
+                                        cache=(before, after))
         v["status_runner"] = res.status
         runs.append(v)
         if v["status"] != "ok":
-            save({"tag": tag, "train": [start, end], "status": "failed", "runs": runs}, rec_path)
-            raise SystemExit(f"{rid}: pass verification failed: {v['problems'][:5]} (KTD4)")
+            _create(att_dir / f"a{n}.json", {"attempt": n, "tag": tag, "train": [start, end], "status": "failed",
+                                             "runs": runs})
+            raise SystemExit(f"{rid}: pass verification failed ({v.get('provenance')}): {v['problems'][:5]} "
+                             "(KTD4, KTD8)")
         curate.curate(rid, _dest(out_dir))
         tables.append(gridrun.run_table(runner.RUNS / rid, rid, nv.GRID, r["fixed"]))
     grid = gridrun.merge(tables, nv.GRID)
     sel = nv.select(grid)
     sel["scored"].to_csv(out_dir / "scored_grid.csv", index=False)
-    rec = {"tag": tag, "train": [start, end], "status": "verified", "runs": runs,
+    rec = {"tag": tag, "train": [start, end], "status": "verified", "attempt": n, "runs": runs,
            "expected": nv.n_combos(), "completed": int(sum(x["completed"] for x in runs)),
            "failed": int(sum(x["failed"] for x in runs)), "cached": int(sum(x["cached"] for x in runs)),
            "seconds": round(sum(x["seconds"] or 0 for x in runs), 1), "trade_floor": nv.trade_floor(),
            "selection_status": sel["status"], "label": sel["label"], "params": sel["params"],
            "reason": sel["reason"]}
+    _create(att_dir / f"a{n}.json", {"attempt": n, "tag": tag, "train": [start, end], "status": "verified",
+                                     "runs": runs})
     save(rec, rec_path)
     save({k: rec[k] for k in ("tag", "train", "trade_floor", "params", "reason", "label")}
          | {"status": sel["status"], "eligible_passes": sel["reason"]["eligible_passes"]}, out_dir / "selection.json")
     explog.append({"id": f"{nv.PREFIX}{tag}_selection", "purpose": "train-only selection (KTD5)", "role": "selection",
-                   "status": sel["status"], "notes": json.dumps({"params": sel["params"], "label": sel["label"]})})
+                   "status": sel["status"], "notes": json.dumps({"params": sel["params"], "label": sel["label"],
+                                                                 "attempt": n})})
     return rec
 
 

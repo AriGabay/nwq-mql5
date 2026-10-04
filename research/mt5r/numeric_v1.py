@@ -168,6 +168,13 @@ def run_id(name: str) -> str:
     return name if name.startswith(PREFIX) else PREFIX + name
 
 
+def grid_run_id(tag: str, part: str, attempt: int) -> str:
+    """Run ID of one split optimization of a window: attempt 1 keeps the original name, later attempts add _a<n>
+    (plan 2026-10-04-2133, KTD9)."""
+    base = f"{tag}_grid_{part}"
+    return run_id(base if attempt == 1 else f"{base}_a{attempt}")
+
+
 # ------------------------------------------------------------------ pre-registration
 def dsr_trials() -> dict:
     windows = len(FOLDS) + 1
