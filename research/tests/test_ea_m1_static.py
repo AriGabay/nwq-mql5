@@ -418,14 +418,55 @@ def test_r0_is_set_only_from_the_fill_and_the_accepted_sl0_never_from_the_curren
     assert "PositionModify" not in restore
 
 
-def test_trail_state_is_saved_per_magic_and_ticket_and_flushed(src):
+def test_trail_state_is_stored_per_magic_and_ticket_and_flushed_separately(src):
     code = _strip_comments(src)
     assert re.search(r'"OBM1T\."\s*\+\s*IntegerToString\(MagicNumber\)\s*\+\s*"\."\s*\+\s*'
                      r'IntegerToString\(\(long\)ticket\)', code)
-    save = _function_body(code, "TrailSave")
+    store = _function_body(code, "TrailStore")
     for key in ("dir", "e", "sl0", "r0", "tp", "best", "act", "actms"):
-        assert f'p + "{key}"' in save, key
-    assert "GlobalVariablesFlush()" in save
+        assert f'p + "{key}"' in store, key
+    assert "GlobalVariablesFlush" not in store and "gTrDirty = true" in store      # plan 0128 KTD4
+    assert "GlobalVariablesFlush()" in _function_body(code, "TrailFlush")
+    assert "TrailFlush(" in _function_body(code, "TrailRegister")
+    manage = _function_body(code, "ManageTrails")
+    assert re.search(r"gTrDirty\s*&&\s*tk\.time_msc\s*-\s*gTrLastFlush\s*>=\s*TRAIL_FLUSH_MS", manage)
+    deinit = _function_body(code, "OnDeinit")
+    assert deinit.index("TrailFlush(") < deinit.index("TrailClose(")
+    assert re.search(r"#define\s+TRAIL_FLUSH_MS\s+10000\b", code)
+
+
+def test_trail_best_is_stored_on_every_change_before_any_hold(src):
+    body = _function_body(_strip_comments(src), "ManageTrails")
+    store = body.index("TrailStore(gTr[i])")
+    assert store < body.index("MathMin(gTr[i].best, tk.ask)") + 200 and store < body.index("closedBar == bar")
+    assert store < body.index("rejectedMsc") and store < body.index("gTrBackoffUntil")
+
+
+def test_trail_retry_wait_backoff_and_one_retry_per_tick(src):
+    code = _strip_comments(src)
+    assert re.search(r"#define\s+TRAIL_REJECT_WAIT_MS\s+1000\b", code)
+    assert re.search(r"TRAIL_BACKOFF_S\[\]\s*=\s*\{\s*1,\s*2,\s*4,\s*8,\s*16,\s*30\s*\}", code)
+    body = _function_body(code, "ManageTrails")
+    assert re.search(r"tk\.time_msc\s*-\s*gTr\[i\]\.rejectedMsc\s*<\s*TRAIL_REJECT_WAIT_MS", body)
+    assert re.search(r"tk\.time_msc\s*<\s*gTrBackoffUntil", body)
+    assert re.search(r"retry\s*&&\s*gTrSlotMsc\s*==\s*tk\.time_msc", body)
+    assert body.index("closedBar == bar") < body.index("rejectedMsc") < body.index("gTrBackoffUntil")         < body.index("gTrSlotMsc ==") < body.index("SYMBOL_TRADE_STOPS_LEVEL")
+    send = _function_body(code, "TrailSend")
+    assert re.search(r"t\.rejectedMsc\s*=\s*tk\.time_msc", send)
+    assert re.search(r"rc\s*==\s*TRADE_RETCODE_TOO_MANY_REQUESTS", send)
+    assert re.search(r"gTrBackoffUntil\s*=\s*tk\.time_msc\s*\+\s*TrailBackoffMs\(gTrStreak\)", send)
+    acc = send[send.index("if(acc)"):send.index("else")]
+    assert "t.rejectedMsc = 0" in acc and "gTrStreak = 0" in acc
+
+
+def test_every_fill_gets_a_registry_entry_and_untrailable_ones_never_send(src):
+    code = _strip_comments(src)
+    reg = _function_body(code, "TrailRegister")
+    assert reg.count("TrailAdd(t)") == 3                         # not selectable, no risk, trailed
+    assert '"not_selectable"' in reg and '"no_risk"' in reg
+    body = _function_body(code, "ManageTrails")
+    assert body.index("!gTr[i].trailable") < body.index("TrailSend(")
+    assert "TrailTracked(" in body                               # a tracked position is left to SyncPosition
 
 
 def test_trailed_stop_exit_is_classified_trail(src):

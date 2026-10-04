@@ -49,7 +49,8 @@ DEALS_COLUMNS = ["time", "ticket", "position_id", "type", "entry", "volume", "pr
 # R figures of a trailed run use r0 = |fill_price - sl0|; rl_setups.sl stays SL0.
 TRAIL_COLUMNS = ["position_id", "setup_id", "dir", "fill_price", "sl0", "r0", "tp", "activated_msc", "activation_bid",
                  "activation_ask", "best_price", "final_sl", "requests", "accepted", "rejected", "not_sent", "exit_kind",
-                 "state_roundtrip"]
+                 "state_roundtrip", "state_final"]   # state_roundtrip: ok | mismatch | not_trailed:<reason>;
+#                                                    state_final (plan 0128 KTD5): ok | mismatch | not_trailed
 SL_MOVE_COLUMNS = ["position_id", "tick_msc", "bid", "ask", "best", "requested_sl", "sl_before", "accepted_sl",
                    "retcode", "outcome"]                  # outcome: accepted | rejected | not_sent:<reason>
 TRAIL_FILES = {"trail": TRAIL_COLUMNS, "sl_moves": SL_MOVE_COLUMNS}
