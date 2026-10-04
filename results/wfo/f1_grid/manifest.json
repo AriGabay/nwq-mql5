@@ -1,0 +1,28 @@
+{
+ "run_id": "f1_grid",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "02a44b32bae4246d6e68f21f284851f985bd628dc7e5f51ace8ee4ada5fed666",
+ "ini_sha256": "1fb2a66aa2a4182258442c36ac6c0f2be2697a274996c9094dc7527d36288620",
+ "meta": {
+  "kind": "research",
+  "role": "train",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "ResearchRunTag": "f1_grid"
+  },
+  "ranges": {
+   "StructureVariant": [
+    0,
+    1,
+    1
+   ]
+  }
+ },
+ "started": "2026-10-04T15:19:10",
+ "status": "ok",
+ "seconds": 37.4,
+ "report": "f1_grid.xml",
+ "exit_code": 0
+}

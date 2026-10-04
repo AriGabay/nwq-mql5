@@ -105,3 +105,30 @@ tickcov_202605,2026-10-03T01:48:21,real-tick coverage per month (journal tick li
 tickcov_202606,2026-10-03T01:48:46,real-tick coverage per month (journal tick lines only),tick_coverage,ob_m1_structure_research.ex5,M1,2026.06.01,2026.06.30,10000,ok,-606.83,169,19.76,
 tickcov_202607,2026-10-03T01:49:11,real-tick coverage per month (journal tick lines only),tick_coverage,ob_m1_structure_research.ex5,M1,2026.07.01,2026.07.31,10000,ok,-327.03,196,19.66,
 session_probe,2026-10-03T09:19:44,"gate review: sessions, ticks, order acceptance and SL/TP replicas at quote-gap opens (probe EA, no strategy rules)",diagnostic,session_probe.ex5,M1,2025.12.01,2026.07.31,,ok,,,,
+f1_grid,2026-10-04T15:19:48,f1 grid,train,ob_m1_structure_research.ex5,M1,2025.12.01,2026.02.28,10000,ok,,,,
+f1_selection,2026-10-04T15:19:48,KTD14 selection,selection,,,,,,no_eligible_pass,,,,"{""tag"": ""f1"", ""train"": [""2025.12.01"", ""2026.02.28""], ""trade_floor"": 45, ""status"": ""no_eligible_pass"", ""params"": {""StructureVariant"": 0}, ""eligible_passes"": 0}"
+f1_oos_procedure,2026-10-04T15:20:12,fold 1 OOS procedure,oos_procedure,ob_m1_structure_research.ex5,M1,2026.03.01,2026.03.31,10000,ok,1805.7,180,14.46,
+f1_oos_fixed_a,2026-10-04T15:20:38,fold 1 OOS fixed_a,oos_fixed_a,ob_m1_structure_research.ex5,M1,2026.03.01,2026.03.31,10000,ok,1805.7,180,14.46,
+f1_oos_fixed_b,2026-10-04T15:21:00,fold 1 OOS fixed_b,oos_fixed_b,ob_m1_structure_research.ex5,M1,2026.03.01,2026.03.31,10000,ok,657.23,54,10.99,
+f2_grid,2026-10-04T15:21:37,f2 grid,train,ob_m1_structure_research.ex5,M1,2026.01.01,2026.03.31,10000,ok,,,,
+f2_selection,2026-10-04T15:21:37,KTD14 selection,selection,,,,,,no_eligible_pass,,,,"{""tag"": ""f2"", ""train"": [""2026.01.01"", ""2026.03.31""], ""trade_floor"": 45, ""status"": ""no_eligible_pass"", ""params"": {""StructureVariant"": 0}, ""eligible_passes"": 0}"
+f2_oos_procedure,2026-10-04T15:22:00,fold 2 OOS procedure,oos_procedure,ob_m1_structure_research.ex5,M1,2026.04.01,2026.04.30,11805,ok,-1608.69,172,26.21,
+f2_oos_fixed_a,2026-10-04T15:22:25,fold 2 OOS fixed_a,oos_fixed_a,ob_m1_structure_research.ex5,M1,2026.04.01,2026.04.30,11805,ok,-1608.69,172,26.21,
+f2_oos_fixed_b,2026-10-04T15:22:48,fold 2 OOS fixed_b,oos_fixed_b,ob_m1_structure_research.ex5,M1,2026.04.01,2026.04.30,10657,ok,-895.91,47,11.53,
+f3_grid,2026-10-04T15:23:25,f3 grid,train,ob_m1_structure_research.ex5,M1,2026.02.01,2026.04.30,10000,ok,,,,
+f3_selection,2026-10-04T15:23:25,KTD14 selection,selection,,,,,,no_eligible_pass,,,,"{""tag"": ""f3"", ""train"": [""2026.02.01"", ""2026.04.30""], ""trade_floor"": 45, ""status"": ""no_eligible_pass"", ""params"": {""StructureVariant"": 0}, ""eligible_passes"": 0}"
+f3_oos_procedure,2026-10-04T15:23:48,fold 3 OOS procedure,oos_procedure,ob_m1_structure_research.ex5,M1,2026.05.01,2026.05.31,10196,ok,304.64,138,17.84,
+f3_oos_fixed_a,2026-10-04T15:24:14,fold 3 OOS fixed_a,oos_fixed_a,ob_m1_structure_research.ex5,M1,2026.05.01,2026.05.31,10196,ok,304.64,138,17.84,
+f3_oos_fixed_b,2026-10-04T15:24:38,fold 3 OOS fixed_b,oos_fixed_b,ob_m1_structure_research.ex5,M1,2026.05.01,2026.05.31,9761,ok,-318.02,58,17.76,
+f4_grid,2026-10-04T15:25:19,f4 grid,train,ob_m1_structure_research.ex5,M1,2026.03.01,2026.05.31,10000,ok,,,,
+f4_selection,2026-10-04T15:25:19,KTD14 selection,selection,,,,,,no_eligible_pass,,,,"{""tag"": ""f4"", ""train"": [""2026.03.01"", ""2026.05.31""], ""trade_floor"": 45, ""status"": ""no_eligible_pass"", ""params"": {""StructureVariant"": 0}, ""eligible_passes"": 0}"
+f4_oos_procedure,2026-10-04T15:25:42,fold 4 OOS procedure,oos_procedure,ob_m1_structure_research.ex5,M1,2026.06.01,2026.06.30,10500,ok,-757.4,169,19.6,
+f4_oos_fixed_a,2026-10-04T15:26:08,fold 4 OOS fixed_a,oos_fixed_a,ob_m1_structure_research.ex5,M1,2026.06.01,2026.06.30,10500,ok,-757.4,169,19.6,
+f4_oos_fixed_b,2026-10-04T15:26:32,fold 4 OOS fixed_b,oos_fixed_b,ob_m1_structure_research.ex5,M1,2026.06.01,2026.06.30,9442,ok,874.11,45,8.83,
+f5_grid,2026-10-04T15:27:12,f5 grid,train,ob_m1_structure_research.ex5,M1,2026.04.01,2026.06.30,10000,ok,,,,
+f5_selection,2026-10-04T15:27:12,KTD14 selection,selection,,,,,,no_eligible_pass,,,,"{""tag"": ""f5"", ""train"": [""2026.04.01"", ""2026.06.30""], ""trade_floor"": 45, ""status"": ""no_eligible_pass"", ""params"": {""StructureVariant"": 0}, ""eligible_passes"": 0}"
+f5_oos_procedure,2026-10-04T15:27:36,fold 5 OOS procedure,oos_procedure,ob_m1_structure_research.ex5,M1,2026.07.01,2026.07.31,9742,ok,-212.76,196,19.39,
+f5_oos_fixed_a,2026-10-04T15:28:03,fold 5 OOS fixed_a,oos_fixed_a,ob_m1_structure_research.ex5,M1,2026.07.01,2026.07.31,9742,ok,-212.76,196,19.39,
+f5_oos_fixed_b,2026-10-04T15:28:26,fold 5 OOS fixed_b,oos_fixed_b,ob_m1_structure_research.ex5,M1,2026.07.01,2026.07.31,10316,ok,812.12,52,9.3,
+final_grid,2026-10-04T15:29:08,final grid,train,ob_m1_structure_research.ex5,M1,2026.05.01,2026.07.31,10000,ok,,,,
+final_selection,2026-10-04T15:29:08,KTD14 selection,selection,,,,,,no_eligible_pass,,,,"{""tag"": ""final"", ""train"": [""2026.05.01"", ""2026.07.31""], ""trade_floor"": 45, ""status"": ""no_eligible_pass"", ""params"": {""StructureVariant"": 0}, ""eligible_passes"": 0}"
