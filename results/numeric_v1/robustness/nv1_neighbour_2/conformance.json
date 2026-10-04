@@ -1,0 +1,269 @@
+{
+ "run_id": "nv1_neighbour_2",
+ "setups": 4564,
+ "bars_m1": 178340,
+ "bars_m5": 35723,
+ "violations": 0,
+ "violation_rows": [],
+ "coverage": {
+  "rules": {
+   "ob_r3": {
+    "checked": 9128,
+    "failed": 0,
+    "passed": 9128
+   },
+   "touch_r5": {
+    "checked": 4564,
+    "failed": 0,
+    "passed": 4564
+   },
+   "break_r6": {
+    "checked": 1819,
+    "failed": 0,
+    "passed": 1819
+   },
+   "return_r7": {
+    "checked": 1402,
+    "failed": 0,
+    "passed": 1402
+   },
+   "second_break_r8": {
+    "checked": 2438,
+    "failed": 0,
+    "passed": 2438
+   },
+   "pivot_causality_r9": {
+    "checked": 56904,
+    "failed": 0,
+    "passed": 56904
+   },
+   "sc_r10": {
+    "checked": 4391,
+    "failed": 0,
+    "passed": 4391
+   },
+   "hl_r11": {
+    "checked": 589,
+    "failed": 0,
+    "passed": 589
+   },
+   "fvg_r12": {
+    "checked": 6855,
+    "failed": 0,
+    "passed": 6855
+   },
+   "fvg_lapse_r13": {
+    "checked": 1474,
+    "failed": 0,
+    "passed": 1474
+   },
+   "reaction_r14": {
+    "checked": 1742,
+    "failed": 0,
+    "passed": 1742
+   },
+   "entry_r15": {
+    "checked": 2218,
+    "failed": 0,
+    "passed": 2218
+   },
+   "competition_r16": {
+    "checked": 353,
+    "failed": 0,
+    "passed": 353
+   },
+   "one_trade_r17": {
+    "checked": 4564,
+    "failed": 0,
+    "passed": 4564
+   },
+   "sl_r18": {
+    "checked": 829,
+    "failed": 0,
+    "passed": 829
+   },
+   "tp_r19": {
+    "checked": 829,
+    "failed": 0,
+    "passed": 829
+   },
+   "exit_sltp": {
+    "checked": 826,
+    "failed": 0,
+    "passed": 826
+   },
+   "risk_r20": {
+    "checked": 831,
+    "failed": 0,
+    "passed": 831
+   },
+   "cap_r21": {
+    "checked": 1387,
+    "failed": 0,
+    "passed": 1387
+   },
+   "cancel_r22": {
+    "checked": 3566,
+    "failed": 0,
+    "passed": 3566
+   },
+   "tf_sync": {
+    "checked": 35723,
+    "failed": 0,
+    "passed": 35723
+   }
+  },
+  "unverifiable": {
+   "short_entry_ask": {
+    "cases": 427,
+    "why": "short SL spread: Ask - Bid at the entry tick is the EA's own log (bars carry Bid only); the checker verifies SL = anchor + buffer + that logged spread and the Bid against the bar open",
+    "example_setups": [
+     698,
+     700,
+     5,
+     722,
+     739
+    ]
+   },
+   "entry_price_ask": {
+    "cases": 404,
+    "why": "long request/fill price is an Ask (not in the bars); the volume check uses the logged price",
+    "example_setups": [
+     720,
+     696,
+     730,
+     740,
+     691
+    ]
+   },
+   "touch_after_last_logged_bar": {
+    "cases": 1,
+    "why": "touch tick inside the final M1 bar, which never closes and is never logged",
+    "example_setups": [
+     4561
+    ]
+   },
+   "tick_within_minute": {
+    "cases": 5233,
+    "why": "touch/return: the minute and a Bid inside that bar at the zone edge are verified; which tick of the minute (tick_msc) is the EA's claim - the bars carry minute OHLC only",
+    "example_setups": [
+     7,
+     701,
+     699,
+     700,
+     704
+    ]
+   },
+   "short_exit_ask": {
+    "cases": 426,
+    "why": "short exits trigger on Ask: only the necessary Bid conditions are checked (no earlier bar whose Bid high reaches the SL; exit-bar Bid low at/below the TP)",
+    "example_setups": [
+     700,
+     698,
+     5,
+     722,
+     739
+    ]
+   },
+   "level_in_session_open_bar": {
+    "cases": 16,
+    "why": "SL/TP level reached only inside the first M1 bar after a quote gap (daily break, weekend). Quotes start 01:00, the trade session 01:01, so nothing executes in that minute (research/session_probe.py: Market orders refused 169/169 at 01:00, filled 169/169 at 01:01; replicas exit as the EA did). The later exit needs the tick log; results/pilot/gate_decisions.md holds the pre-registered sensitivity",
+    "example_setups": [
+     763,
+     1584,
+     1701,
+     1746,
+     1782
+    ]
+   },
+   "exit_same_bar_as_fill": {
+    "cases": 2,
+    "why": "fill and exit in one M1 bar: tick order inside the bar is not in the logs",
+    "example_setups": [
+     1223,
+     2563
+    ]
+   }
+  }
+ },
+ "occurrences": {
+  "long": 2266,
+  "short": 2298,
+  "touched": 3831,
+  "touch_bar_opens_in_zone": 333,
+  "warmup_dropped": 668,
+  "run_end_untouched": 64,
+  "run_end_waiting": 1,
+  "break": 1819,
+  "touch_bar_break": 159,
+  "return": 1402,
+  "return_and_break_same_bar": 655,
+  "cancelled_second_break": 1219,
+  "cancelled_opposing_structure": 1783,
+  "lh_candidates": 4270,
+  "lh_voided": 1851,
+  "sc_hh": 3657,
+  "sc_on_touch_bar": 108,
+  "sc_superseded": 734,
+  "fvg_fixed": 3205,
+  "fvg_c3_before_k1": 994,
+  "fvg_skipped_closed_beyond": 187,
+  "fvg_none": 445,
+  "fvg_lapsed": 1474,
+  "hl": 589,
+  "hl_failed": 0,
+  "hl_failed_variant_a": 1,
+  "reaction": 1742,
+  "reaction_at_k1": 39,
+  "reaction_on_return_bar": 1,
+  "competition": 268,
+  "lost_competition": 353,
+  "filled": 829,
+  "skipped_stop_crossed": 0,
+  "skipped_stops_level": 0,
+  "skipped_volume": 2,
+  "skipped_margin": 0,
+  "skipped_cap": 558,
+  "skipped_broker_reject": 0,
+  "market_closed_retry": 0,
+  "retry_dropped": 0,
+  "sl_anchor_ob": 742,
+  "sl_anchor_hl": 0,
+  "sl_anchor_pivot": 87,
+  "pivots": 24032,
+  "pivots_replaced": 2517,
+  "outside_bar_pivots": 202,
+  "candidates_m5": 4564
+ },
+ "journal": {
+  "warmup_bars": 28785,
+  "stops_level_pts": 20,
+  "tick": 0.01,
+  "discarded_days": 0,
+  "discarded_minutes": 0,
+  "total_minute_bars": 149556,
+  "funnel": {
+   "identified": 4564,
+   "touched": 3832,
+   "structure_changes": 3657,
+   "fvg_fixed": 3205,
+   "ready": 3205,
+   "reactions": 1742,
+   "entries": 1389,
+   "filled": 829,
+   "cancelled_second_break": 1219,
+   "cancelled_opposing_structure": 1783,
+   "skipped_stop_crossed": 0,
+   "skipped_stops_level": 0,
+   "skipped_volume": 2,
+   "skipped_margin": 0,
+   "skipped_cap": 558,
+   "skipped_broker_reject": 0,
+   "lost_competition": 353,
+   "warmup_dropped": 668,
+   "run_end_waiting": 1,
+   "run_end_untouched": 64,
+   "market_closed_retries": 0
+  }
+ }
+}

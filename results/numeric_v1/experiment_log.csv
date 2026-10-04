@@ -40,3 +40,9 @@ nv1_f5_oos_baseline_b,2026-10-04T19:28:45,fold 5 OOS baseline_b (baseline_b),oos
 nv1_final_grid_lo,2026-10-04T19:29:32,final selection (May-July) (lo),train,ob_m1_structure_research.ex5,M1,2026.05.01,2026.07.31,10000,ok,,,,
 nv1_final_grid_hi,2026-10-04T19:30:03,final selection (May-July) (hi),train,ob_m1_structure_research.ex5,M1,2026.05.01,2026.07.31,10000,ok,,,,
 nv1_final_selection,2026-10-04T19:30:03,train-only selection (KTD5),selection,,,,,,no_eligible_pass,,,,"{""params"": {""StructureVariant"": 0, ""SwingStrengthM1"": 3, ""StopBufferPoints"": 20}, ""label"": ""fallback""}"
+nv1_static_baseline_a,2026-10-04T19:32:04,KTD8 neighbour stability (never used for selection),static,ob_m1_structure_research.ex5,M1,2026.03.01,2026.07.31,10000,ok,-331.25,850,29.74,
+nv1_neighbour_1,2026-10-04T19:32:45,KTD8 neighbour stability (never used for selection),neighbour,ob_m1_structure_research.ex5,M1,2026.03.01,2026.07.31,10000,ok,963.74,841,32.34,
+nv1_neighbour_2,2026-10-04T19:33:28,KTD8 neighbour stability (never used for selection),neighbour,ob_m1_structure_research.ex5,M1,2026.03.01,2026.07.31,10000,ok,-1847.82,829,40.55,
+nv1_neighbour_3,2026-10-04T19:34:10,KTD8 neighbour stability (never used for selection),neighbour,ob_m1_structure_research.ex5,M1,2026.03.01,2026.07.31,10000,ok,-644.49,849,32.6,
+nv1_neighbour_4,2026-10-04T19:34:51,KTD8 neighbour stability (never used for selection),neighbour,ob_m1_structure_research.ex5,M1,2026.03.01,2026.07.31,10000,ok,879.78,841,28.06,
+nv1_session_probe_wfo,2026-10-04T19:35:28,"gate review: sessions, ticks, order acceptance and SL/TP replicas at quote-gap opens (probe EA, no strategy rules)",diagnostic,session_probe.ex5,M1,2026.03.01,2026.07.31,,ok,,,,
