@@ -64,5 +64,11 @@ A parameter set held constant in every fold of a walk-forward study and run on t
 ### Fallback
 The default parameters carried into an out-of-window month when no train pass met the eligibility thresholds (`no_eligible_pass`); it completes the evaluation path and is never a selected or improved candidate.
 
+### Recovery attempt
+A new try of an optimization window that failed verification, under its own attempt ID, run IDs and folders. Earlier attempts' records stay as they are, a verified window is never retried, and the tester cache is not deleted.
+
+### Result provenance
+Where an optimization's passes came from: computed fresh, reused from the tester cache, or partial. It is read from the tester's own output and the cache folder's state, never inferred from a new run ID. Only a fresh, complete computation verifies a window.
+
 ### Opposing-structure cancellation
 One swing sequence against the trade after the Touch (for a long: a lower high, then an M1 close below the pivot low before it) that ends a waiting setup for good.
