@@ -26,9 +26,18 @@ MT5 Expert Advisor for XAUUSD.s, researched with a gated, pre-registered protoco
    - **How it moves:** the stop trails 1R behind the best Bid (long) or the best Ask (short) since the fill, on every
      tick, and only in the trade's favour.
    - **What stays fixed:** the TP stays 2R.
+   - **Rejections:**
+     - a rejected stop update is retried after at least 1 second;
+     - TOO_MANY_REQUESTS pauses all trail requests for 1, 2, 4, 8, 16, then 30 seconds;
+     - at most one retry per tick.
+
+     These are fixed constants. Under rejections they can delay when the stop is updated.
+   - **State:** stored in terminal global variables whenever the best price changes, and flushed to disk at the fill, at
+     activation, every 10 s of tick time while it changed, and at a normal shutdown.
    - **Status:** development comparison only, in
-     [`results/trailing_v1/dev_comparison_he.md`](results/trailing_v1/dev_comparison_he.md); plan
-     [`docs/plans/2026-10-05-0007-feat-trailing-stop-1r-plan.md`](docs/plans/2026-10-05-0007-feat-trailing-stop-1r-plan.md).
+     [`results/trailing_v2/dev_comparison_he.md`](results/trailing_v2/dev_comparison_he.md); plans
+     [`docs/plans/2026-10-05-0007-feat-trailing-stop-1r-plan.md`](docs/plans/2026-10-05-0007-feat-trailing-stop-1r-plan.md) and
+     [`docs/plans/2026-10-05-0128-fix-trailing-retry-persistence-plan.md`](docs/plans/2026-10-05-0128-fix-trailing-retry-persistence-plan.md).
 
 Full rules: R3–R23 in the plan below. Terms: [`CONCEPTS.md`](CONCEPTS.md).
 

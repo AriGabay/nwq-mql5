@@ -141,11 +141,13 @@ def conformance_report(run_id: str, dest: str) -> dict:
     """R25 conformance check of one archived research run: the independent M5/M1 replay (KTD11)."""
     from mt5r import conformance_m1 as cm
     d = runner.RUNS / run_id
-    params = {**run_values(run_id), "point": RUN["symbol_spec"]["tick_size"],
+    values = run_values(run_id)
+    params = {**values, "point": RUN["symbol_spec"]["tick_size"],
               "contract_size": RUN["symbol_spec"]["contract_size"]}
     run = cm.read_run(d, run_id)
     res = cm.full(run["setups"], run["events"], run["pivots"], run["bars_m1"], run["bars_m5"], params,
-                  run.get("deals"), run.get("trail"), run.get("sl_moves"))
+                  run.get("deals"), run.get("trail"), run.get("sl_moves"),
+                  trailing=cm.parse_trailing(values.get("EnableTrailingStop")))
     viol = res["violations"]
     facts = journal.run_facts(d)
     out = {"run_id": run_id, "setups": len(run["setups"]), "bars_m1": len(run["bars_m1"]),

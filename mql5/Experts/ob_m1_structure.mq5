@@ -193,17 +193,31 @@ struct TrailPos
    long     actMsc;
    double   actBid;
    double   actAsk;
-   double   lastFailed;     // last value rejected or not sent (0 = none)
-   datetime lastFailedBar;  // M1 bar of that failure: the same value is not re-sent within it
+   long     rejectedMsc;    // tick time of the last rejected request (0 = none since a verified success)
+   double   notSentValue;   // last value held back by the stops / freeze level ...
+   datetime notSentBar;     // ... and its M1 bar: logged once per value and bar
    datetime closedBar;      // M1 bar answered 'market closed': no request before the next bar
+   bool     trailable;      // false: not selectable at the fill or no initial risk - never sends a request
+   string   notTrailed;     // the reason when not trailable
+   string   stateFinal;     // research log: stored state at close equals memory (ok / mismatch / not_trailed)
    int      requests;
    int      accepted;
    int      rejected;
    int      notSent;
    bool     stateOk;        // the saved state read back equal at the fill
-   bool     restored;       // rebuilt from global variables after a restart
   };
 TrailPos gTr[];
+
+// retry policy and persistence (plan 2026-10-05-0128): fixed execution constants, not inputs. Under rejections they
+// delay when the stop is updated; the trail rule itself is unchanged.
+#define TRAIL_REJECT_WAIT_MS 1000     // after a rejected request, per position (tick time)
+#define TRAIL_FLUSH_MS      10000    // periodic flush of stored state that changed (tick time)
+const int TRAIL_BACKOFF_S[] = {1, 2, 4, 8, 16, 30};  // EA-wide hold after the n-th consecutive TOO_MANY_REQUESTS
+long gTrBackoffUntil = 0;            // no trail request before this tick time
+int  gTrStreak       = 0;            // consecutive TOO_MANY_REQUESTS answers; a verified success clears it
+long gTrSlotMsc      = -1;           // tick on which a retry was already sent (one retry per tick)
+bool gTrDirty        = false;        // stored state not yet flushed to disk
+long gTrLastFlush    = 0;
 
 CTrade   trade;
 double   gTick = 0.0;
@@ -279,7 +293,7 @@ bool Waiting(const Setup &s) { return s.state >= ST_TRACK && s.state <= ST_READY
 #define RL_BARS_HEADER "time,open,high,low,close,tick_volume,spread,warmup"
 #define RL_PIVOTS_HEADER "pivot_id,type,peak_time,conf_time,level,replaced_by,outside_bar"
 #define RL_EVENTS_HEADER "setup_id,seq,kind,bar_time,tick_msc,price,lo,hi,ref_id,ref_time,detail"
-#define RL_TRAIL_HEADER "position_id,setup_id,dir,fill_price,sl0,r0,tp,activated_msc,activation_bid,activation_ask,best_price,final_sl,requests,accepted,rejected,not_sent,exit_kind,state_roundtrip"
+#define RL_TRAIL_HEADER "position_id,setup_id,dir,fill_price,sl0,r0,tp,activated_msc,activation_bid,activation_ask,best_price,final_sl,requests,accepted,rejected,not_sent,exit_kind,state_roundtrip,state_final"
 #define RL_SLMOVES_HEADER "position_id,tick_msc,bid,ask,best,requested_sl,sl_before,accepted_sl,retcode,outcome"
 #define RL_SETUPS_HEADER "setup_id,dir,variant,ob_time,ob_high,ob_low,idfvg_c1_time,idfvg_c3_time,idfvg_low,idfvg_high,identified_in_warmup,touch_msc,touch_bar_time,ob_age_bars_touch,ob_age_min_touch,breaks,returns,sc_bar_time,origin_time,ref_pivot_id,hl_pivot_id,fvg_c1_time,fvg_low,fvg_high,reaction_bar_time,entry_request_msc,request_price,attempts,sl,sl_anchor,sl_anchor_price,buffer_pts,tp,volume,fill_msc,fill_price,position_id,ob_age_bars_entry,ob_age_min_entry,exit_msc,exit_price,exit_kind,reason,reason_msc"
 datetime rlDay = 0;
@@ -482,7 +496,7 @@ void RL_TrailRow(const TrailPos &t, string exitKind)
                 RL_L(t.actMsc, t.active) + "," + RL_P(t.actBid, t.active) + "," + RL_P(t.actAsk, t.active) + "," +
                 Fmt(t.best) + "," + Fmt(t.sl) + "," + IntegerToString(t.requests) + "," + IntegerToString(t.accepted) +
                 "," + IntegerToString(t.rejected) + "," + IntegerToString(t.notSent) + "," + exitKind + "," +
-                (t.stateOk ? "ok" : "mismatch");
+                (t.trailable ? (t.stateOk ? "ok" : "mismatch") : "not_trailed:" + t.notTrailed) + "," + t.stateFinal;
    int sz = ArraySize(rlTrailRows);
    ArrayResize(rlTrailRows, sz + 1, 1024);
    rlTrailRows[sz] = row;
@@ -1329,12 +1343,14 @@ string TrailGvPrefix(ulong ticket) { return "OBM1T." + IntegerToString(MagicNumb
 void TrailInit(TrailPos &t)
   {
    t.ticket = 0; t.setupId = 0; t.dir = 0; t.fill = 0; t.sl0 = 0; t.r0 = 0; t.tp = 0; t.best = 0; t.sl = 0;
-   t.active = false; t.actMsc = 0; t.actBid = 0; t.actAsk = 0; t.lastFailed = 0; t.lastFailedBar = 0;
-   t.closedBar = 0; t.requests = 0; t.accepted = 0; t.rejected = 0; t.notSent = 0; t.stateOk = false; t.restored = false;
+   t.active = false; t.actMsc = 0; t.actBid = 0; t.actAsk = 0; t.rejectedMsc = 0; t.notSentValue = 0;
+   t.notSentBar = 0; t.closedBar = 0; t.trailable = true; t.notTrailed = ""; t.stateFinal = "";
+   t.requests = 0; t.accepted = 0; t.rejected = 0; t.notSent = 0; t.stateOk = false;
   }
 
-// KTD4: E, SL0, R0, TP, direction and the trail state per position, flushed to disk on every save
-void TrailSave(const TrailPos &t)
+// E, SL0, R0, TP, direction and the trail state per position in terminal global variables (memory); written to
+// disk only by TrailFlush (plan 0128 KTD4)
+void TrailStore(const TrailPos &t)
   {
    string p = TrailGvPrefix(t.ticket);
    GlobalVariableSet(p + "dir", t.dir);
@@ -1346,7 +1362,22 @@ void TrailSave(const TrailPos &t)
    GlobalVariableSet(p + "best", t.best);
    GlobalVariableSet(p + "act", t.active ? 1.0 : 0.0);
    GlobalVariableSet(p + "actms", (double)t.actMsc);
+   gTrDirty = true;
+  }
+
+// to disk: at registration, at activation, every TRAIL_FLUSH_MS of tick time while dirty, and at deinitialization.
+// An EA restart keeps the stored values (terminal memory); a terminal or OS crash loses what was not flushed.
+void TrailFlush(long msc)
+  {
    GlobalVariablesFlush();
+   gTrDirty = false;
+   gTrLastFlush = msc;
+  }
+
+int TrailBackoffMs(int streak)
+  {
+   int n = ArraySize(TRAIL_BACKOFF_S);
+   return TRAIL_BACKOFF_S[MathMin(streak, n) - 1] * 1000;
   }
 
 // restore from the saved values only; SL0 is never taken from the position's current stop
@@ -1371,7 +1402,22 @@ bool TrailLoad(ulong ticket, TrailPos &t)
    return (t.dir == 1 || t.dir == -1) && t.r0 > 0;
   }
 
-void TrailForget(ulong ticket) { GlobalVariablesDeleteAll(TrailGvPrefix(ticket)); }
+void TrailForget(ulong ticket) { GlobalVariablesDeleteAll(TrailGvPrefix(ticket)); gTrDirty = true; }
+
+void TrailAdd(const TrailPos &t)
+  {
+   int n = ArraySize(gTr);
+   ArrayResize(gTr, n + 1);
+   gTr[n] = t;
+  }
+
+// a position this EA still tracks as filled: its exit is finished by SyncPosition, never dropped here
+bool TrailTracked(ulong ticket)
+  {
+   for(int i = 0; i < ArraySize(S); i++)
+      if(S[i].state == ST_FILLED && S[i].posId == ticket) return true;
+   return false;
+  }
 
 int TrailFind(ulong ticket)
   {
@@ -1380,38 +1426,42 @@ int TrailFind(ulong ticket)
    return -1;
   }
 
-// at the fill: E from the deal, SL0 and TP read back from the position
+// at the fill: E from the deal, SL0 and TP read back from the position. Every fill gets an entry (and a research
+// row); one that cannot be trailed is marked and never sends a request (plan 0128 KTD5)
 void TrailRegister(const Setup &s)
   {
-   if(!PositionSelectByTicket(s.posId))
-     {
-      Print("OBM1 trail: position ", s.posId, " not selectable at the fill - not trailed");
-      return;
-     }
    TrailPos t;
    TrailInit(t);
    t.ticket  = s.posId;
    t.setupId = s.id;
    t.dir     = s.dir;
    t.fill    = s.fillPrice;
+   t.best    = t.fill;
+   if(!PositionSelectByTicket(s.posId))
+     {
+      Print("OBM1 trail: position ", s.posId, " not selectable at the fill - not trailed");
+      t.trailable = false; t.notTrailed = "not_selectable";
+      TrailAdd(t);
+      return;
+     }
    t.sl0     = PositionGetDouble(POSITION_SL);
    t.tp      = PositionGetDouble(POSITION_TP);
    t.r0      = MathAbs(t.fill - t.sl0);
    t.sl      = t.sl0;
-   t.best    = t.fill;
    if(t.r0 < gTick / 2.0)
      {
       Print("OBM1 trail: position ", s.posId, " has no initial risk (SL0 ", Fmt(t.sl0), ") - not trailed");
+      t.trailable = false; t.notTrailed = "no_risk";
+      TrailAdd(t);
       return;
      }
-   TrailSave(t);
+   TrailStore(t);
+   TrailFlush(s.fillMsc);
    TrailPos chk;
    t.stateOk = TrailLoad(t.ticket, chk) && chk.dir == t.dir && chk.setupId == t.setupId &&
                MathAbs(chk.fill - t.fill) < gTick / 2.0 && MathAbs(chk.sl0 - t.sl0) < gTick / 2.0 &&
                MathAbs(chk.r0 - t.r0) < gTick / 2.0 && MathAbs(chk.tp - t.tp) < gTick / 2.0;
-   int n = ArraySize(gTr);
-   ArrayResize(gTr, n + 1);
-   gTr[n] = t;
+   TrailAdd(t);
   }
 
 // OnInit: rebuild the registry for this EA's open positions from the saved state (no trading call here)
@@ -1429,11 +1479,8 @@ void TrailRestore()
          continue;
         }
       t.sl = PositionGetDouble(POSITION_SL);
-      t.restored = true;
       t.stateOk = true;
-      int n = ArraySize(gTr);
-      ArrayResize(gTr, n + 1);
-      gTr[n] = t;
+      TrailAdd(t);
       Print("OBM1 trail restored: position ", tk, " E ", Fmt(t.fill), " SL0 ", Fmt(t.sl0), " R0 ", Fmt(t.r0),
             " active ", t.active, " best ", Fmt(t.best), " SL now ", Fmt(t.sl));
      }
@@ -1443,8 +1490,8 @@ void TrailRestore()
 void TrailNotSent(TrailPos &t, const MqlTick &tk, double req, double posSl, string reason, datetime bar)
   {
    t.notSent++;
-   t.lastFailed = req;
-   t.lastFailedBar = bar;
+   t.notSentValue = req;
+   t.notSentBar = bar;
 #ifdef RESEARCH_LOG
    RL_SlMove(t, tk, req, posSl, posSl, 0, "not_sent:" + reason);
 #endif
@@ -1469,16 +1516,20 @@ void TrailSend(TrailPos &t, const MqlTick &tk, double req, double posSl, double 
    if(acc)
      {
       t.accepted++;
-      t.lastFailed = 0;
-      t.lastFailedBar = 0;
-      TrailSave(t);
+      t.rejectedMsc = 0;          // normal behaviour again
+      gTrStreak = 0;
+      gTrBackoffUntil = 0;
      }
    else
      {
       t.rejected++;
-      t.lastFailed = req;
-      t.lastFailedBar = bar;
+      t.rejectedMsc = tk.time_msc;                                    // no request for this position for 1 s
       if(rc == TRADE_RETCODE_MARKET_CLOSED) t.closedBar = bar;
+      if(rc == TRADE_RETCODE_TOO_MANY_REQUESTS)
+        {
+         gTrStreak++;
+         gTrBackoffUntil = tk.time_msc + TrailBackoffMs(gTrStreak);  // no request of the EA before this
+        }
       Print("OBM1 trail: position ", t.ticket, " stop ", Fmt(req), " rejected, retcode ", rc, ", stop on position ",
             Fmt(slRead), " kept");
      }
@@ -1496,17 +1547,20 @@ void ManageTrails(const MqlTick &tk)
      {
       if(!PositionSelectByTicket(gTr[i].ticket))
         {
-         // closed: tracked positions were already finished in SyncTrades; this is a restored one
-         TrailForget(gTr[i].ticket);
+         if(TrailTracked(gTr[i].ticket)) continue;   // its exit deal may not be in history yet: SyncPosition finishes it
+         TrailForget(gTr[i].ticket);                 // a restored position that closed while untracked
          ArrayRemove(gTr, i, 1);
          continue;
         }
       if(!IsOwn(PositionGetString(POSITION_SYMBOL), PositionGetInteger(POSITION_MAGIC))) continue;
+      if(!gTr[i].trailable) continue;
       double posSl = PositionGetDouble(POSITION_SL);
       double posTp = PositionGetDouble(POSITION_TP);
       gTr[i].sl = posSl;
+      double prevBest = gTr[i].best;
       if(gTr[i].dir == 1) gTr[i].best = MathMax(gTr[i].best, tk.bid);
       else                gTr[i].best = MathMin(gTr[i].best, tk.ask);
+      if(gTr[i].best != prevBest) TrailStore(gTr[i]);   // every new best is stored, also while requests are held
       if(!gTr[i].active)
         {
          bool on = (gTr[i].dir == 1) ? tk.bid >= gTr[i].fill + gTr[i].r0 - gTick / 2.0
@@ -1516,14 +1570,19 @@ void ManageTrails(const MqlTick &tk)
          gTr[i].actMsc = tk.time_msc;
          gTr[i].actBid = tk.bid;
          gTr[i].actAsk = tk.ask;
-         TrailSave(gTr[i]);
+         TrailStore(gTr[i]);
+         TrailFlush(tk.time_msc);
         }
       if(gTr[i].closedBar == bar) continue;           // market closed in this minute: retry from the next bar
       double req = (gTr[i].dir == 1) ? RoundTick(gTr[i].best - gTr[i].r0, false)
                                      : RoundTick(gTr[i].best + gTr[i].r0, true);
       bool improves = (gTr[i].dir == 1) ? req >= posSl + gTick - 1e-9 : req <= posSl - gTick + 1e-9;
       if(!improves) continue;
-      if(gTr[i].lastFailedBar == bar && MathAbs(req - gTr[i].lastFailed) < gTick / 2.0) continue;
+      if(gTr[i].rejectedMsc > 0 && tk.time_msc - gTr[i].rejectedMsc < TRAIL_REJECT_WAIT_MS) continue;
+      if(gTrBackoffUntil > 0 && tk.time_msc < gTrBackoffUntil) continue;
+      bool retry = (gTr[i].rejectedMsc > 0 || gTrStreak > 0);
+      if(retry && gTrSlotMsc == tk.time_msc) continue;  // one retry per tick across the EA
+      if(gTr[i].notSentBar == bar && MathAbs(req - gTr[i].notSentValue) < gTick / 2.0) continue;
       double price = (gTr[i].dir == 1) ? tk.bid : tk.ask;
       long stops  = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
       long freeze = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_FREEZE_LEVEL);
@@ -1538,14 +1597,29 @@ void ManageTrails(const MqlTick &tk)
          TrailNotSent(gTr[i], tk, req, posSl, "freeze_level", bar);
          continue;
         }
+      if(retry) gTrSlotMsc = tk.time_msc;
       TrailSend(gTr[i], tk, req, posSl, posTp, bar);
      }
+   if(gTrDirty && tk.time_msc - gTrLastFlush >= TRAIL_FLUSH_MS) TrailFlush(tk.time_msc);
   }
+
+#ifdef RESEARCH_LOG
+// research check at close: the stored state, reloaded, equals memory (best, activation, activation time)
+string TrailFinalCheck(const TrailPos &t)
+  {
+   if(!t.trailable) return "not_trailed";
+   TrailPos chk;
+   if(!TrailLoad(t.ticket, chk)) return "mismatch";
+   bool same = MathAbs(chk.best - t.best) < gTick / 2.0 && chk.active == t.active && chk.actMsc == t.actMsc;
+   return same ? "ok" : "mismatch";
+  }
+#endif
 
 // exit of a trailed position: its research row; the saved state is deleted only for a closed position
 void TrailClose(int idx, string exitKind, bool positionClosed)
   {
 #ifdef RESEARCH_LOG
+   gTr[idx].stateFinal = TrailFinalCheck(gTr[idx]);
    RL_TrailRow(gTr[idx], exitKind);
 #endif
    if(positionClosed) TrailForget(gTr[idx].ticket);
@@ -1862,6 +1936,7 @@ void ResetState()
    ArrayResize(gO5, 0); ArrayResize(gH5, 0); ArrayResize(gL5, 0); ArrayResize(gC5, 0); ArrayResize(gT5, 0);
    ArrayResize(gPiv, 0); ArrayResize(gSeq, 0); ArrayResize(gNewPiv, 0); ArrayResize(gUsedOb, 0);
    ArrayResize(gOb, 0); ArrayResize(S, 0); ArrayResize(gCand, 0); ArrayResize(gTr, 0);
+   gTrBackoffUntil = 0; gTrStreak = 0; gTrSlotMsc = -1; gTrDirty = false; gTrLastFlush = 0;
    gM1 = 0;
    gM5 = 0;
    gLast1 = 0;
@@ -1939,6 +2014,12 @@ void OnDeinit(const int reason)
    double bid = 0, ask = 0;
    if(SymbolInfoTick(_Symbol, tk)) { nowMsc = tk.time_msc; bid = tk.bid; ask = tk.ask; }
    SyncTrades(nowMsc);
+   if(EnableTrailingStop)
+     {
+      for(int i = 0; i < ArraySize(gTr); i++)
+         if(gTr[i].trailable) TrailStore(gTr[i]);
+      TrailFlush(nowMsc);
+     }
    for(int i = 0; i < ArraySize(gOb); i++)
       if(gOb[i].state == ST_OB_WAIT) Finalize(gOb[i], "run_end_untouched", nowMsc);
    for(int i = 0; i < ArraySize(S); i++)

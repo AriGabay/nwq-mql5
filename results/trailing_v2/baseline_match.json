@@ -1,0 +1,14 @@
+{
+ "off_a": {
+  "run": "tr2_off_a",
+  "baseline": "nv1_f1_oos_baseline_a",
+  "identical": true,
+  "trail_files_written": []
+ },
+ "off_b": {
+  "run": "tr2_off_b",
+  "baseline": "nv1_f1_oos_baseline_b",
+  "identical": true,
+  "trail_files_written": []
+ }
+}

@@ -1,5 +1,6 @@
 """trail_r23 and the stop path in the exit check (plan 2026-10-05-0007, U3): the independent checker replays every
 logged stop move through research/mt5r/trailing.py and checks completeness against the M1 Bid bars."""
+import pathlib
 from types import SimpleNamespace
 
 import pandas as pd
@@ -48,7 +49,7 @@ def trail(**over):
     row = {"position_id": 101, "setup_id": 7, "dir": "L", "fill_price": 2000.0, "sl0": 1995.0, "r0": 5.0,
            "tp": 2010.0, "activated_msc": ms(1, 20), "activation_bid": 2005.00, "activation_ask": 2005.20,
            "best_price": 2007.50, "final_sl": 2002.50, "requests": 3, "accepted": 3, "rejected": 0, "not_sent": 0,
-           "exit_kind": "trail", "state_roundtrip": "ok"}
+           "exit_kind": "trail", "state_roundtrip": "ok", "state_final": "ok"}
     row.update(over)
     return pd.DataFrame([row])
 
@@ -168,31 +169,156 @@ def test_a_request_in_a_market_closed_minute_or_an_identical_resend_is_flagged()
     same = [GOOD_MOVES[0][:6] + (1995.00, 10006, "rejected"), GOOD_MOVES[0][:6] + (1995.00, 10006, "rejected")]
     viol, _, _ = run(mv=moves(same), tr=trail(final_sl=1995.0, accepted=0, best_price=2007.5, exit_kind="sl"),
                      st=setups(exit_kind="sl", exit_price=1995.0))
-    assert "re-sent in the same minute" in details(viol)
+    assert "0 ms after its rejection" in details(viol)
 
 
-# ------------------------------------------------------------------ the run-level wiring, on stored tester evidence
-def _stored_trailed_run():
-    """results/trailing_v1/tr1_on_b: a committed March 2026 run with the trail on (variant B, 56 positions)."""
+# ------------------------------------------------------------------ the PR #6 evidence under the plan 0128 rules
+V1_ON_B = pathlib.Path(__file__).resolve().parents[2] / "results" / "trailing_v1" / "tr1_on_b"
+
+
+def test_the_pr6_trailed_run_is_not_recertified_under_the_new_contract():
+    """results/trailing_v1/tr1_on_b predates rl_trail.state_final: it fails `fields` and nothing else."""
     import cli
-    import trail_cli as tc
-    rid = tc.run_id("on_b")
-    run = cm.read_run(tc.run_dir("on_b"), rid)
-    params = {**tc.BASE_INPUTS, "StructureVariant": tc.VARIANT["on_b"],
-              "point": cli.RUN["symbol_spec"]["tick_size"], "contract_size": cli.RUN["symbol_spec"]["contract_size"]}
-    return run, params
-
-
-def test_read_run_and_full_carry_the_trail_files_into_trail_r23():
-    run, params = _stored_trailed_run()
-    assert {"trail", "sl_moves"} <= set(run)
+    run = cm.read_run(V1_ON_B, "tr1_on_b")
+    params = {**cli.RUN["symbol_spec"], "ImpulseWindowBars": 2, "SwingStrengthM1": 3, "StopBufferPoints": 20,
+              "RiskRR": 2.0, "RiskPercent": 1.0, "MaxExposures": 3, "WarmupDays": 30, "StructureVariant": 1,
+              "point": cli.RUN["symbol_spec"]["tick_size"]}
     res = cm.full(run["setups"], run["events"], run["pivots"], run["bars_m1"], run["bars_m5"], params,
-                  run.get("deals"), run.get("trail"), run.get("sl_moves"))
-    assert res["violations"] == []
-    assert res["coverage"]["rules"]["trail_r23"]["checked"] == len(run["trail"])
-    bad = run["sl_moves"].copy()
-    i = bad.index[bad["outcome"] == "accepted"][5]
-    bad.loc[i, "requested_sl"] = float(bad.loc[i, "requested_sl"]) + 0.05
-    viol = cm.check(run["setups"], run["events"], run["pivots"], run["bars_m1"], run["bars_m5"], params,
-                    run.get("deals"), run.get("trail"), bad)
-    assert any(v["rule"] == "trail_r23" and "!= model" in v["detail"] for v in viol)
+                  run.get("deals"), run.get("trail"), run.get("sl_moves"), trailing=True)
+    assert [(v["rule"], "state_final" in v["detail"]) for v in res["violations"]] == [("fields", True)]
+
+
+# ------------------------------------------------------------------ completeness (plan 0128, R12-R13)
+def two_positions(trail_rows=(101, 102)):
+    st = pd.concat([setups(), setups().assign(setup_id=8, position_id=102)], ignore_index=True)
+    tr = pd.concat([trail(position_id=p, setup_id=7 if p == 101 else 8) for p in trail_rows], ignore_index=True)
+    mv = pd.concat([moves(GOOD_MOVES), moves(GOOD_MOVES).assign(position_id=102)], ignore_index=True)
+    return st, tr, mv
+
+
+def test_every_filled_position_needs_exactly_one_trail_row():                                  # Covers AE5
+    st, tr, mv = two_positions()
+    viol, n, _ = run(st=st, tr=tr, mv=mv)
+    assert viol == [] and n == 2
+    st, tr, mv = two_positions(trail_rows=(101,))
+    viol, _, _ = run(st=st, tr=tr, mv=mv[mv["position_id"] == 101])
+    assert "position 102 is filled but has no rl_trail row" in details(viol)
+    st, tr, mv = two_positions(trail_rows=(101, 102, 102))
+    assert "2 rl_trail rows for position 102" in details(run(st=st, tr=tr, mv=mv)[0])
+
+
+def test_a_trail_row_without_a_filled_position_is_flagged():
+    viol, _, _ = run(tr=pd.concat([trail(), trail(position_id=555, setup_id=99)], ignore_index=True))
+    assert "rl_trail row for position 555 has no filled rl_setups row" in details(viol)
+
+
+def test_the_trail_files_must_match_the_run_input():
+    assert cm.trail_presence(True, None, None)[0]["rule"] == "trail_r23"
+    assert "missing" in cm.trail_presence(True, trail(), None)[0]["detail"]
+    assert "trail-off run" in cm.trail_presence(False, trail(), moves(GOOD_MOVES))[0]["detail"]
+    assert cm.trail_presence(False, None, None) == [] and cm.trail_presence(True, trail(), moves([])) == []
+    assert "EnableTrailingStop" in cm.trail_presence("maybe", None, None)[0]["detail"]
+    assert cm.parse_trailing("true") is True and cm.parse_trailing(1) is True and cm.parse_trailing("false") is False
+    assert cm.parse_trailing(None) is False
+
+
+def test_a_not_trailed_row_is_accepted_only_without_moves_activation_or_a_moved_stop():
+    nt = dict(state_roundtrip="not_trailed:no_risk", state_final="not_trailed", activated_msc=None,
+              activation_bid=None, activation_ask=None, accepted=0, requests=0, final_sl=1995.0, best_price=2000.0,
+              exit_kind="sl", sl0=1995.0, r0=0.0, tp=0.0)
+    st = setups(exit_kind="sl", exit_price=1995.0)
+    viol, _, _ = run(st=st, tr=trail(**nt), mv=moves([]))
+    assert viol == []
+    viol, _, _ = run(st=st, tr=trail(**nt), mv=moves(GOOD_MOVES[:1]))
+    assert "not trailed but has 1 stop request" in details(viol)
+    viol, _, _ = run(st=st, tr=trail(**{**nt, "state_roundtrip": "ok"}), mv=moves([]))
+    assert "state_final not_trailed" in details(viol)
+
+
+def test_the_stored_state_at_close_must_equal_memory():
+    viol, _, _ = run(tr=trail(state_final="mismatch"))
+    assert "stored state at close" in details(viol)
+
+
+def test_a_trail_table_without_the_state_final_column_fails_fields():
+    viol, _, _ = run(tr=trail().drop(columns=["state_final"]))
+    assert viol[0]["rule"] == "fields" and "state_final" in viol[0]["detail"]
+
+
+# ------------------------------------------------------------------ the retry policy (plan 0128, R3-R7)
+REJ_AT = ms(1, 20)
+
+
+def rejected_then(after_ms, rc=10006):
+    return [(REJ_AT, 2005.00, 2005.20, 2005.00, 2000.00, 1995.00, 1995.00, rc, "rejected"),
+            (REJ_AT + after_ms, 2005.00, 2005.20, 2005.00, 2000.00, 1995.00, 2000.00, 10009, "accepted"),
+            (ms(2, 30), 2007.50, 2007.70, 2007.50, 2002.50, 2000.00, 2002.50, 10009, "accepted")]
+
+
+def test_a_request_within_one_second_of_its_rejection_is_flagged():
+    viol, _, _ = run(mv=moves(rejected_then(600)), tr=trail(requests=3, accepted=2, rejected=1))
+    assert "600 ms after its rejection" in details(viol)
+    viol, _, _ = run(mv=moves(rejected_then(1000)), tr=trail(requests=3, accepted=2, rejected=1))
+    assert viol == []
+
+
+def test_the_too_many_requests_backoff_is_ea_wide_and_doubles():
+    rows = [(REJ_AT, 2005.00, 2005.20, 2005.00, 2000.00, 1995.00, 1995.00, 10024, "rejected"),
+            (REJ_AT + 1000, 2005.00, 2005.20, 2005.00, 2000.00, 1995.00, 1995.00, 10024, "rejected"),
+            (REJ_AT + 2500, 2005.00, 2005.20, 2005.00, 2000.00, 1995.00, 2000.00, 10009, "accepted"),
+            (ms(2, 30), 2007.50, 2007.70, 2007.50, 2002.50, 2000.00, 2002.50, 10009, "accepted")]
+    tr = trail(requests=4, accepted=2, rejected=2)
+    assert "during the EA backoff" in details(run(mv=moves(rows), tr=tr)[0])        # needs 2 s after the 2nd
+    rows[2] = (REJ_AT + 3000,) + rows[2][1:]
+    assert run(mv=moves(rows), tr=tr)[0] == []
+
+
+def test_two_retries_on_one_tick_are_flagged_and_two_normal_requests_are_not():
+    st, tr, mv = two_positions()
+    assert run(st=st, tr=tr, mv=mv)[0] == []                                   # normal sends share ticks
+    rows = rejected_then(1000)
+    mv = pd.concat([moves(rows), moves(rows).assign(position_id=102)], ignore_index=True)
+    tr = pd.concat([trail(requests=3, accepted=2, rejected=1),
+                    trail(position_id=102, setup_id=8, requests=3, accepted=2, rejected=1)], ignore_index=True)
+    viol, _, _ = run(st=st, tr=tr, mv=mv)
+    assert "second retry on tick" in details(viol)
+
+
+def test_a_rejected_request_must_also_improve_the_stop():
+    rows = [GOOD_MOVES[0], (ms(1, 40), 2005.50, 2005.70, 2005.50, 2000.00, 2000.00, 2000.00, 10006, "rejected"),
+            (ms(2, 30), 2007.50, 2007.70, 2007.50, 2002.50, 2000.00, 2002.50, 10009, "accepted")]
+    viol, _, _ = run(mv=moves(rows), tr=trail(accepted=2, rejected=1))
+    assert "does not improve" in details(viol)
+
+
+# ------------------------------------------------------------------ plan 0128 evidence: results/trailing_v2/tr2_on_b
+V2_ON_B = pathlib.Path(__file__).resolve().parents[2] / "results" / "trailing_v2" / "tr2_on_b"
+
+
+def _v2_full(trail_table):
+    import cli
+    run = cm.read_run(V2_ON_B, "tr2_on_b")
+    params = {"ImpulseWindowBars": 2, "SwingStrengthM1": 3, "StopBufferPoints": 20, "RiskRR": 2.0, "RiskPercent": 1.0,
+              "MaxExposures": 3, "WarmupDays": 30, "StructureVariant": 1,
+              "point": cli.RUN["symbol_spec"]["tick_size"], "contract_size": cli.RUN["symbol_spec"]["contract_size"]}
+    t = run["trail"] if trail_table is None else trail_table(run["trail"])
+    return run, cm.full(run["setups"], run["events"], run["pivots"], run["bars_m1"], run["bars_m5"], params,
+                        run.get("deals"), t, run.get("sl_moves"), trailing=True)
+
+
+def test_the_stored_trailed_run_passes_with_one_row_per_filled_position():
+    run, res = _v2_full(None)
+    filled = int(run["setups"]["fill_price"].notna().sum())
+    assert res["violations"] == [] and res["coverage"]["rules"]["trail_r23"]["checked"] == filled == 56
+
+
+def test_deleting_one_trail_row_of_the_stored_run_fails():                                    # Covers R14
+    run, res = _v2_full(lambda t: t.iloc[1:])
+    pid = int(run["trail"]["position_id"].iloc[0])
+    assert [v["detail"] for v in res["violations"]] == [f"position {pid} is filled but has no rl_trail row"]
+
+
+def test_duplicating_one_trail_row_of_the_stored_run_fails():                                 # Covers R14
+    run, res = _v2_full(lambda t: pd.concat([t, t.iloc[[3]]], ignore_index=True))
+    pid = int(run["trail"]["position_id"].iloc[3])
+    assert any(v["detail"] == f"2 rl_trail rows for position {pid}" for v in res["violations"])
