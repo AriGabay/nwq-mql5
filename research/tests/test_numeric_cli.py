@@ -1,6 +1,7 @@
 """numeric_cli: stage guards, the OOS loop with chained deposits and fallback labels, resume without re-optimizing,
 and the frozen .set naming (plan 2026-10-04-1851, U2, U7, U8)."""
 import json
+import subprocess
 
 import pytest
 
@@ -31,7 +32,7 @@ def test_post_freeze_commands_refuse_an_uncommitted_prereg(monkeypatch):
 
 def test_post_freeze_commands_refuse_a_prereg_registering_another_ea(monkeypatch):
     monkeypatch.setattr(nc.cli, "committed", lambda path: True)
-    monkeypatch.setattr(nc.subprocess, "run", lambda *a, **k: type("R", (), {"returncode": 0})())
+    monkeypatch.setattr(nc, "prereg_published", lambda path: "origin/main")
     monkeypatch.setattr(nv, "load_prereg", lambda: {"ea_source_sha256": "other"})
     with pytest.raises(SystemExit, match="EA source"):
         nc.prereg_committed()
@@ -149,13 +150,87 @@ def test_report_verdict_states_no_improvement_unless_every_criterion_passes(pass
     assert "recommended" not in text.lower() or "אין recommended.set" in text
 
 
-def test_post_freeze_commands_refuse_a_prereg_not_pushed_to_origin(monkeypatch):
-    monkeypatch.setattr(nc.cli, "committed", lambda path: True)
+# ------------------------------------------------------------------ publication guard on real git repositories
+PRE = "research/prereg.json"
 
-    def fake_run(cmd, *a, **k):
-        failing = cmd[:3] == ["git", "diff", "--quiet"]
-        return type("R", (), {"returncode": 1 if failing else 0, "stdout": "", "stderr": ""})()
 
-    monkeypatch.setattr(nc.subprocess, "run", fake_run)
+def _git(cwd, *args):
+    r = subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *args], cwd=cwd, capture_output=True,
+                       text=True)
+    assert r.returncode == 0, r.stderr
+    return r.stdout.strip()
+
+
+@pytest.fixture
+def repo(tmp_path, monkeypatch):
+    """A clone of a bare origin whose main holds one commit; prereg_published runs inside the clone."""
+    origin, work = tmp_path / "origin.git", tmp_path / "work"
+    _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(origin))
+    _git(tmp_path, "clone", "-q", str(origin), str(work))
+    _git(work, "checkout", "-q", "-b", "main")
+    (work / "README").write_text("x")
+    _git(work, "add", "README")
+    _git(work, "commit", "-q", "-m", "init")
+    _git(work, "push", "-q", "origin", "main")
+    monkeypatch.setattr(nc, "REPO", work)
+    return work
+
+
+def _freeze(work, text="{}", msg="freeze"):
+    (work / "research").mkdir(exist_ok=True)
+    (work / PRE).write_text(text)
+    _git(work, "add", PRE)
+    _git(work, "commit", "-q", "-m", msg)
+
+
+def test_publication_guard_accepts_the_freeze_pushed_on_the_working_branch(repo):
+    _git(repo, "checkout", "-q", "-b", "feat/a")
+    _freeze(repo)
+    _git(repo, "push", "-q", "origin", "feat/a")
+    assert nc.prereg_published(PRE) == "origin/feat/a"
+
+
+def test_publication_guard_accepts_a_new_branch_once_the_freeze_is_merged_to_main(repo):
+    _git(repo, "checkout", "-q", "-b", "feat/a")
+    _freeze(repo)
+    _git(repo, "push", "-q", "origin", "feat/a")
+    _git(repo, "checkout", "-q", "main")
+    _git(repo, "merge", "-q", "--no-ff", "-m", "merge", "feat/a")
+    _git(repo, "push", "-q", "origin", "main")
+    _git(repo, "checkout", "-q", "-b", "feat/b")           # new branch, never pushed
+    assert nc.prereg_published(PRE) == "origin/main"
+    _git(repo, "checkout", "-q", "--detach")                # detached HEAD: main only
+    assert nc.prereg_published(PRE) == "origin/main"
+
+
+def test_publication_guard_refuses_a_freeze_not_pushed_anywhere(repo):
+    _git(repo, "checkout", "-q", "-b", "feat/a")
+    _freeze(repo)
     with pytest.raises(SystemExit, match="not pushed"):
-        nc.prereg_committed()
+        nc.prereg_published(PRE)
+
+
+def test_publication_guard_refuses_a_protocol_changed_after_its_freeze_commit(repo):
+    _git(repo, "checkout", "-q", "-b", "feat/a")
+    _freeze(repo, "{}")
+    _freeze(repo, '{"changed": 1}')
+    _git(repo, "push", "-q", "origin", "feat/a")
+    with pytest.raises(SystemExit, match="exactly once"):
+        nc.prereg_published(PRE)
+
+
+def test_publication_guard_refuses_the_same_content_without_the_freeze_commit(repo):
+    """main gets an identical file from another commit: the content matches, but the freeze itself is unpublished."""
+    _git(repo, "checkout", "-q", "-b", "other")
+    _freeze(repo, "{}", "copy")
+    _git(repo, "push", "-q", "origin", "other:main")
+    _git(repo, "checkout", "-q", "-b", "feat/a", "HEAD~1")
+    _freeze(repo, "{}")                                      # the real freeze commit, different from main's
+    _git(repo, "branch", "-q", "-D", "other")
+    with pytest.raises(SystemExit, match="not pushed"):
+        nc.prereg_published(PRE)
+
+
+def test_publication_guard_refuses_an_uncommitted_protocol(repo):
+    with pytest.raises(SystemExit, match="exactly once"):
+        nc.prereg_published(PRE)

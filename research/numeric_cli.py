@@ -34,7 +34,7 @@ SERIES = ("procedure",) + BASELINE_SERIES
 SETS = {"original": "ob_m1_structure_nv1_original.set", "baseline_a": "ob_m1_structure_nv1_baseline_a.set",
         "baseline_b": "ob_m1_structure_nv1_baseline_b.set", "candidate": "ob_m1_structure_nv1_candidate.set",
         "fallback": "ob_m1_structure_nv1_fallback.set"}
-BRANCH = "feat/new-test-robust-optimization"
+MAIN = "main"
 
 
 def _rel(p) -> str:
@@ -73,15 +73,43 @@ def start(pre_freeze: bool) -> tuple:
     return cfg, P
 
 
+def _git(*args) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True)
+
+
+def published_refs() -> list:
+    """The origin branches a frozen protocol may be published on: the current branch, then main (a detached HEAD
+    has no branch of its own)."""
+    head = _git("rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+    return [b for b in dict.fromkeys([head, MAIN]) if b and b != "HEAD"]
+
+
+def prereg_published(path: str) -> str:
+    """R16: `path` was committed once (its freeze commit) and never changed after it, and an origin branch (the
+    current one or main) holds that freeze commit and the same content. Returns that ref; raises otherwise."""
+    commits = _git("log", "--format=%H", "--", path).stdout.split()
+    if len(commits) != 1:
+        raise SystemExit(f"{path} must be committed exactly once (its freeze commit); found {len(commits)} commits "
+                         "touching it (R16)")
+    freeze = commits[0]
+    refs = published_refs()
+    for ref in refs:
+        _git("fetch", "-q", "origin", ref)
+        remote = f"origin/{ref}"
+        if (_git("cat-file", "-e", f"{remote}:{path}").returncode == 0
+                and _git("diff", "--quiet", remote, "--", path).returncode == 0
+                and _git("merge-base", "--is-ancestor", freeze, remote).returncode == 0):
+            return remote
+    raise SystemExit(f"{path} is not pushed: no origin branch among {refs} holds its freeze commit {freeze[:8]} "
+                     "with the same content; push it before any research run (R16)")
+
+
 def prereg_committed() -> dict:
-    """R16/U6: the numeric_v1 pre-registration is committed, unchanged, pushed, and registers this EA source."""
+    """R16/U6: the numeric_v1 pre-registration is committed, unchanged since its freeze commit, pushed, and
+    registers this EA source."""
     if not cli.committed(nv.PREREG_REL):
         raise SystemExit(f"{nv.PREREG_REL} is missing or has uncommitted changes; refusing to run")
-    subprocess.run(["git", "fetch", "-q", "origin", BRANCH], cwd=REPO, capture_output=True, text=True)
-    pushed = subprocess.run(["git", "diff", "--quiet", f"origin/{BRANCH}", "--", nv.PREREG_REL], cwd=REPO)
-    present = subprocess.run(["git", "cat-file", "-e", f"origin/{BRANCH}:{nv.PREREG_REL}"], cwd=REPO)
-    if pushed.returncode != 0 or present.returncode != 0:
-        raise SystemExit(f"{nv.PREREG_REL} is not pushed to origin/{BRANCH}; push it before any research run (R16)")
+    prereg_published(nv.PREREG_REL)
     P = nv.load_prereg()
     if P.get("ea_source_sha256") != cli.ea_sha():
         raise SystemExit("the EA source differs from the registered ea_source_sha256; refusing to run (R3)")

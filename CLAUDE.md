@@ -2,7 +2,7 @@
 
 Reply to the user in Hebrew. Project state and next step: `docs/PROJECT_STATUS.md`. Terms: `CONCEPTS.md`.
 
-## Sync to GitHub (standing instruction from the user, 2026-10-04)
+## Sync to GitHub (standing instruction from the user; PR and merge rule updated 2026-10-04)
 
 The official repository is `https://github.com/AriGabay/nwq-mql5.git` (remote `origin`). It is **public**.
 
@@ -12,14 +12,28 @@ the protocol, a significant fix, or a finished research stage:
 1. Review the diff and run the verification that fits the change (at least `python -m pytest research/tests -q`
    for pipeline code; compile and tester checks for the EA).
 2. Update `docs/PROJECT_STATUS.md` when the state, results or next step changed.
-3. Make a focused commit and push it to the working branch. The user has approved these pushes as part of the work
-   they request; do not ask again for each regular push.
-4. Confirm the local commit is on GitHub (`git fetch origin` and compare SHAs). If a push fails, say explicitly that
-   the work is **not yet synced**.
-5. Report: what changed and why, what was and was not verified, the branch name, the full SHA pushed, and links to
-   the commit and the main files (`https://github.com/AriGabay/nwq-mql5/commit/<sha>`).
+3. Make a focused commit and push it to the working branch.
+4. Open a PR to `main`, or update the open one. Once the required checks have passed, merge it yourself with a
+   **merge commit** (`gh pr merge --merge`), which keeps every commit for protocol traceability. Never squash or
+   rebase-merge.
+5. Confirm the change is on GitHub: `git fetch origin`, then compare the branch SHA and check that the merged
+   commit is in `origin/main`. If a push, PR or merge fails, say explicitly that the work is **not yet synced** or
+   **not merged**. Never report a merge that did not happen.
+6. Report: what changed and why, what was and was not verified, the branch name, the full SHA pushed, the PR link,
+   the merge status, the full SHA of `main` after the merge, and links to the commit and the main files
+   (`https://github.com/AriGabay/nwq-mql5/commit/<sha>`).
 
-Never force-push, and never merge into `main` as part of syncing; merges go through a PR the user handles.
+The user has approved these pushes, PRs and merges in advance as part of the work they request. Do not ask again for
+each regular push or merge.
+
+**Never:**
+- force-push;
+- bypass checks or branch protections (no `--admin` merge, no disabling a rule).
+
+**When something is missing:**
+- If `gh` is missing, use an authorized GitHub tool, or install `gh`. Its absence alone is no reason to leave
+  verified work without a PR.
+- If permission or sign-in is missing, report that blocker explicitly.
 
 ## Public repository: never commit
 

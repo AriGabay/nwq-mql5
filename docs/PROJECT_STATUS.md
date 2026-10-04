@@ -15,7 +15,7 @@
   - **דוח:** `deliverables/numeric_v1/report_he.md`.
   - **תוכנית:** `docs/plans/2026-10-04-1851-feat-ob-m1-numeric-grid-research-plan.md`.
 - **המחקר הקודם:** ‏"M5 OB + M1 structure", לפי התוכנית מ־2026-10-03. הוא בחר בין A ל־B בלבד, הסתיים ב־2026-10-04 **ונכשל לפי הפרוטוקול**, ואין המלצה. הראיות שלו נשארות כמות שהן.
-- **ענף עבודה:** ‏`feat/new-test-robust-optimization`. ‏PR #1 מוזג ל־`main` ב־GitHub.
+- **ענף עבודה וסנכרון:** כל יחידה מאומתת עוברת ל־`main` דרך PR שממוזג ב־merge commit (כללים ב־`CLAUDE.md`). שומר הפרוטוקול של numeric_v1 מקבל עכשיו פרוטוקול שנדחף לענף הנוכחי או ל־`main`, בתנאי שה־commit של ההקפאה נמצא שם והקובץ לא השתנה מאז.
 
 ## נתיבים
 
@@ -28,7 +28,7 @@
 | קבועי הרצה | `research/run_constants.json` |
 | צינור המחקר | `research/cli.py`, `research/mt5r/` (‏runner, pipeline, wfo, evaluate, conformance_m1, session_sensitivity); ‏numeric_v1: `research/numeric_cli.py`, `research/mt5r/numeric_v1.py`, `research/mt5r/gridrun.py` |
 | בודק התאמה עצמאי | `research/mt5r/conformance_m1.py` |
-| בדיקות | `python -m pytest research/tests -q` (‏259 עוברות) |
+| בדיקות | `python -m pytest research/tests -q` (‏264 עוברות) |
 
 ## פרמטרים (המחקר הקודם; הגריד של numeric_v1 מופיע למעלה)
 
