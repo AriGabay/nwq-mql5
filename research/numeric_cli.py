@@ -482,7 +482,7 @@ def cmd_deliver(args) -> None:
                       for k, v in checks.items()}, indent=1))
 
 
-CRIT_HE = {"oos_frequency": "תדירות (עסקאות בחודש)", "oos_net": "נטו > 0 ומעל שני ה־baselines",
+CRIT_HE = {"oos_frequency": "תדירות (עסקאות בחודש)", "oos_net": "נטו > 0 ומעל ה־baselines של הסדרה (פירוט מתחת)",
            "bootstrap_ci": "CI של ה־PnL היומי > 0", "positive_folds": "רוב folds חיוביים",
            "top_events_removed": "נטו בלי 2 האירועים הגדולים", "loss_limits": "מגבלות הפסד + MC",
            "cost_stress": "לחץ עלויות", "stability": "יציבות שכנים", "dsr": "DSR"}
@@ -494,6 +494,15 @@ def _md(rows: list, cols: list) -> str:
     for r in rows:
         out.append("| " + " | ".join("" if r.get(c) is None else str(r.get(c)) for c in cols) + " |")
     return "\n".join(out)
+
+
+def net_condition(c: dict) -> str:
+    """The net condition a series actually faced, read from its accepted oos_net value: named baselines when the
+    series was compared with any, otherwise net > 0 alone (plan 2026-10-04-2133, R12)."""
+    names = list((c.get("value") or {}).get("baselines") or {})
+    if not names:
+        return "נטו > 0 בלבד (אין baseline להשוואה)"
+    return "נטו > 0 ומעל " + " ו־".join(SERIES_HE.get(n, n) for n in names)
 
 
 def _ok(c: dict) -> str:
@@ -567,6 +576,10 @@ def build_report(acc: dict, windows: list, folds: list, checks: dict) -> str:
         rows.append({"criterion": label, **{SERIES_HE[w]: _ok(acc["acceptance"][w]["criteria"][k]) for w in SERIES},
                      "group R (דיווח)": _ok(acc["acceptance_group_R_report_only"]["criteria"][k])})
     lines.append(_md(rows, ["criterion"] + [SERIES_HE[w] for w in SERIES] + ["group R (דיווח)"]))
+    lines += ["", "- **תנאי הנטו שנבדק לכל סדרה** (הקריטריונים והתוצאות לא שונו):"]
+    lines += [f"  - **{SERIES_HE[w]}:** {net_condition(acc['acceptance'][w]['criteria']['oos_net'])}" for w in SERIES]
+    lines.append(f"  - **group R (דיווח):** "
+                 f"{net_condition(acc['acceptance_group_R_report_only']['criteria']['oos_net'])}")
     net = proc["criteria"]["oos_net"]["value"]
     dsr = proc["criteria"]["dsr"]["value"]
     lines += ["", f"- **נטו של ההליך:** {net.get('net')}. ‏baselines: {net.get('baselines')}. פערים: {net.get('margins')}.",

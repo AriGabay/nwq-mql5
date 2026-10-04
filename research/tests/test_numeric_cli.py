@@ -150,6 +150,28 @@ def test_report_verdict_states_no_improvement_unless_every_criterion_passes(pass
     assert "recommended" not in text.lower() or "אין recommended.set" in text
 
 
+def test_report_states_the_net_condition_each_series_faced():
+    """B was compared with A only and A with no baseline; the criteria section must say so (plan 2026-10-04-2133,
+    U1, R12), while every pass/fail cell stays the accepted value."""
+    acc = _acc(False)
+    base = acc["acceptance"]["procedure"]
+    acc["acceptance"] = {
+        "procedure": base,
+        "baseline_a": {**base, "criteria": {**base["criteria"], "oos_net": {
+            "pass": False, "evaluated": True, "value": {"net": -1.0, "baseline_net": -1.0}, "threshold": "t"}}},
+        "baseline_b": {**base, "criteria": {**base["criteria"], "oos_net": {
+            "pass": True, "evaluated": True, "value": {"net": 2.0, "baselines": {"baseline_a": -1.0},
+                                                       "margins": {"baseline_a": 3.0}}, "threshold": "t"}}}}
+    text = nc.build_report(acc, [], [], {})
+    lines = {ln.split(":**")[0]: ln for ln in text.splitlines() if ln.startswith("  - **")}
+    assert "baseline A (0,3,20)" in lines["  - **הליך הבחירה"] and "baseline B (1,3,20)" in lines["  - **הליך הבחירה"]
+    assert "baseline A (0,3,20)" in lines["  - **baseline B (1,3,20)"]
+    assert "baseline B" not in lines["  - **baseline B (1,3,20)"].split(":**")[1]
+    assert "אין baseline" in lines["  - **baseline A (0,3,20)"]
+    row = next(ln for ln in text.splitlines() if ln.startswith("| נטו > 0"))
+    assert row.split("|")[2:5] == [" נכשל ", " נכשל ", " עובר "]
+
+
 # ------------------------------------------------------------------ publication guard on real git repositories
 PRE = "research/prereg.json"
 
