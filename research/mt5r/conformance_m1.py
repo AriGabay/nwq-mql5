@@ -235,17 +235,15 @@ def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame,
     """Every trailed position against the reference model (research/mt5r/trailing.py) and the M1 Bid bars.
 
     Returns (violations, checked, unverifiable): violations as {setup_id, rule, detail}, the number of positions
-    checked, and Counter-like {key: [setup ids]} of cases the bars cannot prove."""
+    checked, and a dict of key -> [setup ids] of cases the bars cannot prove."""
     tol = tick / 2 + 1e-9
     viol, unv, checked = [], {}, 0
     rows = {int(r["position_id"]): r for r in setups.to_dict("records") if not _missing(r.get("position_id"))}
-    mv = moves.copy() if moves is not None else pd.DataFrame(columns=mc.SL_MOVE_COLUMNS)
-    mv["_ord"] = range(len(mv))
+    mv = moves if moves is not None else pd.DataFrame(columns=mc.SL_MOVE_COLUMNS)
     for t in (trail.to_dict("records") if trail is not None else []):
         pid, sid = int(t["position_id"]), _int(t.get("setup_id"))
         bad = []
-        def add(msg):
-            bad.append(msg)
+        add = bad.append
         checked += 1
         sign = _sign(t["dir"])
         E, sl0, r0, tp = float(t["fill_price"]), float(t["sl0"]), float(t["r0"]), float(t["tp"])
@@ -257,8 +255,8 @@ def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame,
             add(f"E/SL0/TP {E}/{sl0}/{tp} differ from rl_setups {r['fill_price']}/{r['sl']}/{r['tp']}")
         if abs(r0 - abs(E - sl0)) > tol:
             add(f"R0 {r0} != |E - SL0| {abs(E - sl0):.5f}")
-        st = trl.TrailState(direction=sign, fill=E, sl0=sl0, tp=tp, sl=sl0)
-        own = mv[mv["position_id"].astype(int) == pid].sort_values(["tick_msc", "_ord"], kind="mergesort")
+        cur_sl = sl0                                   # the replayed stop on the position
+        own = mv[mv["position_id"].astype(int) == pid].sort_values("tick_msc", kind="mergesort")
         prev_best, accepted = None, 0
         closed_min, failed = None, None                # (minute, value) of the last failure; market-closed minute
         act_ms = _int(t.get("activated_msc"))
@@ -285,19 +283,19 @@ def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame,
             want = trl.requested_sl(sign, best, r0, tick)
             if abs(req - want) > tol:
                 add(f"move at {ms}: requested {req} != model {want} for best {best}")
-            if abs(before - st.sl) > tol:
-                add(f"move at {ms}: stop before {before} != replayed stop {st.sl}")
+            if abs(before - cur_sl) > tol:
+                add(f"move at {ms}: stop before {before} != replayed stop {cur_sl}")
             if outcome == "accepted":
                 if abs(after - req) > tol:
                     add(f"move at {ms}: accepted stop {after} != request {req}")
-                if (req - st.sl) * sign < tick - tol:
-                    add(f"move at {ms}: accepted stop {req} does not improve {st.sl} by a tick")
+                if (req - cur_sl) * sign < tick - tol:
+                    add(f"move at {ms}: accepted stop {req} does not improve {cur_sl} by a tick")
                 accepted += 1
-                st.sl = after
+                cur_sl = after
             elif outcome == "rejected":
-                if (after - st.sl) * sign < -tol:
-                    add(f"move at {ms}: stop read back {after} retreats from {st.sl}")
-                st.sl = after
+                if (after - cur_sl) * sign < -tol:
+                    add(f"move at {ms}: stop read back {after} retreats from {cur_sl}")
+                cur_sl = after
                 failed = (minute, req)
                 if int(m["retcode"]) == trl.RETCODE_MARKET_CLOSED:
                     closed_min = minute
@@ -315,8 +313,8 @@ def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame,
             j = B.bar_at_ms(act_ms)
             if j is not None and ((sign > 0 and B.h[j] < E + r0 - tol) or (sign < 0 and B.l[j] > E - r0 + tol)):
                 add(f"activation at {act_ms}: its M1 bar never reaches E {'+' if sign > 0 else '-'} R0 on Bid")
-        if abs(float(t["final_sl"]) - st.sl) > tol:
-            add(f"final stop {t['final_sl']} != replayed stop {st.sl}")
+        if abs(float(t["final_sl"]) - cur_sl) > tol:
+            add(f"final stop {t['final_sl']} != replayed stop {cur_sl}")
         if int(t["accepted"]) != accepted:
             add(f"accepted count {t['accepted']} != {accepted} accepted rows")
         kind = _str(r.get("exit_kind"))
