@@ -161,3 +161,30 @@ def test_trial_sharpe_variance_uses_custom_column_of_passes_with_trades(tmp_path
     out = evaluate.trial_sharpe_variance([a, b])
     assert abs(out["var_sr"] - 0.03) < 1e-12
     assert out["passes"] == 5 and out["source"].startswith("optimization Custom")
+
+
+def test_named_baselines_require_beating_every_baseline():                               # numeric_v1 AE6
+    p = prereg()
+    rows = [{"fold": i + 1, "net": 1} for i in range(4)]
+    s = stitched(50, profit=10.0)                                   # net 500
+    bases = {"baseline_a": stitched(10, profit=30.0), "baseline_b": stitched(10, profit=80.0)}   # 300, 800
+    out = evaluate.evaluate(s, None, rows, 1.0, 0.001, p, bases=bases)["criteria"]["oos_net"]
+    assert out["pass"] is False
+    assert out["value"]["baselines"] == {"baseline_a": 300.0, "baseline_b": 800.0}
+    assert out["value"]["margins"] == {"baseline_a": 200.0, "baseline_b": -300.0}
+    bases["baseline_b"] = stitched(10, profit=40.0)                 # 400
+    assert evaluate.evaluate(s, None, rows, 1.0, 0.001, p, bases=bases)["criteria"]["oos_net"]["pass"] is True
+
+
+def test_single_baseline_output_is_unchanged_without_named_baselines():
+    out = run(stitched(60))["criteria"]["oos_net"]
+    assert set(out["value"]) == {"net", "baseline_net"} and out["threshold"] == "> 0 and > baseline net"
+
+
+def test_dsr_reports_the_sensitivity_trial_count_when_registered():
+    p = prereg()
+    p["stats"]["dsr_trials"], p["stats"]["dsr_trials_sensitivity"] = 126, 18
+    rows = [{"fold": i + 1, "net": 1} for i in range(4)]
+    d = evaluate.evaluate(stitched(80, profit=10.0), None, rows, 1.0, 0.001, p)["criteria"]["dsr"]["value"]
+    assert d["trials"] == 126 and d["sensitivity"]["trials"] == 18
+    assert d["sensitivity"]["psr_value"] >= d["psr_value"]
