@@ -35,13 +35,17 @@ The user's untracked file `mql5/Experts/ob_fvg_retest copy.mq5` is theirs: never
 
 - Keep earlier evidence; never overwrite or delete old results with new ones. New runs get new folders; finished
   research moves to `archive/`.
-- Do not choose rules or parameters by P&L. A trading-rule change, a new research, or widening the grid needs
-  explicit approval from the user. Never produce `recommended.set` without an independent validation period.
-- The frozen protocol (`research/preregistration.json`) does not change after its commit.
+- Parameters may be selected on train data only, by a selection rule frozen in a committed pre-registration before
+  the runs. Out-of-window (OOS) results, robustness runs and the August–September check may never change a choice
+  or a rule. A trading-rule change, a new research, or widening the grid needs explicit approval from the user.
+  Never produce `recommended.set` without an independent validation period.
+- A frozen protocol (`research/preregistration.json`, `research/preregistration_numeric_v1.json`) does not change
+  after its commit.
 
 ## MT5 safety
 
-- Work only in the MT5 Strategy Tester through the isolated runner (`research/mt5r/runner.py`). Never open, modify
-  or close trades on any account.
+- Work only in the MT5 Strategy Tester through the isolated runner (`research/mt5r/runner.py`). Simulated trades
+  inside the isolated Strategy Tester are allowed. Never open, modify or close trades on any connected account (live
+  or demo).
 - Never start, stop, reconfigure or attach to the live terminal. Research runs only while it is closed; if it is
   open, ask the user to close it. Never close it yourself.
