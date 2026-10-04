@@ -437,3 +437,10 @@ def test_trail_csv_headers_equal_contract(src):
     research = "".join(RESEARCH_BLOCK.findall(src))
     assert _define(research, "RL_TRAIL_HEADER") == ",".join(mc.TRAIL_COLUMNS)
     assert _define(research, "RL_SLMOVES_HEADER") == ",".join(mc.SL_MOVE_COLUMNS)
+
+
+def test_market_closed_blocks_trail_requests_until_the_next_bar(src):
+    code = _strip_comments(src)
+    assert re.search(r"if\s*\(\s*rc\s*==\s*TRADE_RETCODE_MARKET_CLOSED\s*\)\s*t\.closedBar\s*=\s*bar", _function_body(code, "TrailSend"))
+    body = _function_body(code, "ManageTrails")
+    assert body.index("closedBar == bar") < body.index("RoundTick(")

@@ -51,3 +51,10 @@ def test_chart_picks_are_deterministic_per_exit_class_and_side():
                    trail(position_id=3, exit_kind="trail"), trail(position_id=4, exit_kind="trail"),
                    trail(position_id=5, dir="S", exit_kind="sl")], ignore_index=True)
     assert charts_trail.select(t, per_class=2) == [1, 3, 2, 5]
+
+
+def test_render_skips_setups_that_never_filled(tmp_path):
+    st = pd.concat([setups(), setups().assign(setup_id=9, position_id=None, fill_price=None)], ignore_index=True)
+    run = {"setups": st, "trail": trail(), "sl_moves": moves(GOOD_MOVES), "bars_m1": bars(LONG_BARS)}
+    out = charts_trail.render(run, tmp_path, "t")
+    assert [p.name for p in out] == ["t_L_trail_pos101.png"]

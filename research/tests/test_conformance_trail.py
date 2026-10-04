@@ -157,3 +157,15 @@ def test_stop_at_returns_the_last_move_strictly_before():
     assert cm.stop_at(path, 1995.0, 100) == 1995.0
     assert cm.stop_at(path, 1995.0, 150) == 2000.0
     assert cm.stop_at(path, 1995.0, 999) == 2001.0
+
+
+def test_a_request_in_a_market_closed_minute_or_an_identical_resend_is_flagged():
+    mc_rows = [GOOD_MOVES[0][:6] + (1995.00, 10018, "rejected"),
+               (ms(1, 30), 2005.20, 2005.40, 2005.20, 2000.20, 1995.00, 1995.00, 10018, "rejected")]
+    viol, _, _ = run(mv=moves(mc_rows), tr=trail(final_sl=1995.0, accepted=0, best_price=2007.5, exit_kind="sl"),
+                     st=setups(exit_kind="sl", exit_price=1995.0))
+    assert "already answered market closed" in details(viol)
+    same = [GOOD_MOVES[0][:6] + (1995.00, 10006, "rejected"), GOOD_MOVES[0][:6] + (1995.00, 10006, "rejected")]
+    viol, _, _ = run(mv=moves(same), tr=trail(final_sl=1995.0, accepted=0, best_price=2007.5, exit_kind="sl"),
+                     st=setups(exit_kind="sl", exit_price=1995.0))
+    assert "re-sent in the same minute" in details(viol)

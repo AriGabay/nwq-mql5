@@ -113,7 +113,7 @@ def test_done_but_unchanged_stop_is_a_rejection_and_the_same_value_is_not_resent
 def test_a_failed_retcode_is_a_rejection_and_an_improved_value_is_sent_in_the_same_bar():
     st = _long()
     d = _step(st, 2005.00, 2005.20, bar=100)
-    assert tr.on_result(st, d.requested, 10018, sl_read=1995.00, tp_read=st.tp, tick=TICK, bar_time=100) == "rejected"
+    assert tr.on_result(st, d.requested, 10016, sl_read=1995.00, tp_read=st.tp, tick=TICK, bar_time=100) == "rejected"
     d = _step(st, 2005.01, 2005.21, bar=100)
     assert d.kind == "send" and d.requested == pytest.approx(2000.01)
 
@@ -148,3 +148,13 @@ def test_concurrent_positions_trail_independently():
     assert da.kind == "send" and db.kind == "none" and not b.active
     _accept(a, da)
     assert a.sl == pytest.approx(2000.00) and b.sl == pytest.approx(2005.20)
+
+
+def test_after_market_closed_nothing_is_sent_until_the_next_m1_bar():
+    st = _long()
+    d = _step(st, 2005.00, 2005.20, bar=60)
+    assert tr.on_result(st, d.requested, tr.RETCODE_MARKET_CLOSED, sl_read=1995.00, tp_read=st.tp, tick=TICK,
+                        bar_time=60) == "rejected"
+    assert _step(st, 2005.50, 2005.70, bar=60).kind == "none"        # a better value, but the market is closed
+    d = _step(st, 2005.50, 2005.70, bar=120)
+    assert d.kind == "send" and d.requested == pytest.approx(2000.50)

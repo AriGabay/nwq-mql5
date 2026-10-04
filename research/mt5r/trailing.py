@@ -9,7 +9,8 @@ checker (conformance_m1, rule trail_r23):
   spread term (R3).
 - Continuous, only in favour, never deactivated; the TP is never moved (R4, R5).
 - A request is sent only when it improves the stop on the position by at least one tick and passes the stops and
-  freeze levels; a value that failed is not re-sent before it changes or a new M1 bar opens (R11, R12, KTD3).
+  freeze levels; a value that failed is not re-sent before it changes or a new M1 bar opens, and after a
+  market-closed answer nothing is sent before the next M1 bar (R11, R12, KTD3).
 - Accepted only with retcode DONE and the stop read back from the position equal to the request, the TP unchanged
   (R10).
 """
@@ -17,6 +18,7 @@ import math
 from dataclasses import dataclass, field
 
 RETCODE_DONE = 10009        # TRADE_RETCODE_DONE
+RETCODE_MARKET_CLOSED = 10018   # TRADE_RETCODE_MARKET_CLOSED: no request until the next M1 bar
 EPS = 1e-9
 
 
@@ -49,6 +51,7 @@ class TrailState:
     activated_msc: int = None
     last_failed: float = None   # last value rejected or not sent
     last_failed_bar: int = None
+    closed_bar: int = None      # M1 bar in which the broker answered market closed
     r0: float = field(init=False)
 
     def __post_init__(self):
@@ -78,6 +81,8 @@ def decide(st: TrailState, bid: float, ask: float, msc: int, bar_time: int, stop
         if not activated(st.direction, st.fill, st.r0, bid, ask, tick):
             return Decision("none")
         st.active, st.activated_msc, now = True, msc, True
+    if st.closed_bar is not None and st.closed_bar == bar_time:
+        return Decision("none", activated_now=now)          # trading is closed in this minute: not allowed
     req = requested_sl(st.direction, st.best, st.r0, tick)
     improves = req >= st.sl + tick - EPS if st.direction == 1 else req <= st.sl - tick + EPS
     if not improves:
@@ -107,6 +112,8 @@ def on_result(st: TrailState, requested: float, retcode: int, sl_read: float, tp
         st.last_failed = st.last_failed_bar = None
         return "accepted"
     st.last_failed, st.last_failed_bar = requested, bar_time
+    if retcode == RETCODE_MARKET_CLOSED:
+        st.closed_bar = bar_time
     return "rejected"
 
 

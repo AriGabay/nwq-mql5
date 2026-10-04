@@ -195,6 +195,7 @@ struct TrailPos
    double   actAsk;
    double   lastFailed;     // last value rejected or not sent (0 = none)
    datetime lastFailedBar;  // M1 bar of that failure: the same value is not re-sent within it
+   datetime closedBar;      // M1 bar answered 'market closed': no request before the next bar
    int      requests;
    int      accepted;
    int      rejected;
@@ -1329,7 +1330,7 @@ void TrailInit(TrailPos &t)
   {
    t.ticket = 0; t.setupId = 0; t.dir = 0; t.fill = 0; t.sl0 = 0; t.r0 = 0; t.tp = 0; t.best = 0; t.sl = 0;
    t.active = false; t.actMsc = 0; t.actBid = 0; t.actAsk = 0; t.lastFailed = 0; t.lastFailedBar = 0;
-   t.requests = 0; t.accepted = 0; t.rejected = 0; t.notSent = 0; t.stateOk = false; t.restored = false;
+   t.closedBar = 0; t.requests = 0; t.accepted = 0; t.rejected = 0; t.notSent = 0; t.stateOk = false; t.restored = false;
   }
 
 // KTD4: E, SL0, R0, TP, direction and the trail state per position, flushed to disk on every save
@@ -1477,6 +1478,7 @@ void TrailSend(TrailPos &t, const MqlTick &tk, double req, double posSl, double 
       t.rejected++;
       t.lastFailed = req;
       t.lastFailedBar = bar;
+      if(rc == TRADE_RETCODE_MARKET_CLOSED) t.closedBar = bar;
       Print("OBM1 trail: position ", t.ticket, " stop ", Fmt(req), " rejected, retcode ", rc, ", stop on position ",
             Fmt(slRead), " kept");
      }
@@ -1516,6 +1518,7 @@ void ManageTrails(const MqlTick &tk)
          gTr[i].actAsk = tk.ask;
          TrailSave(gTr[i]);
         }
+      if(gTr[i].closedBar == bar) continue;           // market closed in this minute: retry from the next bar
       double req = (gTr[i].dir == 1) ? RoundTick(gTr[i].best - gTr[i].r0, false)
                                      : RoundTick(gTr[i].best + gTr[i].r0, true);
       bool improves = (gTr[i].dir == 1) ? req >= posSl + gTick - 1e-9 : req <= posSl - gTick + 1e-9;

@@ -260,11 +260,17 @@ def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame,
         st = trl.TrailState(direction=sign, fill=E, sl0=sl0, tp=tp, sl=sl0)
         own = mv[mv["position_id"].astype(int) == pid].sort_values(["tick_msc", "_ord"], kind="mergesort")
         prev_best, accepted = None, 0
+        closed_min, failed = None, None                # (minute, value) of the last failure; market-closed minute
         act_ms = _int(t.get("activated_msc"))
         for m in own.to_dict("records"):
             ms, bid, ask, best = int(m["tick_msc"]), float(m["bid"]), float(m["ask"]), float(m["best"])
             req, before, after = float(m["requested_sl"]), float(m["sl_before"]), float(m["accepted_sl"])
             outcome = str(m["outcome"])
+            minute = ms // 60000
+            if closed_min == minute:
+                add(f"move at {ms}: request in a minute already answered market closed")
+            if failed is not None and failed[0] == minute and abs(failed[1] - req) <= tol:
+                add(f"move at {ms}: the failed value {req} was re-sent in the same minute")
             j = B.bar_at_ms(ms)
             if j is not None and not (B.l[j] - tol <= bid <= B.h[j] + tol):
                 add(f"move at {ms}: Bid {bid} outside its M1 bar [{B.l[j]}, {B.h[j]}]")
@@ -292,9 +298,13 @@ def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame,
                 if (after - st.sl) * sign < -tol:
                     add(f"move at {ms}: stop read back {after} retreats from {st.sl}")
                 st.sl = after
+                failed = (minute, req)
+                if int(m["retcode"]) == trl.RETCODE_MARKET_CLOSED:
+                    closed_min = minute
             elif outcome.startswith("not_sent:"):
                 if abs(after - before) > tol:
                     add(f"move at {ms}: not_sent changed the stop {before} -> {after}")
+                failed = (minute, req)
             else:
                 add(f"move at {ms}: unknown outcome {outcome!r}")
             prev_best = best

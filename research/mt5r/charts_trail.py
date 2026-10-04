@@ -87,7 +87,7 @@ def render(run: dict, out_dir, tag: str, per_class: int = 2) -> list:
     """Charts for the deterministic picks of one trailed run (run = conformance_m1.read_run output)."""
     trail, moves, setups = run["trail"], run.get("sl_moves"), run["setups"]
     by_pos = {int(r["position_id"]): r for r in setups.to_dict("records")
-              if str(r.get("position_id", "")) not in ("", "nan", "<NA>")}
+              if r.get("position_id") is not None and not pd.isna(r.get("position_id"))}
     rows = {int(r["position_id"]): r for r in trail.to_dict("records")}
     out = []
     for pid in select(trail, per_class):
