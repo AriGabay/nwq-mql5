@@ -58,5 +58,11 @@ An M1 Fair Value Gap in the trade direction from the move that made the Structur
 ### Reaction candle
 An M1 bar that touches the Entry FVG and closes beyond it in the trade direction (long: green, close above the FVG's upper boundary); the Market entry follows on the first tradeable tick after it closes, and one reaction candle opens at most one trade per direction.
 
+### Fixed baseline
+A parameter set held constant in every fold of a walk-forward study and run on the same out-of-window months as the selection procedure, so the procedure can be compared with it; in the M5 OB + M1 studies these are variant A and variant B at N = 3 and a 20-point buffer.
+
+### Fallback
+The default parameters carried into an out-of-window month when no train pass met the eligibility thresholds (`no_eligible_pass`); it completes the evaluation path and is never a selected or improved candidate.
+
 ### Opposing-structure cancellation
 One swing sequence against the trade after the Touch (for a long: a lower high, then an M1 close below the pivot low before it) that ends a waiting setup for good.
