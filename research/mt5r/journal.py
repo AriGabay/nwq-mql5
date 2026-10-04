@@ -58,6 +58,7 @@ def run_facts(run_dir) -> dict:
     """Facts from the tester (manager) log of an archived run directory."""
     logs = sorted(pathlib.Path(run_dir, "logs").glob("Tester__logs__*.log"))
     text = "\n".join(read(p) for p in logs)
-    # keep only the last test in the shared daily log
-    idx = text.rfind("testing of Experts")
+    # keep only the last run in the shared daily log; an optimization has no "testing of Experts" line, so its own
+    # start marker cuts off the single test that ran before it
+    idx = max(text.rfind("testing of Experts"), text.rfind("complete optimization started"))
     return facts(text[idx:] if idx >= 0 else text)

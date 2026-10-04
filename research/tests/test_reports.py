@@ -61,6 +61,20 @@ def test_journal_facts_and_redaction():
     assert journal.redact("'4416506': authorized from 85.64.1.2 at 4430.21") == "'<acct>': authorized from <ip> at 4430.21"
 
 
+def test_run_facts_of_an_optimization_ignore_the_earlier_single_test_in_the_daily_log(tmp_path):
+    """The tester log is one file per day. An optimization has no 'testing of Experts' line, so its facts must not
+    come from the single test that ran before it on the same day (f2..f5/final grids took the previous fixed_b run)."""
+    day = ("NL\t0\t15:20:29.622\tTester\tXAUUSD.s,M1 (Bybit-Live-4): testing of Experts\\ob.ex5 from 2026.03.01\n"
+           "CS\t0\t15:20:39.000\tCore 01\tfinal balance 10657.23 USD\n"
+           "CS\t0\t15:20:39.100\tCore 01\tFunnel: filled=54\n"
+           "OH\t0\t15:21:10.205\tTester\tcomplete optimization started\n"
+           "RJ\t0\t15:21:30.333\tTester\toptimization finished, total passes 2\n")
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "logs" / "Tester__logs__20261004.log").write_bytes(b"\xff\xfe" + day.encode("utf-16-le"))
+    f = journal.run_facts(tmp_path)
+    assert f["final_balance"] is None and f["funnel"] == {}
+
+
 def test_opt_xml_parses_numbers_and_keeps_text(tmp_path):
     """Numeric columns become numbers (integer inputs stay integer); non-numeric text stays as is. pandas 3 has no
     to_numeric(errors="ignore"), so the parser must not depend on it."""
