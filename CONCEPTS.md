@@ -20,7 +20,7 @@ It holds no password written by the pipeline; the Strategy Tester still requires
 The state of the isolated copy in which it cannot place orders or expose trading tools: automated trading disabled, the terminal's built-in MCP server off, and no stored password in its configuration.
 
 ### Quote-only minute
-The first minute after a break in a symbol's quotes (the daily break or the weekend) in which prices arrive but no order, stop or target executes, because the symbol's trading session starts a minute after its quote session.
+The first minute after a break in a symbol's quotes (the daily break or the weekend) in which prices arrive but no order, stop or target executes and no stop modification is accepted, because the symbol's trading session starts a minute after its quote session.
 
 A level reached only during a quote-only minute fills from the first tradeable tick or later, possibly much later if price moves back; a check that re-derives execution from bars treats that bar as no-execution and reports such cases as unverifiable rather than as violations.
 
