@@ -58,6 +58,7 @@ import numpy as np
 import pandas as pd
 
 from . import m1_contract as mc
+from . import trailing as trl
 
 M1_S, M5_S = 60, 300
 EPS = 1e-6
@@ -65,7 +66,7 @@ DEFAULT_PARAMS = dict(StructureVariant=0, ImpulseWindowBars=2, SwingStrengthM1=3
                       point=0.01, RiskPercent=1.0, MaxExposures=3, contract_size=100, lot_step=0.01, lot_min=0.01)
 RULES = ["ob_r3", "touch_r5", "break_r6", "return_r7", "second_break_r8", "pivot_causality_r9", "sc_r10", "hl_r11",
          "fvg_r12", "fvg_lapse_r13", "reaction_r14", "entry_r15", "competition_r16", "one_trade_r17", "sl_r18",
-         "tp_r19", "exit_sltp", "risk_r20", "cap_r21", "cancel_r22", "tf_sync", "fields"]
+         "tp_r19", "exit_sltp", "risk_r20", "cap_r21", "cancel_r22", "tf_sync", "fields", "trail_r23"]
 # What the logs cannot prove (coverage report): each key counts cases the checker could not verify, or verified only
 # in part, and why. A case listed here is NOT evidence of conformance.
 UNVERIFIABLE = {
@@ -85,6 +86,9 @@ UNVERIFIABLE = {
     "risk_without_deals": "no rl_deals: the balance at entry, hence R20, cannot be rebuilt",
     "exit_same_bar_as_fill": "fill and exit in one M1 bar: tick order inside the bar is not in the logs",
     "exit_after_last_logged_bar": "exit tick inside the final M1 bar, which is never logged",
+    "short_trail_ask": "short trail activation and best price are Ask-based (not in the bars): a bar whose Bid low "
+                       "reaches E - R0 without a logged activation is only a necessary condition, so it is counted "
+                       "here, not flagged (plan 2026-10-05-0007, KTD7)",
     "level_in_session_open_bar": "SL/TP level reached only inside the first M1 bar after a quote gap (daily break, "
                                  "weekend). Quotes start 01:00, the trade session 01:01, so nothing executes in that "
                                  "minute (research/session_probe.py: Market orders refused 169/169 at 01:00, filled "
@@ -197,7 +201,141 @@ def read_run(folder, tag) -> dict:
         if p.exists():
             out["deals"] = pd.read_csv(p)
             break
+    for name in mc.TRAIL_FILES:                        # optional: written only by a trailed run (trail_r23)
+        p = folder / f"rl_{name}_{tag}.csv"
+        if p.exists():
+            out[name] = pd.read_csv(p, keep_default_na=False, na_values=[""])
     return out
+
+
+# --- trail_r23: the 1R trailing stop (plan 2026-10-05-0007, KTD7) ------------------------------------------------
+def stop_path(moves: pd.DataFrame) -> dict:
+    """position_id -> [(tick_msc, accepted stop)] of the accepted modifications, in order."""
+    out = {}
+    if moves is None or not len(moves):
+        return out
+    acc = moves[moves["outcome"].astype(str) == "accepted"]
+    for r in acc.to_dict("records"):
+        out.setdefault(int(r["position_id"]), []).append((int(r["tick_msc"]), float(r["accepted_sl"])))
+    return out
+
+
+def stop_at(path: list, sl0: float, ms: int) -> float:
+    """The stop in force just before ``ms``: the last accepted move strictly earlier, else SL0."""
+    cur = sl0
+    for t, v in path or []:
+        if t < ms:
+            cur = v
+        else:
+            break
+    return cur
+
+
+def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame, B: "_Bars", tick: float):
+    """Every trailed position against the reference model (research/mt5r/trailing.py) and the M1 Bid bars.
+
+    Returns (violations, checked, unverifiable): violations as {setup_id, rule, detail}, the number of positions
+    checked, and Counter-like {key: [setup ids]} of cases the bars cannot prove."""
+    tol = tick / 2 + 1e-9
+    viol, unv, checked = [], {}, 0
+    rows = {int(r["position_id"]): r for r in setups.to_dict("records") if not _missing(r.get("position_id"))}
+    mv = moves.copy() if moves is not None else pd.DataFrame(columns=mc.SL_MOVE_COLUMNS)
+    mv["_ord"] = range(len(mv))
+    for t in (trail.to_dict("records") if trail is not None else []):
+        pid, sid = int(t["position_id"]), _int(t.get("setup_id"))
+        bad = []
+        def add(msg):
+            bad.append(msg)
+        checked += 1
+        sign = _sign(t["dir"])
+        E, sl0, r0, tp = float(t["fill_price"]), float(t["sl0"]), float(t["r0"]), float(t["tp"])
+        r = rows.get(pid)
+        if r is None:
+            viol.append({"setup_id": sid, "rule": "trail_r23", "detail": f"position {pid} has no rl_setups row"})
+            continue
+        if abs(E - float(r["fill_price"])) > tol or abs(sl0 - float(r["sl"])) > tol or abs(tp - float(r["tp"])) > tol:
+            add(f"E/SL0/TP {E}/{sl0}/{tp} differ from rl_setups {r['fill_price']}/{r['sl']}/{r['tp']}")
+        if abs(r0 - abs(E - sl0)) > tol:
+            add(f"R0 {r0} != |E - SL0| {abs(E - sl0):.5f}")
+        st = trl.TrailState(direction=sign, fill=E, sl0=sl0, tp=tp, sl=sl0)
+        own = mv[mv["position_id"].astype(int) == pid].sort_values(["tick_msc", "_ord"], kind="mergesort")
+        prev_best, accepted = None, 0
+        act_ms = _int(t.get("activated_msc"))
+        for m in own.to_dict("records"):
+            ms, bid, ask, best = int(m["tick_msc"]), float(m["bid"]), float(m["ask"]), float(m["best"])
+            req, before, after = float(m["requested_sl"]), float(m["sl_before"]), float(m["accepted_sl"])
+            outcome = str(m["outcome"])
+            j = B.bar_at_ms(ms)
+            if j is not None and not (B.l[j] - tol <= bid <= B.h[j] + tol):
+                add(f"move at {ms}: Bid {bid} outside its M1 bar [{B.l[j]}, {B.h[j]}]")
+            if prev_best is not None and (best - prev_best) * sign < -tol:
+                add(f"move at {ms}: best price {best} went back from {prev_best}")
+            if (sign > 0 and best < bid - tol) or (sign < 0 and best > ask + tol):
+                add(f"move at {ms}: best {best} behind the current {'Bid' if sign > 0 else 'Ask'}")
+            if not trl.activated(sign, E, r0, best if sign > 0 else bid, best if sign < 0 else ask, tick):
+                add(f"move at {ms}: request before +1R (best {best}, E {E}, R0 {r0})")
+            if act_ms is None or act_ms > ms:
+                add(f"move at {ms} before the logged activation {act_ms}")
+            want = trl.requested_sl(sign, best, r0, tick)
+            if abs(req - want) > tol:
+                add(f"move at {ms}: requested {req} != model {want} for best {best}")
+            if abs(before - st.sl) > tol:
+                add(f"move at {ms}: stop before {before} != replayed stop {st.sl}")
+            if outcome == "accepted":
+                if abs(after - req) > tol:
+                    add(f"move at {ms}: accepted stop {after} != request {req}")
+                if (req - st.sl) * sign < tick - tol:
+                    add(f"move at {ms}: accepted stop {req} does not improve {st.sl} by a tick")
+                accepted += 1
+                st.sl = after
+            elif outcome == "rejected":
+                if (after - st.sl) * sign < -tol:
+                    add(f"move at {ms}: stop read back {after} retreats from {st.sl}")
+                st.sl = after
+            elif outcome.startswith("not_sent:"):
+                if abs(after - before) > tol:
+                    add(f"move at {ms}: not_sent changed the stop {before} -> {after}")
+            else:
+                add(f"move at {ms}: unknown outcome {outcome!r}")
+            prev_best = best
+        if act_ms is not None:
+            ab, aa = _flt(t.get("activation_bid")), _flt(t.get("activation_ask"))
+            if ab is None or aa is None or not trl.activated(sign, E, r0, ab, aa, tick):
+                add(f"activation at {act_ms} with Bid/Ask {ab}/{aa} is not at +1R")
+            j = B.bar_at_ms(act_ms)
+            if j is not None and ((sign > 0 and B.h[j] < E + r0 - tol) or (sign < 0 and B.l[j] > E - r0 + tol)):
+                add(f"activation at {act_ms}: its M1 bar never reaches E {'+' if sign > 0 else '-'} R0 on Bid")
+        if abs(float(t["final_sl"]) - st.sl) > tol:
+            add(f"final stop {t['final_sl']} != replayed stop {st.sl}")
+        if int(t["accepted"]) != accepted:
+            add(f"accepted count {t['accepted']} != {accepted} accepted rows")
+        kind = _str(r.get("exit_kind"))
+        if kind == "trail" and accepted == 0:
+            add("exit classified trail although the stop was never moved")
+        if kind == "sl" and accepted > 0:
+            add("exit classified sl although the stop had been moved")
+        if str(t.get("exit_kind")) != str(kind):
+            add(f"rl_trail exit {t.get('exit_kind')} != rl_setups exit {kind}")
+        # completeness on the bars: a bar between the fill and the exit that reaches +1R must see an activation, and
+        # a long's best price is at least every such bar's Bid high
+        f, x = B.bar_at_ms(_int(r.get("fill_msc"))), B.bar_at_ms(_int(r.get("exit_msc")))
+        if f is not None:
+            last = x if x is not None else B.n
+            span = [j for j in range(f + 1, last) if not B.gap_open[j]]
+            if sign > 0:
+                hits = [j for j in span if B.h[j] >= E + r0 - 1e-9]
+                if hits and (act_ms is None or act_ms >= B.close_ms(hits[0])):
+                    add(f"bar {B.t[hits[0]]} reaches +1R on Bid but no activation is logged by its close")
+                top = max((B.h[j] for j in span), default=None)
+                if top is not None and act_ms is not None and float(t["best_price"]) < top - tol:
+                    add(f"final best {t['best_price']} below the highest Bid {top} between fill and exit")
+            else:
+                hits = [j for j in span if B.l[j] <= E - r0 + 1e-9]
+                if hits and (act_ms is None or act_ms >= B.close_ms(hits[0])):
+                    unv.setdefault("short_trail_ask", []).append(sid)
+        for b in bad:
+            viol.append({"setup_id": sid, "rule": "trail_r23", "detail": f"position {pid}: {b}"})
+    return viol, checked, unv
 
 
 # --- helpers ---------------------------------------------------------------------------------------------------
@@ -371,8 +509,10 @@ class _Sim:
 
 # --- the replay ------------------------------------------------------------------------------------------------
 class _Replay:
-    def __init__(self, setups, events, pivots, bars_m1, bars_m5, params, deals=None):
+    def __init__(self, setups, events, pivots, bars_m1, bars_m5, params, deals=None, trail=None, moves=None):
         self.prm = {**DEFAULT_PARAMS, **(params or {})}
+        self.trail, self.moves = trail, moves
+        self.paths = stop_path(moves)
         self.N = int(self.prm["SwingStrengthM1"])
         self.pt = float(self.prm["point"])
         self.buf = float(self.prm["StopBufferPoints"]) * self.pt
@@ -436,6 +576,13 @@ class _Replay:
             self._compare(s)
             self._check_exit(s)
         self._unconsumed()
+        if self.trail is not None:
+            viol, n, unv = check_trails(self.setups, self.trail, self.moves, self.B, self.pt)
+            self.out.extend(viol)
+            self.chk("trail_r23", n)
+            for key, sids in unv.items():
+                for sid in sids:
+                    self.nochk(key, sid)
         return self
 
     # ------------------------------------------------------------------
@@ -1046,8 +1193,12 @@ class _Replay:
             return
         fill_ms, ex_ms, kind = _int(r.get("fill_msc")), _int(r.get("exit_msc")), _str(r.get("exit_kind"))
         sl, tp, xp = _flt(r.get("sl")), _flt(r.get("tp")), _flt(r.get("exit_price"))
-        if ex_ms is None or kind not in ("sl", "tp") or sl is None or tp is None:
+        if ex_ms is None or kind not in ("sl", "trail", "tp") or sl is None or tp is None:
             return
+        # the stop in force: SL0, or the last accepted trail move before that moment (plan 2026-10-05-0007)
+        path = self.paths.get(_int(r.get("position_id")), [])
+        at = lambda ms: stop_at(path, sl, ms)
+        stop_x = at(ex_ms)
         self.chk("exit_sltp")
         f, x = B.bar_at_ms(fill_ms), B.bar_at_ms(ex_ms)
         if x is None:
@@ -1058,18 +1209,18 @@ class _Replay:
         lo_j = f + 1 if f is not None else x
         bad = []
         if s.sign > 0:
-            if kind == "sl" and not (B.l[x] <= sl + EPS and (xp is None or xp <= sl + self.tol)):
-                bad.append(f"SL exit at {ex_ms} @ {xp}: bar low {B.l[x]} does not reach SL {sl}")
+            if kind in ("sl", "trail") and not (B.l[x] <= stop_x + EPS and (xp is None or xp <= stop_x + self.tol)):
+                bad.append(f"{kind.upper()} exit at {ex_ms} @ {xp}: bar low {B.l[x]} does not reach the stop {stop_x}")
             if kind == "tp" and not (B.h[x] >= tp - EPS and (xp is None or xp >= tp - self.tol)):
                 bad.append(f"TP exit at {ex_ms} @ {xp}: bar high {B.h[x]} does not reach TP {tp}")
-            hit = [j for j in range(lo_j, x) if B.l[j] <= sl + EPS or B.h[j] >= tp - EPS]
+            hit = [j for j in range(lo_j, x) if B.l[j] <= at(B.t[j] * 1000) + EPS or B.h[j] >= tp - EPS]
         else:
             self.nochk("short_exit_ask", s.sid)
-            if kind == "sl" and xp is not None and xp < sl - self.tol:
-                bad.append(f"SL exit at {ex_ms} @ {xp} below the short SL {sl}")
+            if kind in ("sl", "trail") and xp is not None and xp < stop_x - self.tol:
+                bad.append(f"{kind.upper()} exit at {ex_ms} @ {xp} below the short stop {stop_x}")
             if kind == "tp" and not (B.l[x] <= tp + EPS and (xp is None or xp <= tp + self.tol)):
                 bad.append(f"TP exit at {ex_ms} @ {xp}: bar low {B.l[x]} does not reach TP {tp}")
-            hit = [j for j in range(lo_j, x) if B.h[j] >= sl - EPS]
+            hit = [j for j in range(lo_j, x) if B.h[j] >= at(B.t[j] * 1000) - EPS]
         if hit and all(B.gap_open[j] for j in hit):
             self.nochk("level_in_session_open_bar", s.sid)
         first = next((j for j in hit if not B.gap_open[j]), None)
@@ -1281,9 +1432,11 @@ class _Replay:
 
 # --- public API ------------------------------------------------------------------------------------------------
 def check(setups: pd.DataFrame, events: pd.DataFrame, pivots: pd.DataFrame, bars_m1: pd.DataFrame,
-          bars_m5: pd.DataFrame, params: dict | None = None, deals: pd.DataFrame | None = None) -> list[dict]:
-    """Violations of R3-R22 re-derived from the logged bars, one dict {setup_id, rule, detail} per failed check."""
-    return _Replay(setups, events, pivots, bars_m1, bars_m5, params, deals).run().out
+          bars_m5: pd.DataFrame, params: dict | None = None, deals: pd.DataFrame | None = None,
+          trail: pd.DataFrame | None = None, moves: pd.DataFrame | None = None) -> list[dict]:
+    """Violations of R3-R22 (and trail_r23 for a trailed run) re-derived from the logged bars, one dict
+    {setup_id, rule, detail} per failed check."""
+    return _Replay(setups, events, pivots, bars_m1, bars_m5, params, deals, trail, moves).run().out
 
 
 def occurrences(setups: pd.DataFrame, events: pd.DataFrame, pivots: pd.DataFrame, bars_m1: pd.DataFrame,
@@ -1294,8 +1447,9 @@ def occurrences(setups: pd.DataFrame, events: pd.DataFrame, pivots: pd.DataFrame
 
 
 def full(setups: pd.DataFrame, events: pd.DataFrame, pivots: pd.DataFrame, bars_m1: pd.DataFrame,
-         bars_m5: pd.DataFrame, params: dict | None = None, deals: pd.DataFrame | None = None) -> dict:
+         bars_m5: pd.DataFrame, params: dict | None = None, deals: pd.DataFrame | None = None,
+         trail: pd.DataFrame | None = None, moves: pd.DataFrame | None = None) -> dict:
     """One replay: violations, occurrences and coverage (checked / failed / passed per rule, plus the cases the
     logs cannot prove, which are not evidence of conformance)."""
-    r = _Replay(setups, events, pivots, bars_m1, bars_m5, params, deals).run()
+    r = _Replay(setups, events, pivots, bars_m1, bars_m5, params, deals, trail, moves).run()
     return {"violations": r.out, "occurrences": {k: int(v) for k, v in r.occ.items()}, "coverage": r.coverage()}
