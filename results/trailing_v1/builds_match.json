@@ -1,0 +1,20 @@
+{
+ "on_a_delivered": {
+  "of": "tr1_on_a",
+  "same_deals": true,
+  "deals": [
+   383,
+   383
+  ],
+  "input_mismatches": []
+ },
+ "on_b_delivered": {
+  "of": "tr1_on_b",
+  "same_deals": true,
+  "deals": [
+   113,
+   113
+  ],
+  "input_mismatches": []
+ }
+}

@@ -1,0 +1,193 @@
+{
+ "run_id": "tr1_on_a",
+ "violations": 0,
+ "violation_rows": [],
+ "coverage": {
+  "rules": {
+   "ob_r3": {
+    "checked": 2956,
+    "failed": 0,
+    "passed": 2956
+   },
+   "touch_r5": {
+    "checked": 1478,
+    "failed": 0,
+    "passed": 1478
+   },
+   "break_r6": {
+    "checked": 338,
+    "failed": 0,
+    "passed": 338
+   },
+   "return_r7": {
+    "checked": 281,
+    "failed": 0,
+    "passed": 281
+   },
+   "second_break_r8": {
+    "checked": 476,
+    "failed": 0,
+    "passed": 476
+   },
+   "pivot_causality_r9": {
+    "checked": 22641,
+    "failed": 0,
+    "passed": 22641
+   },
+   "sc_r10": {
+    "checked": 905,
+    "failed": 0,
+    "passed": 905
+   },
+   "hl_r11": {
+    "checked": 141,
+    "failed": 0,
+    "passed": 141
+   },
+   "fvg_r12": {
+    "checked": 1374,
+    "failed": 0,
+    "passed": 1374
+   },
+   "fvg_lapse_r13": {
+    "checked": 238,
+    "failed": 0,
+    "passed": 238
+   },
+   "reaction_r14": {
+    "checked": 302,
+    "failed": 0,
+    "passed": 302
+   },
+   "entry_r15": {
+    "checked": 427,
+    "failed": 0,
+    "passed": 427
+   },
+   "competition_r16": {
+    "checked": 66,
+    "failed": 0,
+    "passed": 66
+   },
+   "one_trade_r17": {
+    "checked": 1478,
+    "failed": 0,
+    "passed": 1478
+   },
+   "sl_r18": {
+    "checked": 191,
+    "failed": 0,
+    "passed": 191
+   },
+   "tp_r19": {
+    "checked": 191,
+    "failed": 0,
+    "passed": 191
+   },
+   "exit_sltp": {
+    "checked": 190,
+    "failed": 0,
+    "passed": 190
+   },
+   "risk_r20": {
+    "checked": 192,
+    "failed": 0,
+    "passed": 192
+   },
+   "cap_r21": {
+    "checked": 235,
+    "failed": 0,
+    "passed": 235
+   },
+   "cancel_r22": {
+    "checked": 670,
+    "failed": 0,
+    "passed": 670
+   },
+   "tf_sync": {
+    "checked": 11837,
+    "failed": 0,
+    "passed": 11837
+   },
+   "trail_r23": {
+    "checked": 191,
+    "failed": 0,
+    "passed": 191
+   }
+  },
+  "unverifiable": {
+   "short_entry_ask": {
+    "cases": 96,
+    "why": "short SL spread: Ask - Bid at the entry tick is the EA's own log (bars carry Bid only); the checker verifies SL = anchor + buffer + that logged spread and the Bid against the bar open",
+    "example_setups": [
+     698,
+     700,
+     5,
+     714,
+     722
+    ]
+   },
+   "entry_price_ask": {
+    "cases": 96,
+    "why": "long request/fill price is an Ask (not in the bars); the volume check uses the logged price",
+    "example_setups": [
+     696,
+     730,
+     740,
+     691,
+     531
+    ]
+   },
+   "tick_within_minute": {
+    "cases": 1045,
+    "why": "touch/return: the minute and a Bid inside that bar at the zone edge are verified; which tick of the minute (tick_msc) is the EA's claim - the bars carry minute OHLC only",
+    "example_setups": [
+     7,
+     698,
+     701,
+     699,
+     700
+    ]
+   },
+   "short_exit_ask": {
+    "cases": 96,
+    "why": "short exits trigger on Ask: only the necessary Bid conditions are checked (no earlier bar whose Bid high reaches the SL; exit-bar Bid low at/below the TP)",
+    "example_setups": [
+     698,
+     700,
+     5,
+     714,
+     722
+    ]
+   },
+   "level_in_session_open_bar": {
+    "cases": 1,
+    "why": "SL/TP level reached only inside the first M1 bar after a quote gap (daily break, weekend). Quotes start 01:00, the trade session 01:01, so nothing executes in that minute (research/session_probe.py: Market orders refused 169/169 at 01:00, filled 169/169 at 01:01; replicas exit as the EA did). The later exit needs the tick log; results/pilot/gate_decisions.md holds the pre-registered sensitivity",
+    "example_setups": [
+     763
+    ]
+   },
+   "exit_same_bar_as_fill": {
+    "cases": 1,
+    "why": "fill and exit in one M1 bar: tick order inside the bar is not in the logs",
+    "example_setups": [
+     1223
+    ]
+   },
+   "short_trail_ask": {
+    "cases": 4,
+    "why": "short trail activation and best price are Ask-based (not in the bars): a bar whose Bid low reaches E - R0 without a logged activation is only a necessary condition, so it is counted here, not flagged (plan 2026-10-05-0007, KTD7)",
+    "example_setups": [
+     893,
+     1090,
+     1160,
+     1341
+    ]
+   }
+  }
+ },
+ "trail_files": [
+  "sl_moves",
+  "trail"
+ ]
+}

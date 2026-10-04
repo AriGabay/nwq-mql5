@@ -1,0 +1,76 @@
+{
+ "off_a": {
+  "run": "tr1_off_a",
+  "trades": 180,
+  "net": 1805.7,
+  "tester_equity_dd_pct": 14.46,
+  "mean_r_vs_r0": 0.1165,
+  "win_rate": 0.3778,
+  "exit_kinds": {
+   "sl": 112,
+   "tp": 67,
+   "end": 1
+  }
+ },
+ "off_b": {
+  "run": "tr1_off_b",
+  "trades": 54,
+  "net": 657.23,
+  "tester_equity_dd_pct": 10.99,
+  "mean_r_vs_r0": 0.1314,
+  "win_rate": 0.3889,
+  "exit_kinds": {
+   "sl": 33,
+   "tp": 20,
+   "end": 1
+  }
+ },
+ "on_a": {
+  "run": "tr1_on_a",
+  "trades": 191,
+  "net": 1231.09,
+  "tester_equity_dd_pct": 14.97,
+  "mean_r_vs_r0": 0.0851,
+  "win_rate": 0.4974,
+  "exit_kinds": {
+   "sl": 94,
+   "trail": 51,
+   "tp": 45,
+   "end": 1
+  },
+  "trail": {
+   "positions": 191,
+   "activated": 96,
+   "requests": 11487,
+   "accepted": 11482,
+   "rejected": 5,
+   "not_sent": 1,
+   "state_roundtrip_ok": 191
+  },
+  "trail_sl_exits_in_profit": 49
+ },
+ "on_b": {
+  "run": "tr1_on_b",
+  "trades": 56,
+  "net": 233.75,
+  "tester_equity_dd_pct": 11.68,
+  "mean_r_vs_r0": 0.0434,
+  "win_rate": 0.5,
+  "exit_kinds": {
+   "sl": 28,
+   "trail": 16,
+   "tp": 11,
+   "end": 1
+  },
+  "trail": {
+   "positions": 56,
+   "activated": 27,
+   "requests": 3543,
+   "accepted": 3541,
+   "rejected": 2,
+   "not_sent": 1,
+   "state_roundtrip_ok": 56
+  },
+  "trail_sl_exits_in_profit": 16
+ }
+}

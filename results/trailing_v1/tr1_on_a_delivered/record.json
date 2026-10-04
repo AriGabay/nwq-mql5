@@ -1,0 +1,16 @@
+{
+ "run_id": "tr1_on_a_delivered",
+ "kind": "delivered",
+ "of": "tr1_on_a",
+ "status": "ok",
+ "input_mismatches": [],
+ "net_profit": 1231.09,
+ "trades": 191,
+ "profit_factor": 1.15,
+ "recovery_factor": 0.81,
+ "equity_dd_money": 1518.92,
+ "equity_dd_pct": 14.97,
+ "balance_dd_pct": 13.59,
+ "history_quality": "100% real ticks",
+ "build": "6231"
+}
