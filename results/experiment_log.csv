@@ -132,3 +132,5 @@ f5_oos_fixed_a,2026-10-04T15:28:03,fold 5 OOS fixed_a,oos_fixed_a,ob_m1_structur
 f5_oos_fixed_b,2026-10-04T15:28:26,fold 5 OOS fixed_b,oos_fixed_b,ob_m1_structure_research.ex5,M1,2026.07.01,2026.07.31,10316,ok,812.12,52,9.3,
 final_grid,2026-10-04T15:29:08,final grid,train,ob_m1_structure_research.ex5,M1,2026.05.01,2026.07.31,10000,ok,,,,
 final_selection,2026-10-04T15:29:08,KTD14 selection,selection,,,,,,no_eligible_pass,,,,"{""tag"": ""final"", ""train"": [""2026.05.01"", ""2026.07.31""], ""trade_floor"": 45, ""status"": ""no_eligible_pass"", ""params"": {""StructureVariant"": 0}, ""eligible_passes"": 0}"
+holdout_variant_a,2026-10-04T15:30:57,R31 בדיקה היסטורית לא עצמאית,holdout_variant_a,ob_m1_structure_research.ex5,M1,2026.08.01,2026.09.29,10000,ok,-1705.84,268,30.39,
+holdout_variant_b,2026-10-04T15:31:27,R31 בדיקה היסטורית לא עצמאית,holdout_variant_b,ob_m1_structure_research.ex5,M1,2026.08.01,2026.09.29,10000,ok,531.94,86,11.3,

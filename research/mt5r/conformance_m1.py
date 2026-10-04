@@ -805,7 +805,9 @@ class _Replay:
         if fb == i + 1:
             bid = B.o[i + 1]
             crossed = bid <= anchor - self.buf + EPS if s.sign > 0 else bid >= anchor + self.buf - EPS
-            if crossed and first["kind"] != "skipped_stop_crossed":
+            # skip precedence (the EA's order, the plan fixes none): a full cap (R21) is checked before the stop,
+            # so with both true the logged skip is skipped_cap - no order either way; cap_r21 verifies the count
+            if crossed and first["kind"] not in ("skipped_stop_crossed", "skipped_cap"):
                 self.add(s.sid, "entry_r15", f"Bid {bid} at the first tick after the reaction already crosses the "
                                              f"stop (anchor {anchor} {'-' if s.sign > 0 else '+'} buffer): "
                                              f"skipped_stop_crossed expected, logged {first['kind']} (AE7)")

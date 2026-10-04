@@ -1,0 +1,54 @@
+{
+ "variant_a": {
+  "run_id": "holdout_variant_a",
+  "window": [
+   "2026.08.01",
+   "2026.09.29"
+  ],
+  "label": "בדיקה היסטורית לא עצמאית",
+  "independent": false,
+  "input_mismatches": [],
+  "conformance_violations": 0,
+  "net_profit": -1705.84,
+  "fills": 268,
+  "fills_per_month": 135.9653,
+  "tester_equity_dd_pct": 30.39,
+  "tester_balance_dd_pct": 30.29,
+  "balance_dd_pct": 30.295,
+  "equity_dd_pct": 30.447,
+  "first_breach": {
+   "date": "2026-08-04 00:00:00",
+   "type": "daily",
+   "eq_min": 9228.18,
+   "daily_floor": 9600.41
+  },
+  "conformance_violations_first_check": 1,
+  "conformance_note": "first check: 1 entry_r15 at setup 1034 - cap full and stop crossed at the first tick after the daily break; the EA logs skipped_cap (cap checked first), the checker expected skipped_stop_crossed. No order either way. Checker precedence aligned with the EA (no rule fixes one); re-check 0. No tester re-run."
+ },
+ "variant_b": {
+  "run_id": "holdout_variant_b",
+  "window": [
+   "2026.08.01",
+   "2026.09.29"
+  ],
+  "label": "בדיקה היסטורית לא עצמאית",
+  "independent": false,
+  "input_mismatches": [],
+  "conformance_violations": 0,
+  "net_profit": 531.94,
+  "fills": 86,
+  "fills_per_month": 43.6307,
+  "tester_equity_dd_pct": 11.3,
+  "tester_balance_dd_pct": 12.18,
+  "balance_dd_pct": 12.182,
+  "equity_dd_pct": 11.404,
+  "first_breach": {
+   "date": "2026-08-18 00:00:00",
+   "type": "daily",
+   "eq_min": 9827.9,
+   "daily_floor": 9848.31
+  }
+ },
+ "candidate_variant": "A",
+ "note": "Non-independent historical check (R31): run once after the candidate freeze, reported apart, never used for any choice; the WFO months were also seen by earlier research."
+}

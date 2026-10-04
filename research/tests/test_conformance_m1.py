@@ -508,3 +508,15 @@ def test_coverage_lists_tick_level_claims_as_unverifiable(base):
     assert cov["unverifiable"]["tick_within_minute"]["cases"] >= 1          # the touch tick inside its minute
     assert all(r["failed"] == 0 for r in cov["rules"].values())
     assert set(cov["rules"]) <= set(cf.RULES) and set(cov["unverifiable"]) <= set(cf.UNVERIFIABLE)
+
+
+def test_full_cap_takes_precedence_over_a_crossed_stop():
+    """August-September review: when the cap is full AND the stop is already crossed at the first tick, the EA
+    checks the cap first and logs skipped_cap. No order either way and the setup keeps waiting; the plan fixes no
+    precedence, so the checker accepts skipped_cap there and verifies the cap claim separately (cap_r21)."""
+    cap = dict(setup_id=1, kind="skipped_cap", tick_msc=MONDAY * 1000, detail="3")
+    v = run_check(ae7([cap], reason="run_end_waiting"))
+    assert "entry_r15" not in rules(v)
+    assert "cap_r21" in rules(v)          # no open positions in this fixture: the logged 3 is not supported
+    other = dict(setup_id=1, kind="skipped_volume", tick_msc=MONDAY * 1000, price=2015.7, lo=2015.6, detail="0.00")
+    assert "entry_r15" in rules(run_check(ae7([other], reason="run_end_waiting")))
