@@ -119,6 +119,33 @@ def test_balance_before_each_trade_counts_only_trades_closed_earlier():
     assert t["balance_before"].tolist() == [10000.0, 10000.0, 10020.0]
 
 
+def test_planned_risk_and_open_risk_come_from_the_stop_not_from_the_result():
+    """risk = |entry - stop| x volume x 100, as % of the balance the trade was sized on; a breakeven trade keeps it."""
+    t = _trades().assign(intended_entry=[2000.0, 2000.0, 2000.0], sl=[1990.0, 2010.0, 1995.0],
+                         net=[40.0, 0.0, -20.0])
+    t = dg.add_concurrency(dg.add_balance(t))
+    c_pct = 10 / 10040 * 100                     # C is sized after A (+40) and B (0) closed
+    assert t["risk_pct"].tolist() == pytest.approx([0.3, 0.1, c_pct])          # 30$, 10$, 10$
+    assert t["open_risk_pct"].tolist() == pytest.approx([0.3, 0.4, c_pct])    # B opens while A is open
+
+
+def test_cluster_table_reports_net_share_span_and_most_positions_open_at_once():
+    t = dg.add_concurrency(dg.add_balance(_trades()))
+    c = dg.cluster_table(t)
+    assert len(c) == 1                                                        # C stands alone, not a cluster
+    row = c.iloc[0]
+    assert (row["positions"], row["net"], row["max_open_at_once"]) == (2, 20.0, 2)
+    assert row["net_pct_of_balance"] == pytest.approx(20 / 10000 * 100)
+    assert row["span_days"] == pytest.approx(2 / 24, abs=0.05)
+
+
+def test_concurrency_loss_shares_add_up_to_one():
+    t = dg.add_concurrency(dg.add_balance(_trades()))
+    c = dg.concurrency_losses(t)
+    assert c["share_of_total_loss"].sum() == pytest.approx(1.0)
+    assert c.set_index("open_others").loc["1", "trades"] == 1
+
+
 # ------------------------------------------------------------------ U6: lower-risk estimate (R9)
 def test_scaling_by_one_reproduces_the_closed_trade_path():
     t = dg.add_balance(_trades())

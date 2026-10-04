@@ -25,11 +25,11 @@ def run_log_section(run_dir: pathlib.Path) -> str:
     return text[idx:] if idx >= 0 else ""
 
 
-def cache_snapshot(mt5_dir: pathlib.Path, start: str, end: str, kind: str = "research") -> dict:
+def cache_snapshot(mt5_dir: pathlib.Path, start: str, end: str) -> dict:
     """{file name: [size, mtime_ns]} of this window's optimization cache files in the isolated copy's
     Tester/cache. The tester names them after the build, the chart period, the start and the ini ToDate (end + 1
     day): <ex5 stem>.<symbol>.<period>.<YYYYMMDD start>.<YYYYMMDD end+1>.<...>.opt (plan 2026-10-04-2133, KTD8)."""
-    stem = pathlib.Path(pipeline.BUILDS[kind][0]).stem
+    stem = pathlib.Path(pipeline.BUILDS["research"][0]).stem
     ymd = lambda d: d.replace(".", "")
     pattern = f"{stem}.*.{m1_contract.CHART_PERIOD}.{ymd(start)}.{ymd(ini.next_day(end))}.*.opt"
     files = sorted(pathlib.Path(mt5_dir, "Tester", "cache").glob(pattern))

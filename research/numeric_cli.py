@@ -166,8 +166,9 @@ def run_window(cfg, tag: str, start: str, end: str, out_dir: pathlib.Path, purpo
     taken = [rid for rid in rids.values() if (runner.RUNS / rid).exists() or (out_dir / rid).exists()]
     if taken:
         raise SystemExit(f"attempt {n}: run IDs {taken} already exist; refusing to reuse them (KTD9)")
-    _create(att_dir / f"a{n}.started.json", {"attempt": n, "tag": tag, "train": [start, end], "run_ids": rids,
-                                             "started": pd.Timestamp.now().isoformat(timespec="seconds")})
+    base = {"attempt": n, "tag": tag, "train": [start, end]}
+    _create(att_dir / f"a{n}.started.json",
+            {**base, "run_ids": rids, "started": pd.Timestamp.now().isoformat(timespec="seconds")})
     tables, runs = [], []
     for r in parts:
         rid = rids[r["part"]]
@@ -181,9 +182,8 @@ def run_window(cfg, tag: str, start: str, end: str, out_dir: pathlib.Path, purpo
         v["status_runner"] = res.status
         runs.append(v)
         if v["status"] != "ok":
-            _create(att_dir / f"a{n}.json", {"attempt": n, "tag": tag, "train": [start, end], "status": "failed",
-                                             "runs": runs})
-            raise SystemExit(f"{rid}: pass verification failed ({v.get('provenance')}): {v['problems'][:5]} "
+            _create(att_dir / f"a{n}.json", {**base, "status": "failed", "runs": runs})
+            raise SystemExit(f"{rid}: pass verification failed ({v['provenance']}): {v['problems'][:5]} "
                              "(KTD4, KTD8)")
         curate.curate(rid, _dest(out_dir))
         tables.append(gridrun.run_table(runner.RUNS / rid, rid, nv.GRID, r["fixed"]))
@@ -196,8 +196,7 @@ def run_window(cfg, tag: str, start: str, end: str, out_dir: pathlib.Path, purpo
            "seconds": round(sum(x["seconds"] or 0 for x in runs), 1), "trade_floor": nv.trade_floor(),
            "selection_status": sel["status"], "label": sel["label"], "params": sel["params"],
            "reason": sel["reason"]}
-    _create(att_dir / f"a{n}.json", {"attempt": n, "tag": tag, "train": [start, end], "status": "verified",
-                                     "runs": runs})
+    _create(att_dir / f"a{n}.json", {**base, "status": "verified", "runs": runs})
     save(rec, rec_path)
     save({k: rec[k] for k in ("tag", "train", "trade_floor", "params", "reason", "label")}
          | {"status": sel["status"], "eligible_passes": sel["reason"]["eligible_passes"]}, out_dir / "selection.json")
@@ -612,9 +611,9 @@ def build_report(acc: dict, windows: list, folds: list, checks: dict) -> str:
                      "group R (דיווח)": _ok(acc["acceptance_group_R_report_only"]["criteria"][k])})
     lines.append(_md(rows, ["criterion"] + [SERIES_HE[w] for w in SERIES] + ["group R (דיווח)"]))
     lines += ["", "- **תנאי הנטו שנבדק לכל סדרה** (הקריטריונים והתוצאות לא שונו):"]
-    lines += [f"  - **{SERIES_HE[w]}:** {net_condition(acc['acceptance'][w]['criteria']['oos_net'])}" for w in SERIES]
-    lines.append(f"  - **group R (דיווח):** "
-                 f"{net_condition(acc['acceptance_group_R_report_only']['criteria']['oos_net'])}")
+    pairs = [(SERIES_HE[w], acc["acceptance"][w]) for w in SERIES] + [
+        ("group R (דיווח)", acc["acceptance_group_R_report_only"])]
+    lines += [f"  - **{label}:** {net_condition(a['criteria']['oos_net'])}" for label, a in pairs]
     net = proc["criteria"]["oos_net"]["value"]
     dsr = proc["criteria"]["dsr"]["value"]
     lines += ["", f"- **נטו של ההליך:** {net.get('net')}. ‏baselines: {net.get('baselines')}. פערים: {net.get('margins')}.",

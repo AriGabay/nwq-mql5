@@ -267,13 +267,15 @@
     }
    ],
    "max_open_risk_pct": 2.945198149154766,
-   "open_risk_pct_p95": 2.8063335566447334,
+   "open_risk_pct_p95": 2.806333556644734,
    "worst_clusters": [
     {
      "cluster": 141,
      "fold": 3,
      "start": "2026-05-15 09:03:00",
      "positions": 25,
+     "span_days": 12.2,
+     "max_open_at_once": 3,
      "net": -777.57,
      "net_pct_of_balance": -7.418
     },
@@ -282,6 +284,8 @@
      "fold": 2,
      "start": "2026-04-13 01:05:00",
      "positions": 12,
+     "span_days": 1.0,
+     "max_open_at_once": 3,
      "net": -688.14,
      "net_pct_of_balance": -6.073
     },
@@ -290,6 +294,8 @@
      "fold": 5,
      "start": "2026-07-28 10:21:00",
      "positions": 16,
+     "span_days": 1.2,
+     "max_open_at_once": 3,
      "net": -653.12,
      "net_pct_of_balance": -6.605
     },
@@ -298,6 +304,8 @@
      "fold": 4,
      "start": "2026-06-15 05:27:00",
      "positions": 16,
+     "span_days": 2.7,
+     "max_open_at_once": 3,
      "net": -639.78,
      "net_pct_of_balance": -6.519
     },
@@ -306,6 +314,8 @@
      "fold": 3,
      "start": "2026-05-13 19:03:00",
      "positions": 5,
+     "span_days": 0.5,
+     "max_open_at_once": 3,
      "net": -541.36,
      "net_pct_of_balance": -4.862
     }
@@ -611,6 +621,8 @@
      "fold": 3,
      "start": "2026-05-20 17:43:00",
      "positions": 11,
+     "span_days": 6.8,
+     "max_open_at_once": 3,
      "net": -695.87,
      "net_pct_of_balance": -7.182
     },
@@ -619,6 +631,8 @@
      "fold": 3,
      "start": "2026-05-08 18:31:00",
      "positions": 2,
+     "span_days": 2.3,
+     "max_open_at_once": 2,
      "net": -239.33,
      "net_pct_of_balance": -2.359
     },
@@ -627,6 +641,8 @@
      "fold": 1,
      "start": "2026-03-06 04:17:00",
      "positions": 3,
+     "span_days": 2.9,
+     "max_open_at_once": 2,
      "net": -229.03,
      "net_pct_of_balance": -2.3
     },
@@ -635,6 +651,8 @@
      "fold": 4,
      "start": "2026-06-02 17:13:00",
      "positions": 5,
+     "span_days": 0.7,
+     "max_open_at_once": 3,
      "net": -216.57,
      "net_pct_of_balance": -2.25
     },
@@ -643,6 +661,8 @@
      "fold": 3,
      "start": "2026-05-14 08:42:00",
      "positions": 2,
+     "span_days": 0.3,
+     "max_open_at_once": 2,
      "net": -207.6,
      "net_pct_of_balance": -2.06
     }

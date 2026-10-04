@@ -16,14 +16,14 @@ import pathlib
 import numpy as np
 import pandas as pd
 
-from . import numeric_v1 as nv, trades
+from . import numeric_v1 as nv, reports, trades
 
 ESTIMATE_LABEL = "אומדן חשבונאי, לא הרצת MT5"
-TIME_FMT = "%Y.%m.%d %H:%M:%S"
+BASE_RISK_PERCENT = 1.0          # RiskPercent of every stored numeric_v1 run (fixed input)
 
 
 def combo_name(row) -> str:
-    return "/".join(str(int(row[a])) for a in nv.AXES)
+    return "/".join(map(str, nv.tuple_of(row)))
 
 
 # ------------------------------------------------------------------ U4: train windows (R1-R3)
@@ -82,7 +82,7 @@ def neighbour_variation(t: pd.DataFrame) -> pd.DataFrame:
     ordinal axis, same StructureVariant) within each window, averaged over the windows."""
     rows = []
     for w, g in t.groupby("window", sort=False):
-        net = {tuple(int(r[a]) for a in nv.AXES): r["profit"] for _, r in g.iterrows()}
+        net = {nv.tuple_of(r): r["profit"] for _, r in g.iterrows()}
         for key, value in net.items():
             nbs = [nv.tuple_of(n) for n in nv.neighbours(dict(zip(nv.AXES, key)))]
             diffs = [abs(value - net[n]) for n in nbs if n in net]
@@ -114,14 +114,14 @@ def load_baseline_trades(series: str, results: pathlib.Path = nv.RESULTS) -> pd.
         rid = f["oos"][series]["run_id"]
         d = results / "wfo" / rid
         setups = pd.read_csv(d / f"rl_setups_{rid}.csv")
-        deals = pd.read_csv(d / f"rl_deals_{rid}.csv")
+        deals = reports.read_deals(d / f"rl_deals_{rid}.csv")
         t = trades.trade_table(setups, deals)
         extra = setups[pd.to_numeric(setups["position_id"], errors="coerce").notna()][
             ["position_id", "ref_pivot_id", "ob_time"]].copy()
         extra["position_id"] = pd.to_numeric(extra["position_id"])
         t = t.merge(extra.drop_duplicates("position_id"), on="position_id", how="left")
-        t["open_time"] = pd.to_datetime(t["open_time"], format=TIME_FMT)
-        t["close_time"] = pd.to_datetime(t["close_time"], format=TIME_FMT)
+        t["open_time"] = pd.to_datetime(t["open_time"])
+        t["close_time"] = pd.to_datetime(t["close_time"])
         frames.append(t.assign(fold=f["fold"], month=f["test"][0][:7].replace(".", "-"),
                                deposit=float(f["deposits"][series]), run_id=rid))
     return pd.concat(frames, ignore_index=True)
@@ -136,9 +136,9 @@ def add_balance(t: pd.DataFrame) -> pd.DataFrame:
         f = t[(t["fold"] == r["fold"]) & (t["close_time"] <= r["open_time"])]
         bal.append(r["deposit"] + f["net"].sum())
     t["balance_before"] = bal
-    if "realized_r" in t.columns:
-        risk = t["net"] / t["realized_r"].where(t["realized_r"] != 0)
-        t["risk_pct"] = risk.abs() / t["balance_before"] * 100
+    if {"intended_entry", "sl", "volume"} <= set(t.columns):
+        risk = (t["intended_entry"] - t["sl"]).abs() * t["volume"] * trades.CONTRACT_SIZE
+        t["risk_pct"] = risk / t["balance_before"] * 100
     return t
 
 
@@ -146,15 +146,16 @@ def add_concurrency(t: pd.DataFrame) -> pd.DataFrame:
     """concurrent: other positions of the same fold open when this one opened ([open, close) contains its
     open); cluster: maximal chain of overlapping positions in open order."""
     t = t.sort_values(["fold", "open_time"], kind="mergesort").reset_index(drop=True)
+    has_risk = "risk_pct" in t.columns
     conc, open_risk = [], []
     for i, r in t.iterrows():
         o = t[(t["fold"] == r["fold"]) & (t.index != i) & (t["open_time"] <= r["open_time"])
               & (t["close_time"] > r["open_time"])]
         conc.append(len(o))
-        if "risk_pct" in t.columns:
+        if has_risk:
             open_risk.append(float(o["risk_pct"].sum() + r["risk_pct"]))
     t["concurrent"] = conc
-    if "risk_pct" in t.columns:
+    if has_risk:
         t["open_risk_pct"] = open_risk
     cluster, cid, end, fold = [], -1, None, None
     for _, r in t.iterrows():
@@ -209,13 +210,17 @@ def concurrency_losses(t: pd.DataFrame) -> pd.DataFrame:
 
 
 def cluster_table(t: pd.DataFrame) -> pd.DataFrame:
-    """Clusters of two or more overlapping positions: their summed net as % of the balance at the first entry."""
+    """Clusters of two or more transitively overlapping positions: their summed net as % of the balance at the
+    first entry, their span and the most positions open at the same moment (a chain can last days while never
+    holding more than MaxExposures)."""
     rows = []
     for c, g in t.groupby("cluster"):
         if len(g) < 2:
             continue
         first = g.sort_values("open_time").iloc[0]
         rows.append({"cluster": c, "fold": int(first["fold"]), "start": first["open_time"], "positions": len(g),
+                     "span_days": round((g["close_time"].max() - first["open_time"]).total_seconds() / 86400, 1),
+                     "max_open_at_once": int(g["concurrent"].max()) + 1,
                      "net": round(float(g["net"].sum()), 2),
                      "net_pct_of_balance": float(g["net"].sum() / first["balance_before"] * 100)})
     return pd.DataFrame(rows).sort_values("net").reset_index(drop=True) if rows else pd.DataFrame()
@@ -270,8 +275,9 @@ def risk_estimate(t: pd.DataFrame, factors=(1.0, 0.5, 0.25)) -> pd.DataFrame:
             closed_net.append(scaled)
             path.append(path[-1] + scaled)
         p = np.array(path)
-        dd = float(((np.maximum.accumulate(p) - p) / np.maximum.accumulate(p)).max() * 100)
-        rows.append({"k": k, "risk_percent_equivalent": k * 1.0, "net": round(float(p[-1] - initial), 2),
+        peak = np.maximum.accumulate(p)
+        dd = float(((peak - p) / peak).max() * 100)
+        rows.append({"k": k, "risk_percent_equivalent": k * BASE_RISK_PERCENT, "net": round(float(p[-1] - initial), 2),
                      "closed_dd_pct": dd, "label": ESTIMATE_LABEL})
     return pd.DataFrame(rows)
 

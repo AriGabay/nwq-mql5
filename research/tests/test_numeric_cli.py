@@ -139,6 +139,56 @@ def test_a_failed_attempt_is_kept_and_the_retry_uses_its_own_run_ids(attempt_env
     assert json.loads((out / "attempts" / "a2.json").read_text())["status"] == "verified"
 
 
+def test_each_run_is_verified_with_the_cache_snapshots_taken_around_its_own_tester_call(attempt_env, monkeypatch):
+    """Review #4: the provenance guarantee rests on snapshot -> optimization -> snapshot per run, passed in that
+    order to the verification; the real cache_change decides the verdict."""
+    cfg, out, calls, _, runs_dir = attempt_env
+    events, seen = [], []
+    snaps = iter([{}, {"lo.opt": [1, 1]}, {"lo.opt": [1, 1]}, {"lo.opt": [1, 1], "hi.opt": [1, 1]}])
+
+    def snap(*a, **k):
+        events.append("snapshot")
+        return next(snaps)
+
+    real_opt = nc.pipeline.run_optimization
+
+    def opt(cfg_, rid, *a, **k):
+        events.append(f"run {rid}")
+        return real_opt(cfg_, rid, *a, **k)
+
+    def verify(run_dir, rid, expected, grid, fixed, cache=None):
+        seen.append((rid, cache))
+        ok = cache is not None and nc.gridrun.cache_change(*cache) != "unchanged"
+        return {"run_id": rid, "status": "ok" if ok else "failed", "provenance": "computed" if ok else "reused",
+                "expected": expected, "completed": expected, "failed": 0, "cached": 0, "seconds": 1.0,
+                "problems": [] if ok else ["cache unchanged"]}
+
+    monkeypatch.setattr(nc.gridrun, "cache_snapshot", snap)
+    monkeypatch.setattr(nc.pipeline, "run_optimization", opt)
+    monkeypatch.setattr(nc.gridrun, "verify_optimization", verify)
+    rec = nc.run_window(cfg, "f1", "2025.12.01", "2026.02.28", out, "fold 1")
+    assert rec["status"] == "verified"
+    assert events == ["snapshot", "run nv1_f1_grid_lo", "snapshot", "snapshot", "run nv1_f1_grid_hi", "snapshot"]
+    assert seen == [("nv1_f1_grid_lo", ({}, {"lo.opt": [1, 1]})),
+                    ("nv1_f1_grid_hi", ({"lo.opt": [1, 1]}, {"lo.opt": [1, 1], "hi.opt": [1, 1]}))]
+
+
+def test_an_attempt_whose_cache_did_not_change_never_verifies(attempt_env, monkeypatch):
+    cfg, out, *_ = attempt_env
+    monkeypatch.setattr(nc.gridrun, "cache_snapshot", lambda *a, **k: {"x.opt": [1, 1]})
+
+    def verify(run_dir, rid, expected, grid, fixed, cache=None):
+        change = nc.gridrun.cache_change(*cache)
+        return {"run_id": rid, "status": "failed" if change == "unchanged" else "ok", "provenance": "reused",
+                "expected": expected, "completed": expected, "failed": 0, "cached": expected, "seconds": 1.0,
+                "problems": [f"cache {change}"]}
+
+    monkeypatch.setattr(nc.gridrun, "verify_optimization", verify)
+    with pytest.raises(SystemExit, match="reused"):
+        nc.run_window(cfg, "f1", "2025.12.01", "2026.02.28", out, "fold 1")
+    assert not (out / "window.json").exists()
+
+
 def test_an_interrupted_attempt_does_not_block_the_next(attempt_env):
     cfg, out, calls, _, runs_dir = attempt_env
     (out / "attempts").mkdir(parents=True)
