@@ -358,3 +358,82 @@ def test_rl_days_and_rl_deals_headers_equal_predecessor(src):
     old = PREDECESSOR.read_text(encoding="utf-8")
     for first in ("date", "time"):
         assert _file_header(src, first) == _file_header(old, first)
+
+
+# --- 1R trailing stop (plan 2026-10-05-0007, U2) ----------------------------------------------------------------------
+def test_trail_runs_every_tick_after_sync_and_only_with_its_input(src):
+    code = _strip_comments(src)
+    tick = _function_body(code, "OnTick")
+    assert tick.index("SyncTrades(") < tick.index("ManageTrails(") < tick.index("ProcessNewM1Bars(")
+    body = _function_body(code, "ManageTrails")
+    assert re.match(r"\s*if\s*\(\s*!EnableTrailingStop\s*\)\s*return\s*;", body)
+
+
+def test_every_trail_side_effect_is_behind_the_input(src):
+    code = _strip_comments(src)
+    assert re.search(r"if\s*\(\s*EnableTrailingStop\s*\)\s*TrailRegister\s*\(", _function_body(code, "TryEntry"))
+    assert re.search(r"if\s*\(\s*EnableTrailingStop\s*\)\s*TrailRestore\s*\(", _function_body(code, "OnInit"))
+    write = _function_body(code, "RL_WriteRunFiles")
+    guarded = write[write.index("if(EnableTrailingStop)"):]
+    assert '"rl_trail_"' in guarded and '"rl_sl_moves_"' in guarded
+    # nothing else registers, saves or restores trail state
+    outside = re.sub(r"\b(?:TrailRegister|TrailRestore|TrailSave|TrailLoad|TrailSend|TrailNotSent|TrailClose|TrailForget|"
+                     r"ManageTrails)\s*\([^;{]*\)\s*\{", "", code)
+    for name in ("TrailRegister", "TrailRestore"):
+        assert len(re.findall(r"\b" + name + r"\s*\(", outside)) == 1, name
+
+
+def test_trail_modifies_by_ticket_and_verifies_retcode_and_the_stop_on_the_position(src):
+    body = _function_body(_strip_comments(src), "TrailSend")
+    args = _calls(body, "trade.PositionModify")
+    assert len(args) == 1 and _split_args(args[0]) == ["t.ticket", "req", "posTp"]
+    assert "ResultRetcode()" in body and "TRADE_RETCODE_DONE" in body
+    assert "PositionSelectByTicket(t.ticket)" in body and "PositionGetDouble(POSITION_SL)" in body
+    assert "PositionGetDouble(POSITION_TP)" in body
+    assert re.search(r"acc\s*=\s*ok\s*&&\s*rc\s*==\s*TRADE_RETCODE_DONE\s*&&\s*MathAbs\(slRead\s*-\s*req\)", body)
+    assert "PositionModify" not in _function_body(_strip_comments(src), "ManageTrails")
+
+
+def test_trail_request_formula_rounding_and_no_spread_term(src):
+    body = _code(_function_body(src, "ManageTrails"))
+    assert re.search(r"RoundTick\(gTr\[i\]\.best\s*-\s*gTr\[i\]\.r0,\s*false\)", body)
+    assert re.search(r"RoundTick\(gTr\[i\]\.best\s*\+\s*gTr\[i\]\.r0,\s*true\)", body)
+    assert re.search(r"tk\.bid\s*>=\s*gTr\[i\]\.fill\s*\+\s*gTr\[i\]\.r0", body)
+    assert re.search(r"tk\.ask\s*<=\s*gTr\[i\]\.fill\s*-\s*gTr\[i\]\.r0", body)
+    assert "tk.ask - tk.bid" not in body and "spread" not in body.lower()
+    assert re.search(r"MathMax\(gTr\[i\]\.best,\s*tk\.bid\)", body)
+    assert re.search(r"MathMin\(gTr\[i\]\.best,\s*tk\.ask\)", body)
+    assert "SYMBOL_TRADE_STOPS_LEVEL" in body and "SYMBOL_TRADE_FREEZE_LEVEL" in body
+
+
+def test_r0_is_set_only_from_the_fill_and_the_accepted_sl0_never_from_the_current_stop(src):
+    code = _code(src)
+    sets = re.findall(r"\b(\w+)\.r0\s*=(?!=)", code)
+    assert sets == ["t", "t", "t"]                                   # TrailInit, TrailLoad, TrailRegister
+    reg = _function_body(_strip_comments(src), "TrailRegister")
+    assert re.search(r"t\.r0\s*=\s*MathAbs\(t\.fill\s*-\s*t\.sl0\)", reg)
+    assert re.search(r"t\.sl0\s*=\s*PositionGetDouble\(POSITION_SL\)", reg)
+    restore = _function_body(_strip_comments(src), "TrailRestore")
+    assert "TrailLoad(" in restore and not re.search(r"\.sl0\s*=", restore)
+    assert "PositionModify" not in restore
+
+
+def test_trail_state_is_saved_per_magic_and_ticket_and_flushed(src):
+    code = _strip_comments(src)
+    assert re.search(r'"OBM1T\."\s*\+\s*IntegerToString\(MagicNumber\)\s*\+\s*"\."\s*\+\s*'
+                     r'IntegerToString\(\(long\)ticket\)', code)
+    save = _function_body(code, "TrailSave")
+    for key in ("dir", "e", "sl0", "r0", "tp", "best", "act", "actms"):
+        assert f'p + "{key}"' in save, key
+    assert "GlobalVariablesFlush()" in save
+
+
+def test_trailed_stop_exit_is_classified_trail(src):
+    body = _function_body(_strip_comments(src), "SyncPosition")
+    assert re.search(r'DEAL_REASON_SL\)\s*\?\s*\(moved\s*\?\s*"trail"\s*:\s*"sl"\)', body)
+
+
+def test_trail_csv_headers_equal_contract(src):
+    research = "".join(RESEARCH_BLOCK.findall(src))
+    assert _define(research, "RL_TRAIL_HEADER") == ",".join(mc.TRAIL_COLUMNS)
+    assert _define(research, "RL_SLMOVES_HEADER") == ",".join(mc.SL_MOVE_COLUMNS)

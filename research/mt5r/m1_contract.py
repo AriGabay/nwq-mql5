@@ -24,6 +24,7 @@ INPUTS = [
     ("int", "WarmupDays", "30"),
     ("long", "MagicNumber", "770201"),
     ("string", "TradeComment", "OBM1"),
+    ("bool", "EnableTrailingStop", "false"),               # 1R trailing stop (plan 2026-10-05-0007), off = baseline
 ]
 RESEARCH_INPUTS = [("string", "ResearchRunTag", '""')]   # research build only
 ENUMS = {"ENUM_STRUCTURE_VARIANT": {"SV_HH_ONLY": 0, "SV_HH_HL": 1}}
@@ -44,6 +45,14 @@ SETUP_COLUMNS = [
 DAYS_COLUMNS = ["date", "bal_open", "eq_open", "eq_min", "eq_max", "bal_close", "eq_close", "spread_median"]
 DEALS_COLUMNS = ["time", "ticket", "position_id", "type", "entry", "volume", "price", "profit", "commission", "swap",
                  "magic", "comment"]
+# 1R trailing stop (plan 2026-10-05-0007, KTD6): written only when EnableTrailingStop is true; optional for readers.
+# R figures of a trailed run use r0 = |fill_price - sl0|; rl_setups.sl stays SL0.
+TRAIL_COLUMNS = ["position_id", "setup_id", "dir", "fill_price", "sl0", "r0", "tp", "activated_msc", "activation_bid",
+                 "activation_ask", "best_price", "final_sl", "requests", "accepted", "rejected", "not_sent", "exit_kind",
+                 "state_roundtrip"]
+SL_MOVE_COLUMNS = ["position_id", "tick_msc", "bid", "ask", "best", "requested_sl", "sl_before", "accepted_sl",
+                   "retcode", "outcome"]                  # outcome: accepted | rejected | not_sent:<reason>
+TRAIL_FILES = {"trail": TRAIL_COLUMNS, "sl_moves": SL_MOVE_COLUMNS}
 FILES = {"bars_m1": BARS_COLUMNS, "bars_m5": BARS_COLUMNS, "pivots": PIVOT_COLUMNS, "events": EVENT_COLUMNS,
          "setups": SETUP_COLUMNS, "days": DAYS_COLUMNS, "deals": DEALS_COLUMNS}
 
@@ -70,7 +79,7 @@ EVENT_KINDS = {
     "skipped_cap":          "tick_msc, detail=open positions",
     "skipped_broker_reject": "tick_msc, detail=retcode",
     "fill":             "tick_msc, price=fill price, lo=sl, hi=tp after modify",
-    "exit":             "tick_msc, price, detail=sl|tp|end",
+    "exit":             "tick_msc, price, detail=sl|trail|tp|end (trail = stop hit after it was moved)",
     "cancelled_second_break":       "bar_time=closing bar",
     "cancelled_opposing_structure": "bar_time=closing bar, ref_id=H2 (LH) pivot long / L2 (HL) pivot short, "
                                     "ref_time=peak time of L1 / H1 that was broken",
@@ -82,7 +91,7 @@ SKIP_EVENTS = ["skipped_stop_crossed", "skipped_stops_level", "skipped_volume", 
 REASONS = ["cancelled_second_break", "cancelled_opposing_structure", "filled", "run_end_waiting",
            "run_end_untouched", "warmup_dropped"]
 SL_ANCHORS = ["ob", "hl", "pivot"]
-EXIT_KINDS = ["sl", "tp", "end"]
+EXIT_KINDS = ["sl", "trail", "tp", "end"]   # sl = original stop, trail = trailed stop
 
 # --- journal funnel keys (printed as 'Funnel: k=v ...' on several short lines) ---------------------------------
 FUNNEL_KEYS = ["identified", "touched", "structure_changes", "fvg_fixed", "ready", "reactions", "entries",
