@@ -57,3 +57,12 @@ def test_the_trailing_set_enables_only_the_trail_and_is_not_a_recommendation(mon
     defaults = {s.name: s.default for s in tc.pipeline.specs("delivered")}
     assert all(str(vals[k]) == str(v) for k, v in defaults.items() if k != "EnableTrailingStop")
     assert not any("recommended" in f.name for f in tmp_path.iterdir())
+
+
+def test_install_refuses_while_the_live_terminal_runs(monkeypatch):
+    called = []
+    monkeypatch.setattr(tc.runner, "live_terminal_running", lambda: True)
+    monkeypatch.setattr(tc.env, "load_config", lambda: called.append("config"))
+    with pytest.raises(SystemExit, match="live MT5 terminal is running"):
+        tc.cmd_install(None)
+    assert called == []

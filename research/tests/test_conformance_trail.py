@@ -169,3 +169,30 @@ def test_a_request_in_a_market_closed_minute_or_an_identical_resend_is_flagged()
     viol, _, _ = run(mv=moves(same), tr=trail(final_sl=1995.0, accepted=0, best_price=2007.5, exit_kind="sl"),
                      st=setups(exit_kind="sl", exit_price=1995.0))
     assert "re-sent in the same minute" in details(viol)
+
+
+# ------------------------------------------------------------------ the run-level wiring, on stored tester evidence
+def _stored_trailed_run():
+    """results/trailing_v1/tr1_on_b: a committed March 2026 run with the trail on (variant B, 56 positions)."""
+    import cli
+    import trail_cli as tc
+    rid = tc.run_id("on_b")
+    run = cm.read_run(tc.run_dir("on_b"), rid)
+    params = {**tc.BASE_INPUTS, "StructureVariant": tc.VARIANT["on_b"],
+              "point": cli.RUN["symbol_spec"]["tick_size"], "contract_size": cli.RUN["symbol_spec"]["contract_size"]}
+    return run, params
+
+
+def test_read_run_and_full_carry_the_trail_files_into_trail_r23():
+    run, params = _stored_trailed_run()
+    assert {"trail", "sl_moves"} <= set(run)
+    res = cm.full(run["setups"], run["events"], run["pivots"], run["bars_m1"], run["bars_m5"], params,
+                  run.get("deals"), run.get("trail"), run.get("sl_moves"))
+    assert res["violations"] == []
+    assert res["coverage"]["rules"]["trail_r23"]["checked"] == len(run["trail"])
+    bad = run["sl_moves"].copy()
+    i = bad.index[bad["outcome"] == "accepted"][5]
+    bad.loc[i, "requested_sl"] = float(bad.loc[i, "requested_sl"]) + 0.05
+    viol = cm.check(run["setups"], run["events"], run["pivots"], run["bars_m1"], run["bars_m5"], params,
+                    run.get("deals"), run.get("trail"), bad)
+    assert any(v["rule"] == "trail_r23" and "!= model" in v["detail"] for v in viol)

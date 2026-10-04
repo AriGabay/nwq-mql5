@@ -18,11 +18,12 @@ import pandas as pd  # noqa: E402
 
 import cli  # noqa: E402
 from mt5r import (charts_trail, compile as compmod, conformance_m1 as cm, curate, deliver, env, evaluate,  # noqa: E402
-                  explog, pipeline, reports, runner, setfile)
+                  explog, pipeline, reports, runner, setfile, trades)
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
-RESULTS = REPO / "results" / "trailing_v1"
-DELIV = REPO / "deliverables" / "trailing_v1"
+STUDY = "trailing_v1"
+RESULTS = REPO / "results" / STUDY
+DELIV = REPO / "deliverables" / STUDY
 SET_NAME = "ob_m1_structure_trailing.set"
 LOG = RESULTS / "experiment_log.jsonl"
 WINDOW = ("2026.03.01", "2026.03.31")
@@ -35,7 +36,7 @@ RUNS = [("off_a", 0, False), ("off_b", 1, False), ("on_a", 0, True), ("on_b", 1,
 TWINS = {"on_a_delivered": "on_a", "on_b_delivered": "on_b"}
 BASELINE = {"off_a": REPO / "results/numeric_v1/wfo/nv1_f1_oos_baseline_a",
             "off_b": REPO / "results/numeric_v1/wfo/nv1_f1_oos_baseline_b"}
-VARIANT = {"on_a": 0, "on_b": 1, "off_a": 0, "off_b": 1}
+VARIANT = {name: variant for name, variant, _ in RUNS}
 
 
 def run_id(name: str) -> str:
@@ -88,8 +89,12 @@ def compare_deals(a: pd.DataFrame, b: pd.DataFrame) -> list:
 
 # ------------------------------------------------------------------ install + compile
 def cmd_install(args) -> None:
+    if runner.live_terminal_running():
+        raise SystemExit("live MT5 terminal is running; install only while it is closed (R35)")
     use_study_log()
     cfg = env.load_config()
+    env.disable_mcp(cfg)   # the same safety steps as cli.cmd_install
+    env.assert_trade_safety(cfg)
     env.install_sources(cfg)
     out = {}
     for src in env.EA_SOURCES:
@@ -111,9 +116,7 @@ def write_set() -> pathlib.Path:
     if path.exists():
         return path
     spec = pipeline.specs("delivered")
-    values = {s.name: s.default for s in spec}
-    values["EnableTrailingStop"] = True
-    setfile.write_set(path, setfile.render_lines(spec, values),
+    setfile.write_set(path, setfile.render_lines(spec, {"EnableTrailingStop": True}),
                       header="M5 OB + M1 structure, code defaults plus the 1R trailing stop "
                              "(plan 2026-10-05-0007). Development only - not a recommended set.")
     return path
@@ -129,7 +132,7 @@ def research_run(cfg, name: str, variant: int, trailing: bool) -> dict:
                                    role="trail_dev", purpose=f"1R trailing development run {name}")
     if rep is None:
         raise SystemExit(f"{rid}: no report ({res.status})")
-    curate.curate(rid, f"trailing_v1")
+    curate.curate(rid, STUDY)
     rec = {"run_id": rid, "kind": "research", "status": res.status, "inputs": vals,
            "input_mismatches": pipeline.check_inputs_loaded(rep, vals), **reports.summary(rep),
            "history_quality": rep["header"].get("History Quality"), "build": rep["header"].get("Build")}
@@ -158,7 +161,7 @@ def twin_run(cfg, name: str, set_path: pathlib.Path) -> dict:
         raise SystemExit(f"{rid}: no report ({res.status})")
     explog.append({"id": rid, "role": "trail_twin", "expert": ex5, "from": WINDOW[0], "to": WINDOW[1],
                    "status": res.status, "has_report": True})
-    curate.curate(rid, "trailing_v1")
+    curate.curate(rid, STUDY)
     rec = {"run_id": rid, "kind": "delivered", "of": run_id(src), "status": res.status,
            "input_mismatches": pipeline.check_inputs_loaded(rep, expected), **reports.summary(rep),
            "history_quality": rep["header"].get("History Quality"), "build": rep["header"].get("Build")}
@@ -202,7 +205,7 @@ def positions(name: str) -> pd.DataFrame:
     net = d2.groupby("position_id")["net"].sum()
     f["net"] = f["position_id"].map(net).fillna(0.0)
     f["r0"] = (f["fill_price"] - f["sl"]).abs()
-    f["r"] = f["net"] / (f["r0"] * f["volume"] * 100)
+    f["r"] = f["net"] / (f["r0"] * f["volume"] * trades.CONTRACT_SIZE)
     return f
 
 
