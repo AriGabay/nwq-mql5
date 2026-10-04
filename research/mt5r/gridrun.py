@@ -11,7 +11,7 @@ import re
 
 import pandas as pd
 
-from . import journal, reports, wfo
+from . import ini, journal, m1_contract, pipeline, reports, wfo
 
 METRICS = ["profit", "trades", "eq_dd_pct", "recovery_factor", "custom", "sharpe"]
 START_MARK = "complete optimization started"
@@ -25,6 +25,24 @@ def run_log_section(run_dir: pathlib.Path) -> str:
     return text[idx:] if idx >= 0 else ""
 
 
+def cache_snapshot(mt5_dir: pathlib.Path, start: str, end: str, kind: str = "research") -> dict:
+    """{file name: [size, mtime_ns]} of this window's optimization cache files in the isolated copy's
+    Tester/cache. The tester names them after the build, the chart period, the start and the ini ToDate (end + 1
+    day): <ex5 stem>.<symbol>.<period>.<YYYYMMDD start>.<YYYYMMDD end+1>.<...>.opt (plan 2026-10-04-2133, KTD8)."""
+    stem = pathlib.Path(pipeline.BUILDS[kind][0]).stem
+    ymd = lambda d: d.replace(".", "")
+    pattern = f"{stem}.*.{m1_contract.CHART_PERIOD}.{ymd(start)}.{ymd(ini.next_day(end))}.*.opt"
+    files = sorted(pathlib.Path(mt5_dir, "Tester", "cache").glob(pattern))
+    return {f.name: [f.stat().st_size, f.stat().st_mtime_ns] for f in files}
+
+
+def cache_change(before: dict, after: dict) -> str:
+    """new: a cache file appeared; modified: an existing one changed; unchanged: identical snapshots."""
+    if set(after) - set(before):
+        return "new"
+    return "unchanged" if after == before else "modified"
+
+
 def _int_params(row: dict, axes: list) -> dict:
     out = {}
     for a in axes:
@@ -36,9 +54,15 @@ def _int_params(row: dict, axes: list) -> dict:
     return out
 
 
-def verify_optimization(run_dir: pathlib.Path, run_id: str, expected: int, grid: dict, fixed: dict) -> dict:
+def verify_optimization(run_dir: pathlib.Path, run_id: str, expected: int, grid: dict, fixed: dict,
+                        cache: tuple = None) -> dict:
     """Completion record of one optimization run; status 'ok' only when every source agrees on `expected` passes,
-    every pass's inputs lie inside the grid (fixed inputs equal their fixed value) and XML and frames agree."""
+    every pass's inputs lie inside the grid (fixed inputs equal their fixed value) and XML and frames agree.
+
+    Provenance (plan 2026-10-04-2133, KTD8), in order: computed = the counts agree, the log reports `expected` new
+    cache records and the cache changed; reused = no new records, the XML holds every pass and the cache is
+    unchanged; partial = anything else. With `cache` = (snapshot before, snapshot after) only computed verifies;
+    without it the cache is not checked and the record is judged from the tester's output alone."""
     run_dir = pathlib.Path(run_dir)
     axes = list(grid)
     problems = []
@@ -82,10 +106,21 @@ def verify_optimization(run_dir: pathlib.Path, run_id: str, expected: int, grid:
                 for a in axes:
                     if a in x and p[a] is not None and int(float(x[a])) != p[a]:
                         problems.append(f"pass {row['pass']}: XML {a}={x[a]} but frames {a}={p[a]}")
+    change = "not_checked" if cache is None else cache_change(*cache)
+    if (completed == len(xml) == total == new_records == expected) and change != "unchanged":
+        provenance = "computed"
+    elif new_records == 0 and len(xml) == expected and change in ("unchanged", "not_checked"):
+        provenance = "reused"
+    else:
+        provenance = "partial"
+    if cache is not None and provenance != "computed":
+        problems.append(f"provenance {provenance}: cache {change}, {new_records} new records (only a fresh, "
+                        "complete computation verifies)")
     return {"run_id": run_id, "status": "ok" if not problems else "failed", "expected": expected,
             "completed": completed, "failed": max(expected - completed, 0),
             "cached": max(expected - new_records, 0) if total is not None else expected,
             "log_total_passes": total, "new_cache_records": new_records, "xml_rows": int(len(xml)),
+            "provenance": provenance, "cache_change": change,
             "seconds": man.get("seconds"), "exit_code": man.get("exit_code"), "problems": problems[:50]}
 
 

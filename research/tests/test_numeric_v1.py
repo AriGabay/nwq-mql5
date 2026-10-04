@@ -289,3 +289,53 @@ def test_real_previous_grid_run_is_read_by_the_same_parsers():
     rec = gridrun.verify_optimization(d, "f1_grid", 2, grid, {"SwingStrengthM1": 3, "StopBufferPoints": 20})
     assert rec["status"] == "ok", rec["problems"]
     assert reports.read_frames(d / "rl_frames_f1_grid.csv")[0].shape[0] == 2
+
+
+# ------------------------------------------------------------------ result provenance (plan 2026-10-04-2133, U2, KTD8)
+NEW = {"ob_m1_structure_research.XAUUSD.s.M1.20251201.20260301.40.AB.opt": [100, 1]}
+
+
+def test_fresh_computation_with_a_new_cache_file_is_computed_and_verifies(tmp_path):
+    d, rid, r = make_run(tmp_path, "lo")
+    rec = gridrun.verify_optimization(d, rid, r["expected"], nv.GRID, r["fixed"], cache=({}, NEW))
+    assert (rec["status"], rec["provenance"], rec["cache_change"]) == ("ok", "computed", "new")
+
+
+def test_results_served_from_the_cache_are_reused_and_fail(tmp_path):              # Covers AE2
+    d, rid, r = make_run(tmp_path, "lo", new=None)
+    rec = gridrun.verify_optimization(d, rid, r["expected"], nv.GRID, r["fixed"], cache=(NEW, dict(NEW)))
+    assert (rec["status"], rec["provenance"], rec["cache_change"]) == ("failed", "reused", "unchanged")
+
+
+def test_complete_counts_with_an_unchanged_cache_are_partial_and_fail(tmp_path):
+    d, rid, r = make_run(tmp_path, "lo")
+    rec = gridrun.verify_optimization(d, rid, r["expected"], nv.GRID, r["fixed"], cache=(NEW, dict(NEW)))
+    assert (rec["status"], rec["provenance"]) == ("failed", "partial")
+    assert any("provenance partial" in p for p in rec["problems"])
+
+
+def test_a_grown_cache_file_counts_as_a_cache_change():
+    name = next(iter(NEW))
+    assert gridrun.cache_change(NEW, {name: [180, 2]}) == "modified"
+    assert gridrun.cache_change(NEW, dict(NEW)) == "unchanged"
+    assert gridrun.cache_change({}, NEW) == "new"
+
+
+def test_without_snapshots_verification_is_unchanged_and_the_cache_not_checked(tmp_path):
+    d, rid, r = make_run(tmp_path, "lo")
+    rec = gridrun.verify_optimization(d, rid, r["expected"], nv.GRID, r["fixed"])
+    assert (rec["status"], rec["provenance"], rec["cache_change"]) == ("ok", "computed", "not_checked")
+
+
+def test_the_snapshot_takes_only_this_windows_research_cache_files(tmp_path):
+    cache = tmp_path / "Tester" / "cache"
+    cache.mkdir(parents=True)
+    names = ["ob_m1_structure_research.XAUUSD.s.M1.20251201.20260301.40.AB.opt",     # this window: end + 1 day
+             "ob_m1_structure_research.XAUUSD.s.M1.20251201.20260228.40.CD.opt",     # end date itself: not ours
+             "ob_m1_structure.XAUUSD.s.M1.20251201.20260301.40.EF.opt",              # delivered build
+             "ob_fvg_retest_research.XAUUSD.s.M15.20251201.20260301.40.GH.opt",      # another EA
+             "ob_m1_structure_research.XAUUSD.s.M1.20251201_20260301.4.IJ.tst"]      # a single test, not an .opt
+    for n in names:
+        (cache / n).write_bytes(b"x")
+    snap = gridrun.cache_snapshot(tmp_path, "2025.12.01", "2026.02.28")
+    assert list(snap) == [names[0]]
