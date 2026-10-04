@@ -232,3 +232,21 @@ def test_help_lists_subcommands():
 def test_chained_deposit_is_what_the_tester_uses():
     """MT5 truncates a fractional Deposit (9873.96 ran as 9873.00): chain on the truncated value (code review)."""
     assert cli.tester_deposit(9873.96) == 9873 and cli.tester_deposit(10000.0) == 10000
+
+
+def test_protocol_runs_refuse_an_installed_ea_that_differs_from_the_repo(tmp_path, monkeypatch):
+    """Code review (R34): the tester runs the isolated copy's EA, so install-an-edit-then-revert-the-repo must not
+    pass the registered-source guard."""
+    from mt5r import pipeline as pl
+    experts = tmp_path / "MQL5" / "Experts"
+    experts.mkdir(parents=True)
+    for name in env.EA_SOURCES:
+        (experts / name).write_bytes((pl.EA_SRC.parent / name).read_bytes())
+    cfg = argparse.Namespace(mt5_dir=tmp_path)
+    cli.installed_ea_matches(cfg)                                   # identical copies pass
+    (experts / env.EA_SOURCES[0]).write_text("// edited\n")
+    with pytest.raises(SystemExit, match="differs"):
+        cli.installed_ea_matches(cfg)
+    (experts / env.EA_SOURCES[0]).unlink()
+    with pytest.raises(SystemExit, match="differs"):
+        cli.installed_ea_matches(cfg)

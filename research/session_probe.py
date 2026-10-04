@@ -36,6 +36,8 @@ PILOT_RUNS = ("pilot_a", "pilot_b")
 
 def cases(run_ids=PILOT_RUNS) -> pd.DataFrame:
     """The checker's level_in_session_open_bar positions, rebuilt with its own bar logic (conformance_m1._Bars).
+    Bid bars only: shorts enter through the SL branch (Bid high >= SL); a short TP or an Ask-only short SL reached
+    only in the quote-only minute is not a case (see session_sensitivity's module docstring).
     case_id = (index of the run + 1) x 1e6 + setup id."""
     rows = []
     for k, run_id in enumerate(run_ids):

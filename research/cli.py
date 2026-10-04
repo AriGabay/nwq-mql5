@@ -85,6 +85,16 @@ def ea_sha() -> str:
     return sha_source(pipeline.EA_SRC)
 
 
+def installed_ea_matches(cfg) -> None:
+    """The tester compiles and runs the EA sources in the isolated copy (copied by `install`), not the repo files the
+    pre-registration hash guards: refuse when an installed source differs from the repo source (code review)."""
+    for name in env.EA_SOURCES:
+        installed = cfg.mt5_dir / "MQL5" / "Experts" / name
+        if not installed.exists() or sha_source(installed) != sha_source(pipeline.EA_SRC.parent / name):
+            raise SystemExit(f"{installed} differs from mql5/Experts/{name}; run `install` from the registered "
+                             "source before any protocol run (R29)")
+
+
 def holdout_pending(log: list, ea_sha256: str, set_shas: dict) -> list:
     """August-September sides still allowed to run (R31: exactly once). Any logged run that produced a report
     counts as done, whatever its status and whatever EA or .set hash it ran with; only runs without a report
@@ -412,6 +422,7 @@ def cmd_wfo(args) -> None:
     with chained deposits; then the final selection on May-July."""
     P = prereg_committed()
     cfg = env.load_config()
+    installed_ea_matches(cfg)
     done = json.loads(FOLDS.read_text()) if FOLDS.exists() else []
     deposits = {w: P["deposit"] for w in SERIES}
     for rec in done:
@@ -485,6 +496,7 @@ def cmd_holdout(args) -> None:
     if not todo:
         raise SystemExit("a completed August-September run already exists; it runs once (R31)")
     cfg = env.load_config()
+    installed_ea_matches(cfg)
     out = json.loads(AUGSEP.read_text(encoding="utf-8")) if AUGSEP.exists() else {}
     start, end = P["holdout"]
     for who in todo:
@@ -564,6 +576,7 @@ def cmd_robustness(args) -> None:
     if not committed(_rel(DELIV / CAND_SET)):
         raise SystemExit("candidate is not frozen and committed; run `freeze` and commit first")
     cfg = env.load_config()
+    installed_ea_matches(cfg)
     folds = json.loads(FOLDS.read_text())
     cand = json.loads(FINAL.read_text())["params"]
     cand_series = {0: "fixed_a", 1: "fixed_b"}[cand["StructureVariant"]]
@@ -655,6 +668,7 @@ def cmd_deliver(args) -> None:
     final = json.loads(FINAL.read_text())
     folds = json.loads(FOLDS.read_text())
     cfg = env.load_config()
+    installed_ea_matches(cfg)
     ex5 = pipeline.BUILDS["delivered"][0]
     start, end = P["folds"][0]["test"]
     checks = {}

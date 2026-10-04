@@ -826,22 +826,28 @@ class _Replay:
             s.queued = None
 
     def _check_skip_sl(self, s, e, kind, anchor, bid):
+        """skipped_stop_crossed: the EA tests the stop on the trigger side (long Bid <= SL, short Ask >= SL) and logs
+        the request price (long: the Ask, short: the Bid) with lo = SL. bid: the bar-open Bid when this skip is the
+        first tick after the reaction close, else None. The Ask of a short skip is not logged."""
         self.chk("sl_r18")
         sl, price = e["lo"], e["price"]
         if sl is None or price is None:
             self.add(s.sid, "fields", "skipped_stop_crossed lacks price or lo=sl")
             return
-        if not (price <= sl + self.tol if s.sign > 0 else price >= sl - self.tol):
-            self.add(s.sid, "entry_r15", f"skipped_stop_crossed at price {price} but stop {sl} is not crossed")
         if s.sign > 0:
+            if bid is not None and bid > sl + self.tol:
+                self.add(s.sid, "entry_r15", f"skipped_stop_crossed but Bid {bid} is above the long stop {sl}")
             if abs(sl - (anchor - self.buf)) > self.tol:
                 self.add(s.sid, "sl_r18", f"skip SL {sl} != {kind} anchor {anchor} - buffer")
         else:
-            spread = sl - anchor - self.buf
-            exact = None if bid is None else price - bid
-            if spread < -self.tol or (exact is not None and abs(spread - exact) > self.tol):
-                self.add(s.sid, "sl_r18", f"skip SL {sl} != {kind} anchor {anchor} + buffer + spread "
-                                          f"({'Ask - Bid = ' + format(exact, '.2f') if exact is not None else '>= 0'})")
+            # SL = anchor + buffer + spread, so Ask >= SL is Bid >= anchor + buffer: checkable on the logged Bid
+            if price < anchor + self.buf - self.tol:
+                self.add(s.sid, "entry_r15", f"skipped_stop_crossed but Bid {price} is below {kind} anchor {anchor} "
+                                             "+ buffer: the short stop is not crossed")
+            if bid is not None and abs(price - bid) > self.tol:
+                self.add(s.sid, "entry_r15", f"skip Bid {price} != open {bid}: not the first tick after the reaction")
+            if sl - anchor - self.buf < -self.tol:
+                self.add(s.sid, "sl_r18", f"skip SL {sl} is below {kind} anchor {anchor} + buffer (spread < 0)")
 
     def _apply_outcome(self, s: _Sim, i):
         q, s.queued = s.queued, None

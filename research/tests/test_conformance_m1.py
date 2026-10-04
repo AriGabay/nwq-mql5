@@ -351,7 +351,7 @@ def ae7(tail_events, **row):
 
 
 def test_ae7_short_with_stop_crossed_after_the_weekend_is_skipped_and_keeps_waiting():
-    skip = dict(setup_id=1, kind="skipped_stop_crossed", tick_msc=MONDAY * 1000, price=2015.7, lo=2015.6)
+    skip = dict(setup_id=1, kind="skipped_stop_crossed", tick_msc=MONDAY * 1000, price=2015.5, lo=2015.6)  # Bid
     ok = ae7([skip], reason="run_end_waiting")
     assert run_check(ok) == []
     occ = cf.occurrences(ok["setups"], ok["events"], ok["pivots"], ok["bars_m1"], ok["bars_m5"], PARAMS)
@@ -520,3 +520,36 @@ def test_full_cap_takes_precedence_over_a_crossed_stop():
     assert "cap_r21" in rules(v)          # no open positions in this fixture: the logged 3 is not supported
     other = dict(setup_id=1, kind="skipped_volume", tick_msc=MONDAY * 1000, price=2015.7, lo=2015.6, detail="0.00")
     assert "entry_r15" in rules(run_check(ae7([other], reason="run_end_waiting")))
+
+
+# --- code review (R34): skip-event log contract and violation tests for every rule ----------------------------
+class _S:
+    def __init__(self, sign):
+        self.sign, self.sid = sign, 1
+
+
+def _skip_check(sign, price, sl, anchor, bid):
+    r = cf._Replay(None, None, None, None, None, PARAMS)
+    r._check_skip_sl(_S(sign), dict(price=price, lo=sl), "ob", anchor, bid)
+    return rules(r.out)
+
+
+def test_skip_events_carry_the_request_price_and_the_stop_is_tested_on_the_trigger_side():
+    """The EA logs the Ask on a long skip and the Bid on a short one (request price) and tests the stop on the
+    trigger side (long Bid <= SL, short Ask >= SL)."""
+    # long: SL 2004.60 = OB low 2004.80 - 20 points; Bid 2004.50 <= SL < Ask 2004.70 is a crossed stop
+    assert _skip_check(1, 2004.70, 2004.60, 2004.80, bid=2004.50) == set()
+    assert "entry_r15" in _skip_check(1, 2004.90, 2004.60, 2004.80, bid=2004.70)       # Bid above the stop
+    # short: SL 2015.60 = anchor 2015.20 + 20 points + 0.20 spread; logged Bid 2015.50 >= anchor + buffer
+    assert _skip_check(-1, 2015.50, 2015.60, 2015.20, bid=2015.50) == set()
+    assert "entry_r15" in _skip_check(-1, 2015.30, 2015.60, 2015.20, bid=2015.30)      # Bid below anchor + buffer
+    assert "sl_r18" in _skip_check(-1, 2015.50, 2015.30, 2015.20, bid=2015.50)         # SL below anchor + buffer
+
+
+def test_ob_structure_hl_and_one_trade_rules_fire_on_deviating_claims(base):
+    assert "ob_r3" in rules(run_check(with_setup(base, ob_high=2011.5)))
+    ev = base_events(base)
+    assert "sc_r10" in rules(run_check(with_events(base, [e for e in ev if e["kind"] != "sc_hh"])))
+    assert "hl_r11" in rules(run_check(with_events(base, [e for e in ev if e["kind"] != "hl"])))
+    fill = next(e for e in ev if e["kind"] == "fill")
+    assert "one_trade_r17" in rules(run_check(with_events(base, ev + [dict(fill, seq=99)])))
