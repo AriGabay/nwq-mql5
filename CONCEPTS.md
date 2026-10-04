@@ -8,16 +8,21 @@ Shared domain vocabulary for this project — entities, named processes, and sta
 The user's own MetaTrader 5 terminal, connected to a real trading account, which research work must never start, stop, reconfigure, or attach to.
 *Avoid:* main terminal, production terminal
 
-Research runs happen only while the live terminal is closed, because running a second terminal through the same macOS MetaTrader application coincided with the live terminal shutting down.
+Research runs happen only while the live terminal is closed, because running a second terminal beside it once coincided with the live terminal shutting down.
 
 ### Isolated copy
-A separate, portable MetaTrader 5 installation used only for Strategy Tester research, kept in its own Wine prefix and populated from an allowlist of files taken read-only from the live terminal's data.
+A separate, portable MetaTrader 5 installation used only for Strategy Tester research, kept apart from the live terminal's installation and data and populated from an allowlist of files taken read-only from the live terminal's data.
 *Avoid:* research terminal, sandbox copy
 
 It holds no password written by the pipeline; the Strategy Tester still requires an authenticated account there, which the user supplies by logging in to the isolated copy themselves. It must be trade-safe before every run.
 
 ### Trade-safe
 The state of the isolated copy in which it cannot place orders or expose trading tools: automated trading disabled, the terminal's built-in MCP server off, and no stored password in its configuration.
+
+### Quote-only minute
+The first minute after a break in a symbol's quotes (the daily break or the weekend) in which prices arrive but no order, stop or target executes, because the symbol's trading session starts a minute after its quote session.
+
+A level reached only during a quote-only minute fills from the first tradeable tick or later, possibly much later if price moves back; a check that re-derives execution from bars treats that bar as no-execution and reports such cases as unverifiable rather than as violations.
 
 ## Strategy
 
