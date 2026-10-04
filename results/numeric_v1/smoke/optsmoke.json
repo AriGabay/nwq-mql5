@@ -1,0 +1,44 @@
+{
+ "train": [
+  "2026.02.02",
+  "2026.02.06"
+ ],
+ "expected": 18,
+ "completed": 18,
+ "failed": 0,
+ "cached": 0,
+ "seconds": 20.0,
+ "runs": [
+  {
+   "run_id": "nv1_smoke_grid_lo",
+   "status": "ok",
+   "expected": 12,
+   "completed": 12,
+   "failed": 0,
+   "cached": 0,
+   "log_total_passes": 12,
+   "new_cache_records": 12,
+   "xml_rows": 12,
+   "seconds": 11.0,
+   "exit_code": 0,
+   "problems": [],
+   "status_runner": "ok"
+  },
+  {
+   "run_id": "nv1_smoke_grid_hi",
+   "status": "ok",
+   "expected": 6,
+   "completed": 6,
+   "failed": 0,
+   "cached": 0,
+   "log_total_passes": 6,
+   "new_cache_records": 6,
+   "xml_rows": 6,
+   "seconds": 9.0,
+   "exit_code": 0,
+   "problems": [],
+   "status_runner": "ok"
+  }
+ ],
+ "note": "train-only check window; its metrics are not used by the selection rule"
+}

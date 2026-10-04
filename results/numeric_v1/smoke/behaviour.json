@@ -1,0 +1,164 @@
+{
+ "window": [
+  "2026.02.02",
+  "2026.02.06"
+ ],
+ "runs": [
+  {
+   "run_id": "nv1_behaviour_0_3_20",
+   "params": {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 3,
+    "StopBufferPoints": 20
+   },
+   "violations": 0,
+   "pivot_causality_r9": {
+    "checked": 12628,
+    "failed": 0,
+    "passed": 12628
+   },
+   "sl_r18": {
+    "checked": 51,
+    "failed": 0,
+    "passed": 51
+   },
+   "pivots": 6407,
+   "fills": 51,
+   "long_fills": 32,
+   "long_stop_to_anchor_points": [
+    20.0
+   ],
+   "logged_buffer_pts": [
+    20.0
+   ],
+   "input_mismatches": []
+  },
+  {
+   "run_id": "nv1_behaviour_0_2_20",
+   "params": {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 2,
+    "StopBufferPoints": 20
+   },
+   "violations": 0,
+   "pivot_causality_r9": {
+    "checked": 17735,
+    "failed": 0,
+    "passed": 17735
+   },
+   "sl_r18": {
+    "checked": 42,
+    "failed": 0,
+    "passed": 42
+   },
+   "pivots": 9012,
+   "fills": 42,
+   "long_fills": 26,
+   "long_stop_to_anchor_points": [
+    20.0
+   ],
+   "logged_buffer_pts": [
+    20.0
+   ],
+   "input_mismatches": []
+  },
+  {
+   "run_id": "nv1_behaviour_0_4_20",
+   "params": {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 4,
+    "StopBufferPoints": 20
+   },
+   "violations": 0,
+   "pivot_causality_r9": {
+    "checked": 9761,
+    "failed": 0,
+    "passed": 9761
+   },
+   "sl_r18": {
+    "checked": 54,
+    "failed": 0,
+    "passed": 54
+   },
+   "pivots": 4925,
+   "fills": 54,
+   "long_fills": 33,
+   "long_stop_to_anchor_points": [
+    20.0
+   ],
+   "logged_buffer_pts": [
+    20.0
+   ],
+   "input_mismatches": []
+  },
+  {
+   "run_id": "nv1_behaviour_0_3_10",
+   "params": {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 3,
+    "StopBufferPoints": 10
+   },
+   "violations": 0,
+   "pivot_causality_r9": {
+    "checked": 12628,
+    "failed": 0,
+    "passed": 12628
+   },
+   "sl_r18": {
+    "checked": 51,
+    "failed": 0,
+    "passed": 51
+   },
+   "pivots": 6407,
+   "fills": 51,
+   "long_fills": 32,
+   "long_stop_to_anchor_points": [
+    10.0
+   ],
+   "logged_buffer_pts": [
+    10.0
+   ],
+   "input_mismatches": []
+  },
+  {
+   "run_id": "nv1_behaviour_0_3_40",
+   "params": {
+    "StructureVariant": 0,
+    "SwingStrengthM1": 3,
+    "StopBufferPoints": 40
+   },
+   "violations": 0,
+   "pivot_causality_r9": {
+    "checked": 12628,
+    "failed": 0,
+    "passed": 12628
+   },
+   "sl_r18": {
+    "checked": 51,
+    "failed": 0,
+    "passed": 51
+   },
+   "pivots": 6407,
+   "fills": 51,
+   "long_fills": 32,
+   "long_stop_to_anchor_points": [
+    40.0
+   ],
+   "logged_buffer_pts": [
+    40.0
+   ],
+   "input_mismatches": []
+  }
+ ],
+ "pivot_sets_differ_across_N": true,
+ "pivot_counts_by_N": {
+  "2": 9012,
+  "3": 6407,
+  "4": 4925
+ },
+ "all_zero_violations": true,
+ "rules_checked_in_every_run": true,
+ "stop_distance_equals_buffer": true,
+ "all_inputs_loaded": true,
+ "note": "train-only check window; its metrics are not used by the selection rule"
+}

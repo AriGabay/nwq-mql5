@@ -1,0 +1,26 @@
+{
+ "run_id": "nv1_behaviour_0_2_20",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "02a44b32bae4246d6e68f21f284851f985bd628dc7e5f51ace8ee4ada5fed666",
+ "ini_sha256": "04e0e698f2b6ded0f5f87003f35563db97dc877af4b6ac921fd37b0f08dc4466",
+ "meta": {
+  "kind": "research",
+  "role": "behaviour",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "ImpulseWindowBars": 2,
+   "WarmupDays": 30,
+   "StructureVariant": 0,
+   "SwingStrengthM1": 2,
+   "StopBufferPoints": 20,
+   "ResearchRunTag": "nv1_behaviour_0_2_20"
+  }
+ },
+ "started": "2026-10-04T19:18:08",
+ "status": "ok",
+ "seconds": 7.9,
+ "report": "nv1_behaviour_0_2_20.htm",
+ "exit_code": 0
+}
