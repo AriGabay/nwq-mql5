@@ -342,3 +342,22 @@ def test_publication_guard_refuses_the_same_content_without_the_freeze_commit(re
 def test_publication_guard_refuses_an_uncommitted_protocol(repo):
     with pytest.raises(SystemExit, match="exactly once"):
         nc.prereg_published(PRE)
+
+
+# ------------------------------------------------------------------ diagnosis command (plan 2026-10-04-2133, U7)
+def test_diagnose_reads_stored_evidence_writes_only_its_folder_and_never_runs_the_tester(tmp_path, monkeypatch):
+    def refuse(*a, **k):
+        raise AssertionError("the diagnosis must not touch the tester, config or live terminal")
+    for target, name in ((nc, "start"), (nc.env, "load_config"), (nc.runner, "run"),
+                         (nc.pipeline, "run_optimization")):
+        monkeypatch.setattr(target, name, refuse)
+    monkeypatch.setattr(nc, "DIAG", tmp_path / "diagnosis")
+    before = {p: p.stat().st_mtime_ns for p in nv.RESULTS.rglob("*") if p.is_file()}
+    nc.cmd_diagnose(None)
+    after = {p: p.stat().st_mtime_ns for p in nv.RESULTS.rglob("*") if p.is_file()}
+    assert after == before                                         # stored evidence untouched (R10)
+    out = json.loads((tmp_path / "diagnosis" / "summary.json").read_text())
+    for w in ("baseline_a", "baseline_b"):
+        assert out["series"][w]["join_check"] == out["series"][w]["stored_oos_net"]
+        assert all("אומדן" in r["label"] for r in out["series"][w]["risk_estimate"])
+    assert out["train"]["rows"] == 108 and out["train"]["eligible"] == 0 and out["not_stored"]

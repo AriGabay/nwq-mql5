@@ -2,6 +2,7 @@
 
 Order: optsmoke-nv1 -> behaviour-nv1 (pre-freeze, train-only window) -> freeze-rules-nv1 (commit + push)
 -> wfo-nv1 -> freeze-nv1 (commit + push) -> robustness-nv1 -> deliver-nv1.
+diagnose-nv1 reads the finished study's stored evidence only (plan 2026-10-04-2133) and runs no tester.
 
 This CLI never reads the previous research's results for a decision and never writes its files: its own
 pre-registration (research/preregistration_numeric_v1.json), results (results/numeric_v1), deliverables
@@ -20,8 +21,8 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 import cli  # noqa: E402
-from mt5r import (curate, env, evaluate, explog, gridrun, metrics, montecarlo, numeric_v1 as nv, pipeline,  # noqa: E402
-                  reports, runner, setfile)
+from mt5r import (curate, diagnosis_nv1 as dg, env, evaluate, explog, gridrun, metrics, montecarlo,  # noqa: E402
+                  numeric_v1 as nv, pipeline, reports, runner, setfile)
 
 REPO = nv.REPO
 WFO = nv.RESULTS / "wfo"
@@ -665,9 +666,90 @@ def write_deliverables(acc: dict, checks: dict) -> None:
                                                  encoding="utf-8")
 
 
+# ------------------------------------------------------------------ diagnosis (plan 2026-10-04-2133, U4-U7)
+DIAG = nv.RESULTS / "diagnosis"
+NOT_STORED = [
+    "train windows: only per-pass aggregates (scored_grid.csv, XML, frames); no trades, days or equity curve",
+    "intraday equity per tick or per minute: only daily open/min/max/close (rl_days)",
+    "spread and slippage per trade: only the daily median spread and the cost-stress estimate in acceptance.json",
+    "margin used per position and free margin",
+    "the unrounded volume the EA computed before flooring to the 0.01 lot step",
+    "any run at a risk other than 1%: lower-risk figures here are an accounting estimate only",
+]
+
+
+def _csv(df: pd.DataFrame, name: str) -> None:
+    DIAG.mkdir(parents=True, exist_ok=True)
+    df.to_csv(DIAG / name, index=False)
+
+
+def cmd_diagnose(args) -> None:
+    """Read-only diagnosis of the finished study from stored evidence (KTD1): no tester, no config, no live
+    terminal. Writes only under results/numeric_v1/diagnosis/."""
+    P = nv.load_prereg()
+    sel = P["selection"]
+    acc = json.loads((nv.RESULTS / "acceptance.json").read_text())
+    t = dg.train_table(dg.load_grids(), sel["trade_floor"], sel["max_equity_dd_pct"])
+    summary = dg.combo_summary(t).merge(dg.neighbour_variation(t), on="combo")
+    rc = dg.rank_correlation(t)
+    _csv(t, "train_table.csv")
+    _csv(summary, "train_combo_summary.csv")
+    _csv(rc, "train_rank_correlation.csv")
+    per_window = (t.groupby("window", sort=False)
+                   .agg(profitable=("profit", lambda x: int((x > 0).sum())), net_median=("profit", "median"),
+                        eq_dd_min=("eq_dd_pct", "min"), eq_dd_median=("eq_dd_pct", "median"),
+                        trades_min=("trades", "min"), eligible=("eligible", "sum")).reset_index())
+    _csv(per_window, "train_windows.csv")
+    out = {"study": nv.STUDY, "source": "stored numeric_v1 evidence only; no tester run",
+           "thresholds": {"trade_floor": sel["trade_floor"], "max_equity_dd_pct": sel["max_equity_dd_pct"]},
+           "train": {"rows": int(len(t)), "eligible": int(t["eligible"].sum()),
+                     "below_trade_floor": int((t["trades"] < sel["trade_floor"]).sum()),
+                     "above_dd_limit": int((t["eq_dd_pct"] > sel["max_equity_dd_pct"]).sum()),
+                     "windows": per_window.round(2).to_dict("records"),
+                     "rank_correlation": rc.round(3).to_dict("records"),
+                     "median_neighbour_abs_diff": float(summary["mean_abs_diff_net"].median()),
+                     "median_abs_net": float(t["profit"].abs().median()),
+                     "note": "windows overlap by two of three months; descriptive only, never summed"},
+           "series": {}, "not_stored": NOT_STORED}
+    folds = json.loads(FOLDS_JSON.read_text())
+    for w in BASELINE_SERIES:
+        tr = dg.add_structure(dg.add_concurrency(dg.add_balance(dg.load_baseline_trades(w))))
+        _csv(tr, f"trades_{w}.csv")
+        groups = {g: dg.grouped_stats(tr, g) for g in ("dir", "month", "shared_structure")}
+        for g, df in groups.items():
+            _csv(df, f"{w}_by_{g}.csv")
+        conc = dg.concurrency_losses(tr)
+        clusters = dg.cluster_table(tr)
+        est = dg.risk_estimate(tr)
+        lots = [dg.lot_rounding(tr["volume"], k) for k in (0.5, 0.25)]
+        days = dg.worst_days(nv.RESULTS, [f["oos"][w]["run_id"] for f in folds])
+        _csv(conc, f"{w}_by_concurrency.csv")
+        _csv(clusters, f"{w}_clusters.csv")
+        _csv(est, f"{w}_risk_estimate.csv")
+        _csv(days, f"{w}_worst_days.csv")
+        crit = acc["acceptance"][w]["criteria"]
+        out["series"][w] = {
+            "params": nv.series_name(nv.BASELINES[w]), "stats": dg.trade_stats(tr),
+            "stored_oos_net": crit["oos_net"]["value"]["net"], "join_check": round(float(tr["net"].sum()), 2),
+            "by_dir": groups["dir"].round(4).to_dict("records"), "by_month": groups["month"].round(4).to_dict("records"),
+            "by_concurrency": conc.round(4).to_dict("records"),
+            "by_shared_structure": groups["shared_structure"].round(4).to_dict("records"),
+            "max_open_risk_pct": float(tr["open_risk_pct"].max()),
+            "open_risk_pct_p95": float(tr["open_risk_pct"].quantile(0.95)),
+            "worst_clusters": clusters.head(5).astype({"start": str}).round(3).to_dict("records") if len(clusters) else [],
+            "costs": dg.costs(tr), "cost_stress": crit["cost_stress"]["value"], "outliers": dg.outliers(tr),
+            "top_events_removed": crit["top_events_removed"]["value"],
+            "minute_0100_fills": dg.minute_0100(tr), "session_sensitivity_0100": acc["session_sensitivity"][w],
+            "worst_days": days.round(3).to_dict("records"),
+            "risk_estimate": est.round(3).to_dict("records"), "lot_rounding": lots}
+    save(out, DIAG / "summary.json")
+    print(json.dumps({w: {"join_check": v["join_check"], "stored_oos_net": v["stored_oos_net"]}
+                      for w, v in out["series"].items()}, indent=1))
+
+
 COMMANDS = {"optsmoke-nv1": cmd_optsmoke, "behaviour-nv1": cmd_behaviour, "freeze-rules-nv1": cmd_freeze_rules,
             "wfo-nv1": cmd_wfo, "freeze-nv1": cmd_freeze, "robustness-nv1": cmd_robustness,
-            "deliver-nv1": cmd_deliver}
+            "deliver-nv1": cmd_deliver, "diagnose-nv1": cmd_diagnose}
 
 
 def main() -> None:
