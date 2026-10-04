@@ -377,7 +377,7 @@ def test_every_trail_side_effect_is_behind_the_input(src):
     guarded = write[write.index("if(EnableTrailingStop)"):]
     assert '"rl_trail_"' in guarded and '"rl_sl_moves_"' in guarded
     # nothing else registers, saves or restores trail state
-    outside = re.sub(r"\b(?:TrailRegister|TrailRestore|TrailSave|TrailLoad|TrailSend|TrailNotSent|TrailClose|TrailForget|"
+    outside = re.sub(r"\b(?:TrailRegister|TrailRestore|TrailStore|TrailFlush|TrailLoad|TrailSend|TrailNotSent|TrailClose|TrailForget|"
                      r"ManageTrails)\s*\([^;{]*\)\s*\{", "", code)
     for name in ("TrailRegister", "TrailRestore"):
         assert len(re.findall(r"\b" + name + r"\s*\(", outside)) == 1, name

@@ -276,20 +276,20 @@ def check_retry_policy(moves: pd.DataFrame, sid_of: dict) -> list:
     if moves is None or not len(moves):
         return viol
     rej, streak, until, slot = {}, 0, None, None
+
+    def add(pid, detail):
+        viol.append({"setup_id": sid_of.get(pid), "rule": "trail_r23", "detail": f"position {pid}: {detail}"})
     for m in moves.reset_index(drop=True).sort_values("tick_msc", kind="mergesort").to_dict("records"):
         pid, ms, outcome = int(m["position_id"]), int(m["tick_msc"]), str(m["outcome"])
-
-        def add(detail):
-            viol.append({"setup_id": sid_of.get(pid), "rule": "trail_r23", "detail": f"position {pid}: {detail}"})
         if pid in rej and ms - rej[pid] < REJECT_WAIT_MS:
-            add(f"request at {ms}, {ms - rej[pid]} ms after its rejection")
+            add(pid, f"request at {ms}, {ms - rej[pid]} ms after its rejection")
         if until is not None and ms < until:
-            add(f"request at {ms} during the EA backoff (until {until})")
+            add(pid, f"request at {ms} during the EA backoff (until {until})")
         if outcome.startswith("not_sent:"):
             continue
         if pid in rej or streak > 0:
             if slot == ms:
-                add(f"second retry on tick {ms}")
+                add(pid, f"second retry on tick {ms}")
             slot = ms
         if outcome == "accepted":
             rej.pop(pid, None)
@@ -328,9 +328,10 @@ def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame,
         if pid not in filled:
             viol.append({"setup_id": None, "rule": "trail_r23",
                          "detail": f"rl_trail row for position {pid} has no filled rl_setups row"})
-    sid_of = {int(t["position_id"]): _int(t.get("setup_id")) for t in trail.to_dict("records")}
+    recs = trail.to_dict("records")
+    sid_of = {int(t["position_id"]): _int(t.get("setup_id")) for t in recs}
     viol.extend(check_retry_policy(mv, sid_of))
-    for t in trail.to_dict("records"):
+    for t in recs:
         pid, sid = int(t["position_id"]), _int(t.get("setup_id"))
         bad = []
         add = bad.append
@@ -341,7 +342,8 @@ def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame,
         if r is None:
             continue                                   # reported by the completeness check above
         final_state, roundtrip = _str(t.get("state_final")), _str(t.get("state_roundtrip"))
-        own_n = int((mv["position_id"].astype(int) == pid).sum()) if len(mv) else 0
+        own = mv[mv["position_id"].astype(int) == pid].sort_values("tick_msc", kind="mergesort")
+        own_n = len(own)
         if final_state == "not_trailed" or roundtrip.startswith("not_trailed:"):
             if not (final_state == "not_trailed" and roundtrip.startswith("not_trailed:")):
                 add(f"state_final {final_state} with state_roundtrip {roundtrip}")
@@ -363,7 +365,6 @@ def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame,
         if abs(r0 - abs(E - sl0)) > tol:
             add(f"R0 {r0} != |E - SL0| {abs(E - sl0):.5f}")
         cur_sl = sl0                                   # the replayed stop on the position
-        own = mv[mv["position_id"].astype(int) == pid].sort_values("tick_msc", kind="mergesort")
         prev_best, accepted = None, 0
         closed_min, held = None, None                  # market-closed minute; (minute, value) held back (not_sent)
         act_ms = _int(t.get("activated_msc"))

@@ -26,7 +26,7 @@ import pandas as pd  # noqa: E402
 
 import cli  # noqa: E402
 from mt5r import (charts_trail, compile as compmod, conformance_m1 as cm, curate, deliver, env, evaluate,  # noqa: E402
-                  explog, pipeline, reports, runner, setfile, textio, trades)
+                  explog, pipeline, reports, runner, setfile, trades)
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 STUDY = "trailing_v2"
@@ -72,10 +72,6 @@ def inputs(variant: int, trailing: bool) -> dict:
     return {**BASE_INPUTS, "StructureVariant": variant, "EnableTrailingStop": trailing}
 
 
-def run_dir(name: str, attempt: int = 1) -> pathlib.Path:
-    return RESULTS / run_id(name, attempt)
-
-
 # ------------------------------------------------------------------ provenance (KTD8)
 def source_sha() -> dict:
     """{file name: sha256 with CRLF read as LF} of both EA sources: the research file is only a define plus an
@@ -92,7 +88,7 @@ def installed_ex5_sha(cfg, ex5: str) -> str:
     path = cfg.mt5_dir / "MQL5" / "Experts" / ex5
     if not path.exists():
         raise SystemExit(f"{path} is missing; run `install` first")
-    return textio.sha256(path)
+    return cli.sha(path)
 
 
 def set_lines() -> list:
@@ -328,11 +324,11 @@ def cmd_runs(args) -> None:
     att = RESULTS / "attempts"
     n = attempts_started() + 1
     plan, refusals = plan_attempt(n, cur)
-    base = {"attempt": n, "source_sha256": source_sha(), "window": list(WINDOW)}
+    header = {"attempt": n, "source_sha256": next(iter(cur.values()))["source_sha256"], "window": list(WINDOW)}
     _create(att / f"a{n}.started.json",
-            {**base, "planned": plan, "started": pd.Timestamp.now().isoformat(timespec="seconds")})
+            {**header, "planned": plan, "started": pd.Timestamp.now().isoformat(timespec="seconds")})
     if refusals:
-        _create(att / f"a{n}.json", {**base, "status": "refused", "refusals": refusals, "run_ids": {}})
+        _create(att / f"a{n}.json", {**header, "status": "refused", "refusals": refusals, "run_ids": {}})
         raise SystemExit("; ".join(refusals) + " (KTD8)")
     used, reused = {}, []
     try:
@@ -359,10 +355,10 @@ def cmd_runs(args) -> None:
             used[name] = rid
             print(f"{name} ({rid}): net {rec['net_profit']} trades {rec['trades']}", flush=True)
     except BaseException as e:
-        _create(att / f"a{n}.json", {**base, "status": "failed", "error": f"{type(e).__name__}: {e}",
+        _create(att / f"a{n}.json", {**header, "status": "failed", "error": f"{type(e).__name__}: {e}",
                                      "run_ids": used, "reused": reused})
         raise
-    _create(att / f"a{n}.json", {**base, "status": "ok", "run_ids": used, "reused": reused})
+    _create(att / f"a{n}.json", {**header, "status": "ok", "run_ids": used, "reused": reused})
 
 
 # ------------------------------------------------------------------ analysis
@@ -438,7 +434,8 @@ def cmd_analyze(args) -> None:
                         "input_mismatches": recs[twin]["input_mismatches"]}
     evaluate.save(builds, RESULTS / "builds_match.json")
     match = {name: {"run": sel[name], "baseline": BASELINE[name].name,
-                    "identical": not (RESULTS / f"{sel[name]}_mismatch.json").exists(),
+                    "identical": not compare_deals(pd.read_csv(RESULTS / sel[name] / f"rl_deals_{sel[name]}.csv"),
+                                                   pd.read_csv(BASELINE[name] / f"rl_deals_{BASELINE[name].name}.csv")),
                     "trail_files_written": sorted(p.name for p in (RESULTS / sel[name]).glob("rl_trail*")) +
                     sorted(p.name for p in (RESULTS / sel[name]).glob("rl_sl_moves*"))} for name in BASELINE}
     evaluate.save(match, RESULTS / "baseline_match.json")
