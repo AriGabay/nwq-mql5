@@ -1,0 +1,23 @@
+{
+ "run_id": "stability_1",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "02a44b32bae4246d6e68f21f284851f985bd628dc7e5f51ace8ee4ada5fed666",
+ "ini_sha256": "34ab90ee943ecb37c5fbc0c839e2a05b325b182d230dea49d6e542bbe0980177",
+ "meta": {
+  "kind": "research",
+  "role": "stability",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "StructureVariant": 0,
+   "SwingStrengthM1": 2,
+   "ResearchRunTag": "stability_1"
+  }
+ },
+ "started": "2026-10-04T15:35:49",
+ "status": "ok",
+ "seconds": 42.1,
+ "report": "stability_1.htm",
+ "exit_code": 0
+}

@@ -1,0 +1,51 @@
+{
+ "method": "re-pricing of a fixed trade list; closed-trade balance drawdown on the corrected timeline",
+ "per_run": {
+  "holdout_variant_a": {
+   "deposit": 10000.0,
+   "positions": 268,
+   "affected": 5,
+   "outcome_flips": 0,
+   "net_primary": -1705.84,
+   "net_sensitivity": -1707.68,
+   "net_delta": -1.84,
+   "max_dd_closed_pct_primary": 30.295,
+   "max_dd_closed_pct_sensitivity": 31.054
+  },
+  "holdout_variant_b": {
+   "deposit": 10000.0,
+   "positions": 86,
+   "affected": 3,
+   "outcome_flips": 0,
+   "net_primary": 531.94,
+   "net_sensitivity": 621.5,
+   "net_delta": 89.56,
+   "max_dd_closed_pct_primary": 12.182,
+   "max_dd_closed_pct_sensitivity": 12.218
+  }
+ },
+ "per_group": {
+  "holdout_variant_a": {
+   "deposit": 10000.0,
+   "positions": 268,
+   "affected": 5,
+   "outcome_flips": 0,
+   "net_primary": -1705.84,
+   "net_sensitivity": -1707.68,
+   "net_delta": -1.84,
+   "max_dd_closed_pct_primary": 30.295,
+   "max_dd_closed_pct_sensitivity": 31.054
+  },
+  "holdout_variant_b": {
+   "deposit": 10000.0,
+   "positions": 86,
+   "affected": 3,
+   "outcome_flips": 0,
+   "net_primary": 531.94,
+   "net_sensitivity": 621.5,
+   "net_delta": 89.56,
+   "max_dd_closed_pct_primary": 12.182,
+   "max_dd_closed_pct_sensitivity": 12.218
+  }
+ }
+}
