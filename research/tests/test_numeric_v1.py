@@ -120,9 +120,10 @@ def test_window_guard_refuses_august_overlap_in_dot_format():
 
 def test_run_ids_and_probe_tags_carry_the_prefix():
     assert nv.run_id("f3_grid_lo") == "nv1_f3_grid_lo"
+    assert nv.run_id("session_probe_wfo") == "nv1_session_probe_wfo"
     assert nv.run_id("nv1_session_probe_wfo") == "nv1_session_probe_wfo"
-    with pytest.raises(SystemExit):
-        nv.check_run_id("session_probe_wfo")
+    with pytest.raises(ValueError):
+        nv.run_id("../wfo")
 
 
 def test_explog_writes_to_the_given_or_current_module_log(tmp_path, monkeypatch):

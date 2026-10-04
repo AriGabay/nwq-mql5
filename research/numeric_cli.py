@@ -29,7 +29,8 @@ FINAL_DIR = nv.RESULTS / "final_selection"
 ROBUST = nv.RESULTS / "robustness"
 SMOKE = nv.RESULTS / "smoke"
 FOLDS_JSON = WFO / "folds.json"
-SERIES = ("procedure", "baseline_a", "baseline_b")
+BASELINE_SERIES = tuple(nv.BASELINES)
+SERIES = ("procedure",) + BASELINE_SERIES
 SETS = {"original": "ob_m1_structure_nv1_original.set", "baseline_a": "ob_m1_structure_nv1_baseline_a.set",
         "baseline_b": "ob_m1_structure_nv1_baseline_b.set", "candidate": "ob_m1_structure_nv1_candidate.set",
         "fallback": "ob_m1_structure_nv1_fallback.set"}
@@ -45,15 +46,18 @@ def _dest(path: pathlib.Path) -> str:
     return pathlib.Path(path).resolve().relative_to(REPO / "results").as_posix()
 
 
-def save(obj, path: pathlib.Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    evaluate.save(obj, path)
+save = evaluate.save      # writes JSON and creates the parent directory
 
 
 # ------------------------------------------------------------------ guards (U2 step 3)
+def use_study_log() -> None:
+    """pipeline, runner helpers and the session probe append to explog.LOG: point it at this study's log."""
+    explog.LOG = nv.LOG
+
+
 def start(pre_freeze: bool) -> tuple:
     """Common entry: own experiment log, config, installed-EA check; then the stage guard. Returns (cfg, P)."""
-    explog.LOG = nv.LOG
+    use_study_log()
     if pre_freeze:
         if nv.PREREG_PATH.exists():
             raise SystemExit(f"{nv.PREREG_REL} exists: pre-freeze commands run only before the freeze (U2)")
@@ -87,7 +91,7 @@ def prereg_committed() -> dict:
 def oos_run(cfg, name: str, start: str, end: str, deposit: float, params: dict, role: str, purpose: str,
             dest: pathlib.Path) -> dict:
     """One research-build single run with its record (inputs loaded, conformance, drawdowns), reused on resume."""
-    rid = nv.check_run_id(nv.run_id(name))
+    rid = nv.run_id(name)
     nv.check_window(start, end)
     rec_path = dest / rid / "record.json"
     if rec_path.exists():
@@ -111,12 +115,11 @@ def run_window(cfg, tag: str, start: str, end: str, out_dir: pathlib.Path, purpo
             return rec
     tables, runs = [], []
     for r in nv.split_runs():
-        rid = nv.check_run_id(nv.run_id(f"{tag}_grid_{r['part']}"))
+        rid = nv.run_id(f"{tag}_grid_{r['part']}")
         vals = {**nv.FIXED_INPUTS, **r["fixed"]}
         res, _ = pipeline.run_optimization(cfg, rid, "research", cli.CHART_PERIOD, start, end, vals, r["ranges"],
                                            role="train", purpose=f"{purpose} ({r['part']})")
         v = gridrun.verify_optimization(runner.RUNS / rid, rid, r["expected"], nv.GRID, r["fixed"])
-        v.pop("tuples")
         v["status_runner"] = res.status
         runs.append(v)
         if v["status"] != "ok":
@@ -152,11 +155,11 @@ def cmd_optsmoke(args) -> None:
     print(json.dumps({k: out[k] for k in ("expected", "completed", "failed", "cached", "seconds")}, indent=1))
 
 
-def behaviour_summary(run_id: str, dest: str, params: dict) -> dict:
-    """KTD11 evidence of one behaviour run: conformance coverage of the pivot and stop rules, the pivot count, and
-    the logged long stop-to-anchor distances (points), which must all equal the run's buffer."""
-    conf = cli.conformance_report(run_id, dest)
-    run = cli.cm_read(run_id)
+def behaviour_summary(run_id: str, dest: pathlib.Path, params: dict, run: dict) -> dict:
+    """KTD11 evidence of one behaviour run: conformance coverage of the pivot and stop rules (from the replay
+    oos_record already saved), the pivot count, and the logged long stop-to-anchor distances (points), which must
+    all equal the run's buffer."""
+    conf = json.loads((dest / run_id / "conformance.json").read_text())
     rules = conf["coverage"]["rules"]
     st = run["setups"]
     filled = st[pd.to_numeric(st["fill_price"], errors="coerce").notna()]
@@ -178,9 +181,10 @@ def cmd_behaviour(args) -> None:
         name = "behaviour_" + "_".join(str(v) for v in nv.tuple_of(p))
         rec = oos_run(cfg, name, *nv.SMOKE_WINDOW, nv.DEPOSIT, p, "behaviour", "U5 behaviour check (KTD11)", dest)
         rid = rec["run_id"]
-        s = behaviour_summary(rid, _dest(dest), p)
+        run = cli.cm_read(rid)
+        s = behaviour_summary(rid, dest, p, run)
         s["input_mismatches"] = rec["input_mismatches"]
-        piv = cli.cm_read(rid)["pivots"]
+        piv = run["pivots"]
         pivot_sets[nv.tuple_of(p)] = set(map(tuple, piv[["type", "peak_time"]].astype(str).to_numpy()))
         rows.append(s)
     n_sets = {n: pivot_sets[(0, n, 20)] for n in (2, 3, 4)}
@@ -204,7 +208,7 @@ def cmd_behaviour(args) -> None:
 def cmd_freeze_rules(args) -> None:
     if nv.PREREG_PATH.exists():
         raise SystemExit(f"{nv.PREREG_REL} exists; the protocol is frozen once (R16)")
-    explog.LOG = nv.LOG
+    use_study_log()
     old = json.loads((REPO / nv.OLD_PREREG_REL).read_text(encoding="utf-8"))
     files = [SMOKE / "optsmoke.json", SMOKE / "behaviour.json"]
     missing = [_rel(f) for f in files if not f.exists()]
@@ -226,7 +230,7 @@ def cmd_wfo(args) -> None:
     for fold in P["folds"][len(done):]:
         k = fold["fold"]
         win = run_window(cfg, f"f{k}", *fold["train"], WFO / f"f{k}_selection", f"fold {k} train grid")
-        params = {"procedure": win["params"], **{b: nv.BASELINES[b] for b in ("baseline_a", "baseline_b")}}
+        params = {"procedure": win["params"], **nv.BASELINES}
         rec = {"fold": k, "train": fold["train"], "test": fold["test"], "window": win, "deposits": dict(deposits),
                "oos": {}}
         for w in SERIES:
@@ -268,15 +272,12 @@ def window_table() -> pd.DataFrame:
 
 # ------------------------------------------------------------------ U8: freeze the .set files
 def tested_values(params: dict) -> dict:
-    vals = pipeline.base_values("delivered")
-    vals.update(nv.FIXED_INPUTS)
-    vals.update({k: int(params[k]) for k in nv.AXES})
-    return vals
+    return cli.tested_values({**nv.FIXED_INPUTS, **{k: int(params[k]) for k in nv.AXES}})
 
 
 def cmd_freeze(args) -> None:
     prereg_committed()
-    explog.LOG = nv.LOG
+    use_study_log()
     final = json.loads((FINAL_DIR / "window.json").read_text())
     kind = "candidate" if final["selection_status"] == "selected" else "fallback"
     names = [SETS["original"], SETS["baseline_a"], SETS["baseline_b"], SETS[kind]]
@@ -287,7 +288,7 @@ def cmd_freeze(args) -> None:
     spec = pipeline.specs("delivered")
     setfile.write_set(nv.DELIV / SETS["original"], setfile.render_lines(spec),
                       header="M5 OB + M1 structure, original parameters: code defaults of ob_m1_structure.mq5")
-    for b in ("baseline_a", "baseline_b"):
+    for b in BASELINE_SERIES:
         setfile.write_set(nv.DELIV / SETS[b], setfile.render_lines(spec, tested_values(nv.BASELINES[b])),
                           header=f"numeric_v1 fixed {b} {nv.tuple_of(nv.BASELINES[b])} as tested")
     t = nv.tuple_of(final["params"])
@@ -303,18 +304,13 @@ def cmd_freeze(args) -> None:
 
 
 # ------------------------------------------------------------------ U9: robustness and acceptance
-def stitch(run_ids: list, root: pathlib.Path) -> dict:
-    return evaluate.stitch([evaluate.load_run(r, root) for r in run_ids])
-
-
 def series_view(s: dict, start: str, end: str, tester_dd: list) -> dict:
-    tab = s["table"]
-    d = evaluate.drawdowns(s)
-    return {"net": round(float(s["net_profit"]), 2), "fills": int(len(s["trades"])),
-            "fills_per_month": evaluate.fills_per_month(len(s["trades"]), start, end),
-            "win_rate": round(float((tab["net"] > 0).mean()), 4) if len(tab) else 0.0,
-            "dd_tester_equity_max_pct": max(x[0] for x in tester_dd), "dd_tester_balance_max_pct": max(x[1] for x in tester_dd),
-            "dd_daily_records_pct": d["equity_dd_pct"], "dd_closed_trades_pct": d["balance_dd_pct"]}
+    """cli._series_view plus the tester's maximum drawdowns, with the two rebuilt drawdowns named by source."""
+    v = cli._series_view(s, start, end)
+    return {"net": v["net"], "fills": v["fills"], "fills_per_month": v["fills_per_month"], "win_rate": v["win_rate"],
+            "dd_tester_equity_max_pct": max(x[0] for x in tester_dd),
+            "dd_tester_balance_max_pct": max(x[1] for x in tester_dd),
+            "dd_daily_records_pct": v["equity_dd_pct"], "dd_closed_trades_pct": v["balance_dd_pct"]}
 
 
 def cmd_robustness(args) -> None:
@@ -339,7 +335,12 @@ def cmd_robustness(args) -> None:
     share = float(np.mean([r["net"] > 0 for r in rows[1:]])) if len(rows) > 1 else float("nan")
 
     ids = {w: [f["oos"][w]["run_id"] for f in folds] for w in SERIES}
-    series = {w: stitch(ids[w], WFO) for w in SERIES}
+    loaded = {r: evaluate.load_run(r, WFO) for rs in ids.values() for r in rs}
+
+    def stitch(run_ids):
+        return evaluate.stitch([loaded[r] for r in run_ids])
+
+    series = {w: stitch(ids[w]) for w in SERIES}
     tdd = {w: [(f["oos"][w]["equity_dd_pct"], f["oos"][w]["balance_dd_pct"]) for f in folds] for w in SERIES}
 
     def fold_net(w, grp=None):
@@ -353,18 +354,18 @@ def cmd_robustness(args) -> None:
 
     grids = sorted(WFO.glob("f*_selection/scored_grid.csv")) + [FINAL_DIR / "scored_grid.csv"]
     tv = evaluate.trial_sharpe_variance(grids)
-    bases = {b: series[b] for b in ("baseline_a", "baseline_b")}
+    bases = {b: series[b] for b in BASELINE_SERIES}
     acc = {"procedure": evaluate.evaluate(series["procedure"], None, fold_net("procedure"), share, tv["var_sr"], P,
                                           bases=bases),
            "baseline_a": evaluate.evaluate(series["baseline_a"], None, fold_net("baseline_a"), None, tv["var_sr"], P),
            "baseline_b": evaluate.evaluate(series["baseline_b"], None, fold_net("baseline_b"), None, tv["var_sr"], P,
                                            bases={"baseline_a": series["baseline_a"]})}
     G, R = nv.GROUPS["G"], nv.GROUPS["R"]
-    group_r = {w: stitch(pick(w, R), WFO) for w in SERIES}
+    group_r = {w: stitch(pick(w, R)) for w in SERIES}
     acc_r = evaluate.evaluate(group_r["procedure"], None, fold_net("procedure", R), share, tv["var_sr"], P,
-                              window=span(R), bases={b: group_r[b] for b in ("baseline_a", "baseline_b")})
+                              window=span(R), bases={b: group_r[b] for b in BASELINE_SERIES})
     groups = {w: {"all": series_view(series[w], *win, tdd[w]),
-                  "G": series_view(stitch(pick(w, G), WFO), *span(G), [t for f, t in zip(folds, tdd[w]) if f["fold"] in G]),
+                  "G": series_view(stitch(pick(w, G)), *span(G), [t for f, t in zip(folds, tdd[w]) if f["fold"] in G]),
                   "R": series_view(group_r[w], *span(R), [t for f, t in zip(folds, tdd[w]) if f["fold"] in R])}
               for w in SERIES}
     S = P["stats"]
@@ -375,7 +376,7 @@ def cmd_robustness(args) -> None:
         mc = (montecarlo.shuffle_paths(ev["ret"].to_numpy(), n_paths=S["mc_paths"], seed=S["seed"],
                                        initial=series[w]["initial"]) if len(ev) else {})
         shuffle[w] = {k: v for k, v in mc.items() if np.ndim(v) == 0}
-    tag = nv.check_run_id(nv.run_id("session_probe_wfo"))
+    tag = nv.run_id("session_probe_wfo")
     sens = cli.session_sensitivity(tag, [r for w in SERIES for r in ids[w]], {w: ids[w] for w in SERIES}, win,
                                    out_root=ROBUST)
     fold_rows = [{"fold": f["fold"], "test": f["test"], "label": f["window"]["label"],
@@ -422,7 +423,7 @@ def cmd_deliver(args) -> None:
     for key, params in (("original", nv.DEFAULTS), ("baseline_a", nv.BASELINES["baseline_a"]),
                         ("baseline_b", nv.BASELINES["baseline_b"]), (kind, cand)):
         name = SETS[key]
-        rid = nv.check_run_id(nv.run_id("validate_" + key))
+        rid = nv.run_id("validate_" + key)
         text = pipeline._ini(ex5, cli.CHART_PERIOD, s, e, nv.DEPOSIT, rid,
                              cli.deliver.set_file_lines(nv.DELIV / name))
         res = runner.run(cfg, rid, text, ex5, meta={"role": "set_validation", "set": name})

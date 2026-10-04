@@ -24,11 +24,11 @@
 | ‏EA (גרסת מסירה) | `mql5/Experts/ob_m1_structure.mq5` (‏sha256 רשום ב־pre-registration: `6dbea8e7…`) |
 | ‏EA (גרסת מחקר עם לוגים) | `mql5/Experts/ob_m1_structure_research.mq5` |
 | תוכנית ודרישות R1–R35 | `docs/plans/2026-10-03-0013-feat-m5-ob-m1-structure-ea-plan.md` |
-| פרוטוקול קפוא | `research/preregistration.json` (‏commit `a947be2`) |
+| פרוטוקול קפוא | `research/preregistration.json` (‏A/B, ‏commit `a947be2`); `research/preregistration_numeric_v1.json` (‏numeric_v1, ‏commit `8da989a`) |
 | קבועי הרצה | `research/run_constants.json` |
-| צינור המחקר | `research/cli.py`, `research/mt5r/` (‏runner, pipeline, wfo, evaluate, conformance_m1, session_sensitivity) |
+| צינור המחקר | `research/cli.py`, `research/mt5r/` (‏runner, pipeline, wfo, evaluate, conformance_m1, session_sensitivity); ‏numeric_v1: `research/numeric_cli.py`, `research/mt5r/numeric_v1.py`, `research/mt5r/gridrun.py` |
 | בודק התאמה עצמאי | `research/mt5r/conformance_m1.py` |
-| בדיקות | `python -m pytest research/tests -q` (‏218 עוברות) |
+| בדיקות | `python -m pytest research/tests -q` (‏259 עוברות) |
 
 ## פרמטרים (המחקר הקודם; הגריד של numeric_v1 מופיע למעלה)
 

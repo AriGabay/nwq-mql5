@@ -161,17 +161,11 @@ def check_window(start: str, end: str) -> None:
 
 
 def run_id(name: str) -> str:
-    """KTD2: every run ID and probe tag of this study carries the prefix (the runner deletes runs/<id>)."""
-    rid = name if name.startswith(PREFIX) else PREFIX + name
-    if not rid.startswith(PREFIX) or "/" in rid or "\\" in rid:
+    """KTD2: every run ID and probe tag of this study carries the prefix (the runner deletes runs/<id>), and is a
+    single path component."""
+    if "/" in name or "\\" in name:
         raise ValueError(f"bad run id {name!r}")
-    return rid
-
-
-def check_run_id(rid: str) -> str:
-    if not rid.startswith(PREFIX):
-        raise SystemExit(f"run id {rid!r} lacks the {PREFIX} prefix of {STUDY} (KTD2)")
-    return rid
+    return name if name.startswith(PREFIX) else PREFIX + name
 
 
 # ------------------------------------------------------------------ pre-registration

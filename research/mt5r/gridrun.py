@@ -62,7 +62,6 @@ def verify_optimization(run_dir: pathlib.Path, run_id: str, expected: int, grid:
     for name, n in (("frames", completed), ("XML", len(xml)), ("log total", total)):
         if n != expected:
             problems.append(f"{name} passes = {n}, expected {expected}")
-    tuples = []
     if completed:
         if "pass" in xml.columns:
             xml_by_pass = {int(r["pass"]): r for r in xml.to_dict("records")}
@@ -83,13 +82,11 @@ def verify_optimization(run_dir: pathlib.Path, run_id: str, expected: int, grid:
                 for a in axes:
                     if a in x and p[a] is not None and int(float(x[a])) != p[a]:
                         problems.append(f"pass {row['pass']}: XML {a}={x[a]} but frames {a}={p[a]}")
-            tuples.append(tuple(p[a] for a in axes))
     return {"run_id": run_id, "status": "ok" if not problems else "failed", "expected": expected,
             "completed": completed, "failed": max(expected - completed, 0),
             "cached": max(expected - new_records, 0) if total is not None else expected,
             "log_total_passes": total, "new_cache_records": new_records, "xml_rows": int(len(xml)),
-            "seconds": man.get("seconds"), "exit_code": man.get("exit_code"), "problems": problems[:50],
-            "tuples": tuples}
+            "seconds": man.get("seconds"), "exit_code": man.get("exit_code"), "problems": problems[:50]}
 
 
 def run_table(run_dir: pathlib.Path, run_id: str, grid: dict, fixed: dict) -> pd.DataFrame:

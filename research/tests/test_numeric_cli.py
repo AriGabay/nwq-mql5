@@ -147,3 +147,15 @@ def test_report_verdict_states_no_improvement_unless_every_criterion_passes(pass
     text = nc.build_report(_acc(passed), [], [], {})
     assert ("לא נמצא שיפור במסגרת הגריד שנבדק" in text) == (not passed)
     assert "recommended" not in text.lower() or "אין recommended.set" in text
+
+
+def test_post_freeze_commands_refuse_a_prereg_not_pushed_to_origin(monkeypatch):
+    monkeypatch.setattr(nc.cli, "committed", lambda path: True)
+
+    def fake_run(cmd, *a, **k):
+        failing = cmd[:3] == ["git", "diff", "--quiet"]
+        return type("R", (), {"returncode": 1 if failing else 0, "stdout": "", "stderr": ""})()
+
+    monkeypatch.setattr(nc.subprocess, "run", fake_run)
+    with pytest.raises(SystemExit, match="not pushed"):
+        nc.prereg_committed()

@@ -188,3 +188,12 @@ def test_dsr_reports_the_sensitivity_trial_count_when_registered():
     d = evaluate.evaluate(stitched(80, profit=10.0), None, rows, 1.0, 0.001, p)["criteria"]["dsr"]["value"]
     assert d["trials"] == 126 and d["sensitivity"]["trials"] == 18
     assert d["sensitivity"]["psr_value"] >= d["psr_value"]
+
+
+def test_named_baselines_fail_when_net_only_equals_a_baseline():
+    """numeric_v1's real outcome: the fallback procedure equals baseline A, which is not an improvement."""
+    rows = [{"fold": i + 1, "net": 1} for i in range(4)]
+    s = stitched(50, profit=10.0)
+    bases = {"baseline_a": stitched(50, profit=10.0), "baseline_b": stitched(10, profit=-5.0)}
+    out = evaluate.evaluate(s, None, rows, 1.0, 0.001, prereg(), bases=bases)["criteria"]["oos_net"]
+    assert out["pass"] is False and out["value"]["margins"]["baseline_a"] == 0.0
