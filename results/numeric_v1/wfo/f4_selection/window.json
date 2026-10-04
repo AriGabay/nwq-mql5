@@ -1,0 +1,59 @@
+{
+ "tag": "f4",
+ "train": [
+  "2026.03.01",
+  "2026.05.31"
+ ],
+ "status": "verified",
+ "runs": [
+  {
+   "run_id": "nv1_f4_grid_lo",
+   "status": "ok",
+   "expected": 12,
+   "completed": 12,
+   "failed": 0,
+   "cached": 0,
+   "log_total_passes": 12,
+   "new_cache_records": 12,
+   "xml_rows": 12,
+   "seconds": 38.1,
+   "exit_code": 0,
+   "problems": [],
+   "status_runner": "ok"
+  },
+  {
+   "run_id": "nv1_f4_grid_hi",
+   "status": "ok",
+   "expected": 6,
+   "completed": 6,
+   "failed": 0,
+   "cached": 0,
+   "log_total_passes": 6,
+   "new_cache_records": 6,
+   "xml_rows": 6,
+   "seconds": 26.4,
+   "exit_code": 0,
+   "problems": [],
+   "status_runner": "ok"
+  }
+ ],
+ "expected": 18,
+ "completed": 18,
+ "failed": 0,
+ "cached": 0,
+ "seconds": 64.5,
+ "trade_floor": 45,
+ "selection_status": "no_eligible_pass",
+ "label": "fallback",
+ "params": {
+  "StructureVariant": 0,
+  "SwingStrengthM1": 3,
+  "StopBufferPoints": 20
+ },
+ "reason": {
+  "eligible_passes": 0,
+  "below_trade_floor": 0,
+  "above_dd_limit": 18,
+  "note": "no pass met trades >= 45 and tester equity DD <= 10.0%; the defaults are carried forward as a fallback, not as a selected candidate"
+ }
+}

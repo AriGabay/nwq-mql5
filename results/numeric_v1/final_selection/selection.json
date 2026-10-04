@@ -1,0 +1,22 @@
+{
+ "tag": "final",
+ "train": [
+  "2026.05.01",
+  "2026.07.31"
+ ],
+ "trade_floor": 45,
+ "params": {
+  "StructureVariant": 0,
+  "SwingStrengthM1": 3,
+  "StopBufferPoints": 20
+ },
+ "reason": {
+  "eligible_passes": 0,
+  "below_trade_floor": 0,
+  "above_dd_limit": 18,
+  "note": "no pass met trades >= 45 and tester equity DD <= 10.0%; the defaults are carried forward as a fallback, not as a selected candidate"
+ },
+ "label": "fallback",
+ "status": "no_eligible_pass",
+ "eligible_passes": 0
+}

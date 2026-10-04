@@ -1,0 +1,36 @@
+{
+ "run_id": "nv1_f2_grid_hi",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "02a44b32bae4246d6e68f21f284851f985bd628dc7e5f51ace8ee4ada5fed666",
+ "ini_sha256": "11f8b537b8b7b8dcd05764f5a9bb8b3678be8a4c755a3e2ef1f87023b4a17bc9",
+ "meta": {
+  "kind": "research",
+  "role": "train",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "ImpulseWindowBars": 2,
+   "WarmupDays": 30,
+   "StopBufferPoints": 40,
+   "ResearchRunTag": "nv1_f2_grid_hi"
+  },
+  "ranges": {
+   "StructureVariant": [
+    0,
+    1,
+    1
+   ],
+   "SwingStrengthM1": [
+    2,
+    1,
+    4
+   ]
+  }
+ },
+ "started": "2026-10-04T19:22:05",
+ "status": "ok",
+ "seconds": 22.3,
+ "report": "nv1_f2_grid_hi.xml",
+ "exit_code": 0
+}

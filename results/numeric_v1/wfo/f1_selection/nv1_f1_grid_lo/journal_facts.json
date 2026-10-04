@@ -1,0 +1,14 @@
+{
+ "discarded_days": 0,
+ "discarded_minutes": 0,
+ "total_minute_bars": null,
+ "real_ticks_begin": null,
+ "warmup_bars": null,
+ "stops_level_pts": null,
+ "tick": null,
+ "final_balance": null,
+ "every_tick_generation_used": false,
+ "ticks": null,
+ "bars_generated": null,
+ "funnel": {}
+}

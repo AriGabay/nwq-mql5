@@ -1,0 +1,7 @@
+window,train,expected,completed,failed,cached,seconds,eligible,status,label,params,reason
+fold 1,2025.12.01-2026.02.28,18,18,0,0,47.0,0,no_eligible_pass,fallback,0/3/20,"no pass met trades >= 45 and tester equity DD <= 10.0%; the defaults are carried forward as a fallback, not as a selected candidate"
+fold 2,2026.01.01-2026.03.31,18,18,0,0,52.7,0,no_eligible_pass,fallback,0/3/20,"no pass met trades >= 45 and tester equity DD <= 10.0%; the defaults are carried forward as a fallback, not as a selected candidate"
+fold 3,2026.02.01-2026.04.30,18,18,0,0,56.0,0,no_eligible_pass,fallback,0/3/20,"no pass met trades >= 45 and tester equity DD <= 10.0%; the defaults are carried forward as a fallback, not as a selected candidate"
+fold 4,2026.03.01-2026.05.31,18,18,0,0,64.5,0,no_eligible_pass,fallback,0/3/20,"no pass met trades >= 45 and tester equity DD <= 10.0%; the defaults are carried forward as a fallback, not as a selected candidate"
+fold 5,2026.04.01-2026.06.30,18,18,0,0,66.3,0,no_eligible_pass,fallback,0/3/20,"no pass met trades >= 45 and tester equity DD <= 10.0%; the defaults are carried forward as a fallback, not as a selected candidate"
+final,2026.05.01-2026.07.31,18,18,0,0,74.1,0,no_eligible_pass,fallback,0/3/20,"no pass met trades >= 45 and tester equity DD <= 10.0%; the defaults are carried forward as a fallback, not as a selected candidate"
