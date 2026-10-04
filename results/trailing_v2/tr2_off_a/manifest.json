@@ -1,0 +1,27 @@
+{
+ "run_id": "tr2_off_a",
+ "ex5": "ob_m1_structure_research.ex5",
+ "ex5_sha256": "00568d9bd5e3e684d337e6b52017da6110d00c29701cbf77a9d4661b36e89754",
+ "ini_sha256": "b9431abd9084aa55fd033bb52af0f014b9585bf1a51b8511f623d0c71073df99",
+ "meta": {
+  "kind": "research",
+  "role": "trail_dev",
+  "values": {
+   "RiskPercent": 1.0,
+   "MaxExposures": 3,
+   "RiskRR": 2.0,
+   "ImpulseWindowBars": 2,
+   "SwingStrengthM1": 3,
+   "StopBufferPoints": 20,
+   "WarmupDays": 30,
+   "StructureVariant": 0,
+   "EnableTrailingStop": false,
+   "ResearchRunTag": "tr2_off_a"
+  }
+ },
+ "started": "2026-10-05T01:48:49",
+ "status": "ok",
+ "seconds": 12.7,
+ "report": "tr2_off_a.htm",
+ "exit_code": 0
+}

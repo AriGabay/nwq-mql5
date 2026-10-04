@@ -1,0 +1,15 @@
+{
+ "run_id": "tr2_on_a_delivered",
+ "ex5": "ob_m1_structure.ex5",
+ "ex5_sha256": "366fb68125bde8ec797d4abe959ae44a419f361e0037523b2628fcfb344550af",
+ "ini_sha256": "27468af6187c730b98fc67436e7686bb452958eb9f0c56ae03ea05f971dc430a",
+ "meta": {
+  "role": "trail_twin",
+  "of": "tr2_on_a"
+ },
+ "started": "2026-10-05T01:49:49",
+ "status": "ok",
+ "seconds": 13.0,
+ "report": "tr2_on_a_delivered.htm",
+ "exit_code": 0
+}

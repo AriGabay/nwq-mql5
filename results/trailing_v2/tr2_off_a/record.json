@@ -1,0 +1,35 @@
+{
+ "run_id": "tr2_off_a",
+ "kind": "research",
+ "status": "ok",
+ "source_sha256": {
+  "ob_m1_structure.mq5": "f30959f0f6805fc5341a96c5e1b67d8e6a6920af3e83bea100de166c215bfd86",
+  "ob_m1_structure_research.mq5": "b587ea4e93a77568f3d779e3ba195ba98afd234ca546c1fb988492b11bcd94ed"
+ },
+ "ex5_sha256": "00568d9bd5e3e684d337e6b52017da6110d00c29701cbf77a9d4661b36e89754",
+ "inputs": {
+  "RiskPercent": 1.0,
+  "MaxExposures": 3,
+  "RiskRR": 2.0,
+  "ImpulseWindowBars": 2,
+  "SwingStrengthM1": 3,
+  "StopBufferPoints": 20,
+  "WarmupDays": 30,
+  "StructureVariant": 0,
+  "EnableTrailingStop": false
+ },
+ "window": [
+  "2026.03.01",
+  "2026.03.31"
+ ],
+ "input_mismatches": [],
+ "net_profit": 1805.7,
+ "trades": 180,
+ "profit_factor": 1.19,
+ "recovery_factor": 1.21,
+ "equity_dd_money": 1492.45,
+ "equity_dd_pct": 14.46,
+ "balance_dd_pct": 14.33,
+ "history_quality": "100% real ticks",
+ "build": "6231"
+}

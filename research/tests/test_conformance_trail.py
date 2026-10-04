@@ -289,3 +289,36 @@ def test_a_rejected_request_must_also_improve_the_stop():
             (ms(2, 30), 2007.50, 2007.70, 2007.50, 2002.50, 2000.00, 2002.50, 10009, "accepted")]
     viol, _, _ = run(mv=moves(rows), tr=trail(accepted=2, rejected=1))
     assert "does not improve" in details(viol)
+
+
+# ------------------------------------------------------------------ plan 0128 evidence: results/trailing_v2/tr2_on_b
+V2_ON_B = pathlib.Path(__file__).resolve().parents[2] / "results" / "trailing_v2" / "tr2_on_b"
+
+
+def _v2_full(trail_table):
+    import cli
+    run = cm.read_run(V2_ON_B, "tr2_on_b")
+    params = {"ImpulseWindowBars": 2, "SwingStrengthM1": 3, "StopBufferPoints": 20, "RiskRR": 2.0, "RiskPercent": 1.0,
+              "MaxExposures": 3, "WarmupDays": 30, "StructureVariant": 1,
+              "point": cli.RUN["symbol_spec"]["tick_size"], "contract_size": cli.RUN["symbol_spec"]["contract_size"]}
+    t = run["trail"] if trail_table is None else trail_table(run["trail"])
+    return run, cm.full(run["setups"], run["events"], run["pivots"], run["bars_m1"], run["bars_m5"], params,
+                        run.get("deals"), t, run.get("sl_moves"), trailing=True)
+
+
+def test_the_stored_trailed_run_passes_with_one_row_per_filled_position():
+    run, res = _v2_full(None)
+    filled = int(run["setups"]["fill_price"].notna().sum())
+    assert res["violations"] == [] and res["coverage"]["rules"]["trail_r23"]["checked"] == filled == 56
+
+
+def test_deleting_one_trail_row_of_the_stored_run_fails():                                    # Covers R14
+    run, res = _v2_full(lambda t: t.iloc[1:])
+    pid = int(run["trail"]["position_id"].iloc[0])
+    assert [v["detail"] for v in res["violations"]] == [f"position {pid} is filled but has no rl_trail row"]
+
+
+def test_duplicating_one_trail_row_of_the_stored_run_fails():                                 # Covers R14
+    run, res = _v2_full(lambda t: pd.concat([t, t.iloc[[3]]], ignore_index=True))
+    pid = int(run["trail"]["position_id"].iloc[3])
+    assert any(v["detail"] == f"2 rl_trail rows for position {pid}" for v in res["violations"])

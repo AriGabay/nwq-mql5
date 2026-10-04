@@ -1,0 +1,20 @@
+{
+ "attempt": 1,
+ "source_sha256": {
+  "ob_m1_structure.mq5": "f30959f0f6805fc5341a96c5e1b67d8e6a6920af3e83bea100de166c215bfd86",
+  "ob_m1_structure_research.mq5": "b587ea4e93a77568f3d779e3ba195ba98afd234ca546c1fb988492b11bcd94ed"
+ },
+ "window": [
+  "2026.03.01",
+  "2026.03.31"
+ ],
+ "planned": {
+  "off_a": "tr2_off_a",
+  "off_b": "tr2_off_b",
+  "on_a": "tr2_on_a",
+  "on_b": "tr2_on_b",
+  "on_a_delivered": "tr2_on_a_delivered",
+  "on_b_delivered": "tr2_on_b_delivered"
+ },
+ "started": "2026-10-05T01:48:48"
+}
