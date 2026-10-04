@@ -51,6 +51,7 @@ Violations are dicts {setup_id, rule, detail}; one rule name per requirement (``
 from __future__ import annotations
 
 import bisect
+import math
 import pathlib
 from collections import Counter
 
@@ -231,6 +232,76 @@ def stop_at(path: list, sl0: float, ms: int) -> float:
     return cur
 
 
+# retry policy of plan 2026-10-05-0128 (KTD1-KTD3), restated here so the checker stays independent of the model
+TOO_MANY_REQUESTS = 10024           # TRADE_RETCODE_TOO_MANY_REQUESTS
+REJECT_WAIT_MS = 1000               # no request of a position within 1 s of its rejected request
+BACKOFF_S = (1, 2, 4, 8, 16, 30)    # EA-wide hold after the n-th consecutive TOO_MANY_REQUESTS
+
+
+def parse_trailing(v):
+    """EnableTrailingStop from run values: True/False, "true"/"false", 1/0; None (not set) is the code default false.
+    Anything else is returned unchanged and reported by trail_presence."""
+    if v is None or (isinstance(v, float) and math.isnan(v)):
+        return False
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, (int, float)) and v in (0, 1):
+        return bool(v)
+    if isinstance(v, str) and v.strip().lower() in ("true", "false", "1", "0"):
+        return v.strip().lower() in ("true", "1")
+    return v
+
+
+def trail_presence(trailing, trail, moves) -> list:
+    """A run with EnableTrailingStop must carry both trail files; a run without it must carry none (plan 0128 R13)."""
+    def bad(detail):
+        return [{"setup_id": None, "rule": "trail_r23", "detail": detail}]
+    if not isinstance(trailing, bool):
+        return bad(f"EnableTrailingStop value {trailing!r} cannot be read")
+    if trailing and (trail is None or moves is None):
+        missing = [n for n, f in (("rl_trail", trail), ("rl_sl_moves", moves)) if f is None]
+        return bad(f"trailing run: {', '.join(missing)} missing")
+    if not trailing and (trail is not None or moves is not None):
+        return bad("trail files present in a trail-off run")
+    return []
+
+
+def check_retry_policy(moves: pd.DataFrame, sid_of: dict) -> list:
+    """All positions' requests merged in time order (stable on file order): the 1 s wait after a position's
+    rejection, the EA-wide backoff after TOO_MANY_REQUESTS (cleared by an accepted request) and at most one retry
+    per tick. A retry is a request of a position whose last request was rejected, or any request while the
+    TOO_MANY_REQUESTS streak is above zero. Requests held by the stops or freeze level (not_sent) come after the
+    wait and backoff gates, so they must respect them too, but use no retry slot."""
+    viol = []
+    if moves is None or not len(moves):
+        return viol
+    rej, streak, until, slot = {}, 0, None, None
+    for m in moves.reset_index(drop=True).sort_values("tick_msc", kind="mergesort").to_dict("records"):
+        pid, ms, outcome = int(m["position_id"]), int(m["tick_msc"]), str(m["outcome"])
+
+        def add(detail):
+            viol.append({"setup_id": sid_of.get(pid), "rule": "trail_r23", "detail": f"position {pid}: {detail}"})
+        if pid in rej and ms - rej[pid] < REJECT_WAIT_MS:
+            add(f"request at {ms}, {ms - rej[pid]} ms after its rejection")
+        if until is not None and ms < until:
+            add(f"request at {ms} during the EA backoff (until {until})")
+        if outcome.startswith("not_sent:"):
+            continue
+        if pid in rej or streak > 0:
+            if slot == ms:
+                add(f"second retry on tick {ms}")
+            slot = ms
+        if outcome == "accepted":
+            rej.pop(pid, None)
+            streak, until = 0, None
+        elif outcome == "rejected":
+            rej[pid] = ms
+            if int(m["retcode"]) == TOO_MANY_REQUESTS:
+                streak += 1
+                until = ms + BACKOFF_S[min(streak, len(BACKOFF_S)) - 1] * 1000
+    return viol
+
+
 def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame, B: "_Bars", tick: float):
     """Every trailed position against the reference model (research/mt5r/trailing.py) and the M1 Bid bars.
 
@@ -240,7 +311,26 @@ def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame,
     viol, unv, checked = [], {}, 0
     rows = {int(r["position_id"]): r for r in setups.to_dict("records") if not _missing(r.get("position_id"))}
     mv = moves if moves is not None else pd.DataFrame(columns=mc.SL_MOVE_COLUMNS)
-    for t in (trail.to_dict("records") if trail is not None else []):
+    if trail is None:
+        return viol, checked, unv
+    lacking = [c for c in mc.TRAIL_COLUMNS if c not in trail.columns]
+    if lacking:
+        return [{"setup_id": None, "rule": "fields", "detail": f"rl_trail lacks contract columns {lacking}"}], 0, unv
+    # completeness (plan 0128 R12/R13): exactly one row per filled position, none for anything else
+    filled = {pid for pid, r in rows.items() if not _missing(r.get("fill_price"))}
+    counts = trail["position_id"].astype(int).value_counts().to_dict()
+    for pid in sorted(filled - set(counts)):
+        viol.append({"setup_id": _int(rows[pid].get("setup_id")), "rule": "trail_r23",
+                     "detail": f"position {pid} is filled but has no rl_trail row"})
+    for pid, n in sorted(counts.items()):
+        if n > 1:
+            viol.append({"setup_id": None, "rule": "trail_r23", "detail": f"{n} rl_trail rows for position {pid}"})
+        if pid not in filled:
+            viol.append({"setup_id": None, "rule": "trail_r23",
+                         "detail": f"rl_trail row for position {pid} has no filled rl_setups row"})
+    sid_of = {int(t["position_id"]): _int(t.get("setup_id")) for t in trail.to_dict("records")}
+    viol.extend(check_retry_policy(mv, sid_of))
+    for t in trail.to_dict("records"):
         pid, sid = int(t["position_id"]), _int(t.get("setup_id"))
         bad = []
         add = bad.append
@@ -249,8 +339,25 @@ def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame,
         E, sl0, r0, tp = float(t["fill_price"]), float(t["sl0"]), float(t["r0"]), float(t["tp"])
         r = rows.get(pid)
         if r is None:
-            viol.append({"setup_id": sid, "rule": "trail_r23", "detail": f"position {pid} has no rl_setups row"})
+            continue                                   # reported by the completeness check above
+        final_state, roundtrip = _str(t.get("state_final")), _str(t.get("state_roundtrip"))
+        own_n = int((mv["position_id"].astype(int) == pid).sum()) if len(mv) else 0
+        if final_state == "not_trailed" or roundtrip.startswith("not_trailed:"):
+            if not (final_state == "not_trailed" and roundtrip.startswith("not_trailed:")):
+                add(f"state_final {final_state} with state_roundtrip {roundtrip}")
+            if own_n:
+                add(f"not trailed but has {own_n} stop request(s)")
+            if _int(t.get("activated_msc")) is not None:
+                add("not trailed but activated")
+            if abs(float(t["final_sl"]) - sl0) > tol:
+                add(f"not trailed but its stop {t['final_sl']} != SL0 {sl0}")
+            for b in bad:
+                viol.append({"setup_id": sid, "rule": "trail_r23", "detail": f"position {pid}: {b}"})
             continue
+        if roundtrip != "ok":
+            add(f"state round trip at the fill: {roundtrip}")
+        if final_state != "ok":
+            add(f"stored state at close: {final_state}")
         if abs(E - float(r["fill_price"])) > tol or abs(sl0 - float(r["sl"])) > tol or abs(tp - float(r["tp"])) > tol:
             add(f"E/SL0/TP {E}/{sl0}/{tp} differ from rl_setups {r['fill_price']}/{r['sl']}/{r['tp']}")
         if abs(r0 - abs(E - sl0)) > tol:
@@ -258,7 +365,7 @@ def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame,
         cur_sl = sl0                                   # the replayed stop on the position
         own = mv[mv["position_id"].astype(int) == pid].sort_values("tick_msc", kind="mergesort")
         prev_best, accepted = None, 0
-        closed_min, failed = None, None                # (minute, value) of the last failure; market-closed minute
+        closed_min, held = None, None                  # market-closed minute; (minute, value) held back (not_sent)
         act_ms = _int(t.get("activated_msc"))
         for m in own.to_dict("records"):
             ms, bid, ask, best = int(m["tick_msc"]), float(m["bid"]), float(m["ask"]), float(m["best"])
@@ -267,8 +374,10 @@ def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame,
             minute = ms // 60000
             if closed_min == minute:
                 add(f"move at {ms}: request in a minute already answered market closed")
-            if failed is not None and failed[0] == minute and abs(failed[1] - req) <= tol:
-                add(f"move at {ms}: the failed value {req} was re-sent in the same minute")
+            if held is not None and held[0] == minute and abs(held[1] - req) <= tol:
+                add(f"move at {ms}: the held-back value {req} was requested again in the same minute")
+            if outcome in ("accepted", "rejected") and (req - cur_sl) * sign < tick - tol:
+                add(f"move at {ms}: request {req} does not improve the stop {cur_sl} by a tick")
             j = B.bar_at_ms(ms)
             if j is not None and not (B.l[j] - tol <= bid <= B.h[j] + tol):
                 add(f"move at {ms}: Bid {bid} outside its M1 bar [{B.l[j]}, {B.h[j]}]")
@@ -288,21 +397,18 @@ def check_trails(setups: pd.DataFrame, trail: pd.DataFrame, moves: pd.DataFrame,
             if outcome == "accepted":
                 if abs(after - req) > tol:
                     add(f"move at {ms}: accepted stop {after} != request {req}")
-                if (req - cur_sl) * sign < tick - tol:
-                    add(f"move at {ms}: accepted stop {req} does not improve {cur_sl} by a tick")
                 accepted += 1
                 cur_sl = after
             elif outcome == "rejected":
                 if (after - cur_sl) * sign < -tol:
                     add(f"move at {ms}: stop read back {after} retreats from {cur_sl}")
                 cur_sl = after
-                failed = (minute, req)
                 if int(m["retcode"]) == trl.RETCODE_MARKET_CLOSED:
                     closed_min = minute
             elif outcome.startswith("not_sent:"):
                 if abs(after - before) > tol:
                     add(f"move at {ms}: not_sent changed the stop {before} -> {after}")
-                failed = (minute, req)
+                held = (minute, req)
             else:
                 add(f"move at {ms}: unknown outcome {outcome!r}")
             prev_best = best
@@ -517,9 +623,10 @@ class _Sim:
 
 # --- the replay ------------------------------------------------------------------------------------------------
 class _Replay:
-    def __init__(self, setups, events, pivots, bars_m1, bars_m5, params, deals=None, trail=None, moves=None):
+    def __init__(self, setups, events, pivots, bars_m1, bars_m5, params, deals=None, trail=None, moves=None,
+                 trailing=False):
         self.prm = {**DEFAULT_PARAMS, **(params or {})}
-        self.trail, self.moves = trail, moves
+        self.trail, self.moves, self.trailing = trail, moves, trailing
         self.paths = stop_path(moves)
         self.N = int(self.prm["SwingStrengthM1"])
         self.pt = float(self.prm["point"])
@@ -584,6 +691,7 @@ class _Replay:
             self._compare(s)
             self._check_exit(s)
         self._unconsumed()
+        self.out.extend(trail_presence(self.trailing, self.trail, self.moves))
         if self.trail is not None:
             viol, n, unv = check_trails(self.setups, self.trail, self.moves, self.B, self.pt)
             self.out.extend(viol)
@@ -1441,10 +1549,11 @@ class _Replay:
 # --- public API ------------------------------------------------------------------------------------------------
 def check(setups: pd.DataFrame, events: pd.DataFrame, pivots: pd.DataFrame, bars_m1: pd.DataFrame,
           bars_m5: pd.DataFrame, params: dict | None = None, deals: pd.DataFrame | None = None,
-          trail: pd.DataFrame | None = None, moves: pd.DataFrame | None = None) -> list[dict]:
+          trail: pd.DataFrame | None = None, moves: pd.DataFrame | None = None,
+          trailing=False) -> list[dict]:
     """Violations of R3-R22 (and trail_r23 for a trailed run) re-derived from the logged bars, one dict
-    {setup_id, rule, detail} per failed check."""
-    return _Replay(setups, events, pivots, bars_m1, bars_m5, params, deals, trail, moves).run().out
+    {setup_id, rule, detail} per failed check. ``trailing`` is the run's EnableTrailingStop (parse_trailing)."""
+    return _Replay(setups, events, pivots, bars_m1, bars_m5, params, deals, trail, moves, trailing).run().out
 
 
 def occurrences(setups: pd.DataFrame, events: pd.DataFrame, pivots: pd.DataFrame, bars_m1: pd.DataFrame,
@@ -1456,8 +1565,8 @@ def occurrences(setups: pd.DataFrame, events: pd.DataFrame, pivots: pd.DataFrame
 
 def full(setups: pd.DataFrame, events: pd.DataFrame, pivots: pd.DataFrame, bars_m1: pd.DataFrame,
          bars_m5: pd.DataFrame, params: dict | None = None, deals: pd.DataFrame | None = None,
-         trail: pd.DataFrame | None = None, moves: pd.DataFrame | None = None) -> dict:
+         trail: pd.DataFrame | None = None, moves: pd.DataFrame | None = None, trailing=False) -> dict:
     """One replay: violations, occurrences and coverage (checked / failed / passed per rule, plus the cases the
-    logs cannot prove, which are not evidence of conformance)."""
-    r = _Replay(setups, events, pivots, bars_m1, bars_m5, params, deals, trail, moves).run()
+    logs cannot prove, which are not evidence of conformance). ``trailing`` is the run's EnableTrailingStop."""
+    r = _Replay(setups, events, pivots, bars_m1, bars_m5, params, deals, trail, moves, trailing).run()
     return {"violations": r.out, "occurrences": {k: int(v) for k, v in r.occ.items()}, "coverage": r.coverage()}
