@@ -992,6 +992,31 @@ def _table_row(row, evs, pivots):
             ex, "-" if net is None or _missing(net) else f"{float(net):+.2f}", reason]
 
 
+def legend_handles():
+    """One key for every marking, shown on each chart (gate review: mark each stage clearly)."""
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+    m = dict(linestyle="none", markeredgecolor=SURFACE)
+    return [Patch(facecolor=BLUE, alpha=0.25, edgecolor=BLUE, label="M5 OB zone"),
+            Patch(facecolor=VIOLET, alpha=0.3, edgecolor=VIOLET, label="M5 identifying FVG"),
+            Line2D([], [], marker="v", color=ORANGE, markersize=8, label="touch (first tick in OB)", **m),
+            Line2D([], [], marker="x", color=RED, markersize=7, markeredgewidth=2, linestyle="none",
+                   label="break: M1 close beyond OB"),
+            Line2D([], [], marker="o", markerfacecolor=SURFACE, markeredgecolor=BLUE, markeredgewidth=1.8,
+                   markersize=7, linestyle="none", label="return (renewed touch)"),
+            Line2D([], [], marker="*", color=INK, markersize=10, linestyle="--", linewidth=1.0,
+                   label="M1 structure change HH/LL + crossed level"),
+            Line2D([], [], marker="o", markerfacecolor="none", markeredgecolor=INK, markeredgewidth=1.6,
+                   markersize=9, linestyle="none", label="HL / LH"),
+            Patch(facecolor=AQUA, alpha=0.35, edgecolor=AQUA, label="new M1 entry FVG"),
+            Patch(facecolor=AQUA, alpha=0.18, label="reaction candle (band)"),
+            Line2D([], [], marker="D", color=ORANGE, markersize=7, label="entry (fill)", **m),
+            Line2D([], [], color=RED, linestyle="--", linewidth=1.4, label="SL"),
+            Line2D([], [], color=GREEN, linestyle="--", linewidth=1.4, label="TP"),
+            Line2D([], [], marker="X", color=INK, markersize=8, label="exit", **m),
+            Line2D([], [], marker="o", color=VIOLET, markersize=8, label="n = timeline row", **m)]
+
+
 def render(run: dict, out_dir, seed: int = SEED, n_per_category: int = 1, variants=None) -> dict:
     """Charts (out_dir/charts/*.png) and a markdown table (out_dir/setups_table.md) for the seeded KTD12 examples
     of one run (``load_run``)."""
@@ -1013,7 +1038,9 @@ def render(run: dict, out_dir, seed: int = SEED, n_per_category: int = 1, varian
             info = draw_setup(ax5, ax1, row, run, net=row.get("net"), category=row["category"],
                               related=row.get("related") or None, ax_tl=axt)
             fig.suptitle(info["title"], fontsize=10, color=INK, x=0.01, ha="left")
-            fig.tight_layout()
+            fig.legend(handles=legend_handles(), loc="upper left", bbox_to_anchor=(0.01, 0.975), ncol=7, fontsize=7,
+                       frameon=False, handlelength=1.6, columnspacing=1.2)
+            fig.tight_layout(rect=(0, 0, 1, 0.955))
             v, d = variant_name(row.get("variant")), dict(SIDES)[side_of(row.get("dir"))]
             path = charts_dir / f"{v}_{d}_{row['category']}_setup{_int(row, 'setup_id'):06d}.png"
             fig.savefig(path, dpi=110, facecolor=SURFACE)
