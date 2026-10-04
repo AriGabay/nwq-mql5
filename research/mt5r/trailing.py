@@ -110,6 +110,17 @@ def on_result(st: TrailState, requested: float, retcode: int, sl_read: float, tp
     return "rejected"
 
 
+class FixedStopOnly(ValueError):
+    """A research tool that assumes one stop for the whole trade was given a trailed run."""
+
+
+def refuse_trailed(tool: str, setups=None, trail=None) -> None:
+    """Tools that re-price or classify exits against a fixed SL refuse a trailed run (plan KTD9)."""
+    if is_trailed_run(setups, trail):
+        raise FixedStopOnly(f"{tool} assumes a fixed stop (SL0 for the whole trade); this run has a trailing stop "
+                            "(plan 2026-10-05-0007, KTD9) - refusing")
+
+
 def is_trailed_run(setups=None, trail=None) -> bool:
     """A run is trailed when any exit is 'trail' or its rl_trail table has rows (plan KTD9)."""
     if trail is not None and len(trail):

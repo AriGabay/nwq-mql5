@@ -27,6 +27,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from . import trailing
 from .trades import CONTRACT_SIZE as CONTRACT
 QUOTE_ONLY_S = 60
 
@@ -92,6 +93,8 @@ def _positions(setups: pd.DataFrame, deals: pd.DataFrame, alt: pd.DataFrame):
 def evaluate_series(parts: list) -> dict:
     """Primary vs sensitivity over chained runs [(setups, deals, alt), ...] in time order: the first run's
     deposit starts one closed-balance curve through all of them."""
+    for p in parts:
+        trailing.refuse_trailed("the 01:00 session sensitivity", p[0])
     got = [_positions(*p) for p in parts]
     deposit = got[0][0]
     f = pd.concat([x[1][["net", "t"]] for x in got], ignore_index=True)
