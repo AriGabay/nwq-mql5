@@ -65,7 +65,8 @@ def _fake_feed(monkeypatch, tmp_path, answers):
     slept, calls = [], {"n": 0}
     monkeypatch.setattr(dc.time, "sleep", lambda s: slept.append(s))
 
-    def fetch(u, tries=4):
+    def fetch(u, budget, tries=4):
+        budget.request()                                # one HTTP request, charged like the real fetch
         calls["n"] += 1
         return answers(u, calls["n"])
     monkeypatch.setattr(dc, "fetch", fetch)
@@ -226,3 +227,41 @@ def test_a_parallel_download_is_refused(monkeypatch, tmp_path):
     lock.write_text(json.dumps({"pid": os.getpid()}))
     with pytest.raises(SystemExit, match="another download is running"):
         dc.cmd_download(args)
+
+
+def test_retries_inside_fetch_are_charged_and_cannot_pass_the_budget(monkeypatch, tmp_path):
+    import urllib.error
+    monkeypatch.setattr(dc, "RAW", tmp_path / "raw")
+    monkeypatch.setattr(dc.time, "sleep", lambda s: None)
+    sent = []
+
+    def urlopen(req, timeout=30):
+        sent.append(req.full_url)
+        raise urllib.error.URLError("connection reset")
+    monkeypatch.setattr(dc.urllib.request, "urlopen", urlopen)
+    dc._write_json(dc.budget_path(), {"max_requests": 7, "max_wait_seconds": 10_000, "requests": 5, "wait_seconds": 0})
+    budget = dc.Budget()
+    with pytest.raises(dc.BudgetSpent, match="request budget spent"):
+        dc.fetch("https://x/2024/00/02/10h_ticks.bi5", budget, tries=4)
+    assert len(sent) == 2                                  # only the 2 requests left, not the 4 retries
+    b = dc.load_budget()
+    assert b["requests"] == 7 and b["wait_seconds"] == 5    # the pause between them was charged too
+
+
+def test_a_wait_that_would_pass_the_budget_is_not_slept(monkeypatch, tmp_path):
+    monkeypatch.setattr(dc, "RAW", tmp_path / "raw")
+    slept = []
+    monkeypatch.setattr(dc.time, "sleep", lambda s: slept.append(s))
+    dc._write_json(dc.budget_path(), {"max_requests": 99, "max_wait_seconds": 1000, "requests": 0, "wait_seconds": 950})
+    with pytest.raises(dc.BudgetSpent, match="wait budget would be exceeded"):
+        dc.Budget().wait(900)
+    assert slept == [] and dc.load_budget()["wait_seconds"] == 950
+
+
+def test_the_existing_budget_is_kept_and_marked_as_possibly_undercounted(monkeypatch, tmp_path):
+    monkeypatch.setattr(dc, "RAW", tmp_path / "raw")
+    dc._write_json(dc.budget_path(), {"max_requests": 2500, "max_wait_seconds": 43200, "requests": 41, "wait_seconds": 900})
+    b = dc.Budget().b
+    assert b["requests"] == 41 and b["wait_seconds"] == 900 and b["counting"]["count_before"] == 41
+    assert "lower than the requests actually sent" in b["counting"]["note"]
+    assert dc.load_budget()["counting"] == b["counting"]

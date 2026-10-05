@@ -87,11 +87,50 @@ def _iso(ms) -> str:
 
 
 # ------------------------------------------------------------------ download and manifest
-def fetch(u: str, tries: int = 4) -> tuple:
+class BudgetSpent(RuntimeError):
+    """The shared download budget is spent: no further HTTP request is sent."""
+
+
+class Budget:
+    """The shared budget for both months (requests sent and seconds waited), kept between runs. Every HTTP
+    request, a retry included, is checked and counted before it is sent; every wait is counted before it starts.
+    Counts kept before this per-request counting (2026-10-05) were per download attempt, so they may be lower
+    than the requests actually sent; they are kept, not reset."""
+
+    def __init__(self):
+        self.b = load_budget()
+        if "counting" not in self.b:                       # kept, never reset: the earlier count is recorded as-is
+            self.b["counting"] = {"per_http_request_since": now_iso(), "count_before": self.b["requests"],
+                                  "note": "counts before this time were per download attempt, not per HTTP "
+                                          "request; they may be lower than the requests actually sent"}
+            _write_json(budget_path(), self.b)
+
+    def left(self) -> str:
+        return budget_left(self.b)
+
+    def request(self) -> None:
+        why = self.left()
+        if why:
+            raise BudgetSpent(why)
+        self.b["requests"] += 1
+        _write_json(budget_path(), self.b)
+
+    def wait(self, seconds: float) -> None:
+        if self.b["wait_seconds"] + seconds > self.b["max_wait_seconds"]:
+            raise BudgetSpent(f"wait budget would be exceeded ({self.b['wait_seconds']} + {seconds} > "
+                              f"{self.b['max_wait_seconds']} s)")
+        self.b["wait_seconds"] += seconds
+        _write_json(budget_path(), self.b)
+        time.sleep(seconds)
+
+
+def fetch(u: str, budget: "Budget", tries: int = 4) -> tuple:
     """(http status, body). 404 is an answer (no file for that hour); 429 raises RateLimited at once; network
-    errors are retried a few times, then raised."""
+    errors are retried a few times, then raised. Every HTTP request and every retry pause goes through the
+    budget first."""
     err = None
     for k in range(tries):
+        budget.request()
         try:
             with urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": UA}), timeout=30) as r:
                 return r.status, r.read()
@@ -104,7 +143,11 @@ def fetch(u: str, tries: int = 4) -> tuple:
             err = e
         except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
             err = e
-        time.sleep(5 * (k + 1))
+        if k + 1 < tries:
+            why = budget.left()                             # no pause before a request the budget would refuse
+            if why:
+                raise BudgetSpent(why)
+            budget.wait(5 * (k + 1))
     raise NetworkError(f"{u}: {err}")
 
 
@@ -198,7 +241,8 @@ def cmd_download(args) -> None:
     kept between runs) stops the run with a partial summary when it is spent."""
     y, m = check_month(args.month)
     with DownloadLock():
-        st, b = load_status(args.month), load_budget()
+        st, budget = load_status(args.month), Budget()
+        b = budget.b
         t_end = time.time() + args.max_hours * 3600
         got, stop = 0, None
         for h in dk.month_hours(y, m):
@@ -210,13 +254,14 @@ def cmd_download(args) -> None:
             if st["hours"].get(key, {}).get("status") == "http_404":
                 continue
             while stop is None:
-                stop = budget_left(b) or ("max_hours" if time.time() > t_end else None)
+                stop = budget.left() or ("max_hours" if time.time() > t_end else None)
                 if stop:
                     break
-                b["requests"] += 1
-                _write_json(budget_path(), b)
                 try:
-                    status, body = fetch(dk.url(SYMBOL, h))
+                    status, body = fetch(dk.url(SYMBOL, h), budget)
+                except BudgetSpent as e:
+                    stop = str(e)
+                    break
                 except (RateLimited, NetworkError) as e:
                     limited = isinstance(e, RateLimited)
                     wait = e.retry_after if limited and e.retry_after is not None else args.wait
@@ -231,9 +276,11 @@ def cmd_download(args) -> None:
                     save_status(args.month, st)
                     if stop:
                         break
-                    b["wait_seconds"] += wait
-                    _write_json(budget_path(), b)
-                    time.sleep(wait)
+                    try:
+                        budget.wait(wait)
+                    except BudgetSpent as be:
+                        stop = str(be)
+                        break
                     continue
                 if status == 404:
                     st["hours"][key] = {"status": "http_404", "at": now_iso()}
