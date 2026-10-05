@@ -1,0 +1,56 @@
+{
+ "source": "Dukascopy Historical Data Export widget (manual download by the user), period 1 Tick, one file per offer side",
+ "location": "outside git (data/ in the working copy, gitignored)",
+ "files": {
+  "ASK": {
+   "name": "XAU-USD_1Tick_ASK_2024-01-02_10_00-10_00_Etc_UTC.csv",
+   "bytes": 327994,
+   "sha256": "4aa2ff4d04d83377ec41239612dc7a59bd8b8fbd2e97c67d28fb2144eb587fbe",
+   "rows": 4969,
+   "first_utc": "2024-01-02T10:00:00.000+00:00",
+   "last_utc": "2024-01-02T10:59:59.000+00:00",
+   "time_nondecreasing": true,
+   "price_min": 2073.735,
+   "price_max": 2077.965
+  },
+  "BID": {
+   "name": "XAU-USD_1Tick_BID_2024-01-02_10_00-10_00_Etc_UTC.csv",
+   "bytes": 327996,
+   "sha256": "d96e8aeea4ba42f36c842124b0bb1d46e41084aa5efc25b16654730a0412c66c",
+   "rows": 4969,
+   "first_utc": "2024-01-02T10:00:00.000+00:00",
+   "last_utc": "2024-01-02T10:59:59.000+00:00",
+   "time_nondecreasing": true,
+   "price_min": 2073.415,
+   "price_max": 2077.675
+  }
+ },
+ "pairing": {
+  "method": "row position (the time is equal on every row; never joined by time)",
+  "rows": 4969,
+  "crossed": 0,
+  "spread_min": 0.2,
+  "spread_max": 0.407,
+  "rows_sharing_a_second": 4106
+ },
+ "against_feed_hour": {
+  "feed_file": "XAUUSD/2024/00/02/10h_ticks.bi5",
+  "rows_export": 4969,
+  "ticks_feed": 4969,
+  "same_count": true,
+  "ask_mismatch": 0,
+  "bid_mismatch": 0,
+  "volume_mismatch": 0,
+  "identical_prices_in_order": true,
+  "time_equal_to_feed_second": 4964,
+  "time_one_second_later": 5,
+  "time_one_second_later_feed_ms": [
+   999
+  ],
+  "time_other": 0,
+  "feed_ticks_with_nonzero_ms": 4966,
+  "feed_seconds_with_several_ticks": 1331,
+  "feed_ticks_sharing_a_second": 4107,
+  "feed_max_ticks_in_one_second": 9
+ }
+}

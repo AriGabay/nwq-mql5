@@ -16,6 +16,11 @@ Commands:
 - verify-import <month>: the terminal's readback against the source, tick by tick.
 - tester-dump <symbol> <month>: duka_tick_dump.mq5 in the isolated Tester (real ticks; it never trades).
 - verify-tester <month>: the ticks the Tester delivered for XAUUSD.duka against the source.
+- manual-check: the manual web export of one hour (two CSV files, ASK and BID, in MANUAL) against the feed file
+  of the same hour, row by row; no ticks are written from the CSV.
+- export-sample: the one-hour sample (2024-01-02 10:00 UTC, the feed file the manual export matched) for the
+  import path check; `import --sample`, `verify-import sample`, `tester-dump XAUUSD.duka sample` and
+  `verify-tester sample` then check the import path on that hour only (never a month's coverage).
 - compare <month>: March 2026 Dukascopy against the Tester ticks of Bybit XAUUSD.s (clock, sessions, prices,
   spread, density). Nothing is shifted or adjusted in the stored data.
 """
@@ -26,6 +31,7 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import shutil
 import struct
 import subprocess
@@ -50,6 +56,10 @@ CUSTOM = "XAUUSD.duka"
 BYBIT = "XAUUSD.s"
 MONTHS = {"2024-01": (2024, 1), "2026-03": (2026, 3)}       # the approved scope; nothing else
 HOLIDAYS = [dt.date(2024, 1, 1)]
+SAMPLE = "sample"                                            # one hour inside January 2024, for the import path
+SAMPLE_HOUR = dt.datetime(2024, 1, 2, 10, tzinfo=dt.timezone.utc)
+MANUAL = pathlib.Path(os.environ.get("NWQ_DUKA_MANUAL", str(REPO / "data")))   # gitignored
+MANUAL_FILES = {s: f"XAU-USD_1Tick_{s}_2024-01-02_10_00-10_00_Etc_UTC.csv" for s in ("ASK", "BID")}
 UA = "nwq-mql5 data check (python urllib; one request at a time)"
 SRC_DIR = REPO / "research" / "mql5"
 IMPORT_SCRIPT = "duka_import.mq5"
@@ -422,6 +432,57 @@ def require_resolved(month: str, allow_partial: bool) -> dict:
     return cov
 
 
+def sample_ticks() -> pd.DataFrame:
+    p = raw_path(SAMPLE_HOUR)
+    if not p.exists():
+        raise SystemExit(f"{p} missing: the sample hour's feed file is needed")
+    return dk.decode(p.read_bytes(), SAMPLE_HOUR, dk.PRICE_DIVISOR[SYMBOL])
+
+
+def source_ticks(key: str) -> pd.DataFrame:
+    """The source ticks of a month (current files) or of the one-hour sample."""
+    return sample_ticks() if key == SAMPLE else load_month(key)[0]
+
+
+def cmd_manual_check(args) -> None:
+    """The manual web export of the sample hour against the feed file: layout, both sides, pairing, row by row."""
+    out = {"source": "Dukascopy Historical Data Export widget (manual download by the user), period 1 Tick, "
+                     "one file per offer side",
+           "location": "outside git (data/ in the working copy, gitignored)", "files": {}}
+    sides = {}
+    for side, name in MANUAL_FILES.items():
+        p = MANUAL / name
+        data = p.read_bytes()
+        df = dk.read_export_csv(p)
+        sides[side] = df
+        out["files"][side] = {"name": name, "bytes": len(data), "sha256": sha256(data), "rows": int(len(df)),
+                              "first_utc": _iso(int(df["time_s"].min()) * 1000),
+                              "last_utc": _iso(int(df["time_s"].max()) * 1000),
+                              "time_nondecreasing": bool((np.diff(df["time_s"].to_numpy()) >= 0).all()),
+                              "price_min": float(df["price"].min()), "price_max": float(df["price"].max())}
+    pairs = dk.pair_export_sides(sides["ASK"], sides["BID"])
+    spread = pairs["ask"] - pairs["bid"]
+    out["pairing"] = {"method": "row position (the time is equal on every row; never joined by time)",
+                      "rows": int(len(pairs)), "crossed": int((spread < 0).sum()),
+                      "spread_min": round(float(spread.min()), 3), "spread_max": round(float(spread.max()), 3),
+                      "rows_sharing_a_second": int(pd.Series(pairs["time_s"]).duplicated(keep=False).sum())}
+    out["against_feed_hour"] = {"feed_file": raw_path(SAMPLE_HOUR).relative_to(RAW).as_posix(),
+                                **dk.compare_export_to_feed(pairs, sample_ticks())}
+    evaluate.save(out, RESULTS / "manual_sample_check.json")
+    print(json.dumps(out, indent=1))
+
+
+def cmd_export_sample(args) -> None:
+    ticks = sample_ticks()
+    if dk.quality(ticks)["out_of_order"]:
+        raise SystemExit("sample: ticks out of time order - not exported")
+    cfg = env.load_config()
+    frm = int(SAMPLE_HOUR.timestamp() * 1000)
+    dst = mt5_files(cfg) / bin_name(SAMPLE)
+    write_ticks_bin(dst, ticks, frm, frm + 3_600_000 - 1)
+    print(f"{dst}: {len(ticks)} ticks, {dst.stat().st_size} bytes, sha256 {sha256(dst.read_bytes())}")
+
+
 # ------------------------------------------------------------------ quality
 def derived(name: str) -> pathlib.Path:
     p = RAW / "derived" / name
@@ -466,8 +527,8 @@ def mt5_files(cfg) -> pathlib.Path:
     return cfg.mt5_dir / "MQL5" / "Files"
 
 
-def bin_name(month: str) -> str:
-    return f"duka_XAUUSD_{month}.bin"
+def bin_name(key: str) -> str:
+    return f"duka_XAUUSD_{key}.bin"
 
 
 def write_ticks_bin(path: pathlib.Path, ticks: pd.DataFrame, from_msc: int, to_msc: int) -> None:
@@ -503,14 +564,17 @@ def cmd_export(args) -> None:
     print(f"{dst}: {len(ticks)} ticks, {dst.stat().st_size} bytes, sha256 {sha256(dst.read_bytes())}")
 
 
-def startup_ini() -> str:
-    """Offline start: an unknown server and a closed-port proxy, so no account can connect; trading off; the import
-    script at startup; the terminal shuts down after it."""
+def startup_ini(server: str, script_parameters: str = "") -> str:
+    """Offline start: no account (Login=0) and every connection through a proxy on a closed local port, so nothing
+    can connect; trading off; the import script at startup (with a preset from MQL5/Presets when given); the
+    terminal shuts down after it. The server name only selects the local symbol base the startup chart needs: with
+    an unknown server (first attempt, 2026-10-05) the chart symbol did not exist and the script never started."""
     return "\r\n".join([
-        "[Common]", "Server=nwq-offline-no-server", "Login=0", "ProxyEnable=1", "ProxyType=0",
+        "[Common]", f"Server={server}", "Login=0", "ProxyEnable=1", "ProxyType=0",
         "ProxyAddress=127.0.0.1:9", "NewsEnable=0",
         "[Experts]", "AllowLiveTrading=0", "AllowDllImport=0", "Enabled=0",
-        "[StartUp]", f"Script={pathlib.Path(IMPORT_SCRIPT).stem}", "ShutdownTerminal=1", ""])
+        "[StartUp]", f"Script={pathlib.Path(IMPORT_SCRIPT).stem}"]
+        + ([f"ScriptParameters={script_parameters}"] if script_parameters else []) + ["ShutdownTerminal=1", ""])
 
 
 TRADE_CALLS = ("OrderSend", "OrderSendAsync", "PositionOpen", "PositionClose", "PositionModify", "CTrade",
@@ -522,6 +586,20 @@ def assert_no_trading_calls(src: pathlib.Path) -> None:
     hits = [c for c in TRADE_CALLS if c in text]
     if hits:
         raise SystemExit(f"{src.name} contains trading calls {hits}; refusing")
+
+
+def run_part(data: bytes, start: int) -> str:
+    """The text a run appended to a terminal log (UTF-16 with BOM) after it was ``start`` bytes long: the day's
+    log holds earlier runs too, and their lines must not be read as this run's."""
+    start = max(2, start - start % 2) if data[:2] == b"\xff\xfe" else start
+    tail = data[start:]
+    return tail.decode("utf-16-le", "replace") if data[:2] == b"\xff\xfe" else tail.decode("utf-8", "replace")
+
+
+def connection_lines(journal: str) -> list:
+    """Lines saying the terminal connected or authorized, with every long number (an account) masked."""
+    hits = [l for l in journal.splitlines() if any(w in l.lower() for w in ("authorized on", "connected to"))]
+    return [re.sub(r"\d{5,}", "<number>", l) for l in hits]
 
 
 def cmd_import(args) -> None:
@@ -536,9 +614,17 @@ def cmd_import(args) -> None:
     assert_no_trading_calls(src)
     env.disable_mcp(cfg)
     env.assert_trade_safety(cfg)
-    for m in MONTHS:
+    keys = [SAMPLE] if args.sample else list(MONTHS)
+    for m in keys:
         if not (mt5_files(cfg) / bin_name(m)).exists():
-            raise SystemExit(f"{bin_name(m)} missing in MQL5/Files: run export {m} first")
+            raise SystemExit(f"{bin_name(m)} missing in MQL5/Files: run "
+                             f"{'export-sample' if m == SAMPLE else 'export ' + m} first")
+    preset = ""
+    if args.sample:                                     # only the sample file; the script's default lists the months
+        preset = "duka_import_sample.set"
+        (cfg.mt5_dir / "MQL5" / "Presets").mkdir(parents=True, exist_ok=True)
+        env.write_utf16(cfg.mt5_dir / "MQL5" / "Presets" / preset,
+                        f"CustomName={CUSTOM}\r\nTickFiles={bin_name(SAMPLE)}\r\n")
     scripts = cfg.mt5_dir / "MQL5" / "Scripts"
     scripts.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, scripts / IMPORT_SCRIPT)
@@ -555,7 +641,8 @@ def cmd_import(args) -> None:
     if log_file.exists():
         log_file.unlink()
     ini_rel = pathlib.Path("runs_ini") / "duka_import.ini"
-    env.write_utf16(cfg.mt5_dir / ini_rel, startup_ini())
+    env.write_utf16(cfg.mt5_dir / ini_rel, startup_ini(cfg.server, preset))
+    log_sizes = {f.name: f.stat().st_size for f in cfg.mt5_dir.glob("logs/*.log")}
     t0 = time.time()
     cmd = cfg.launcher() + [cfg.win_path("terminal64.exe"), "/portable", f"/config:{cfg.win_path(ini_rel.as_posix())}"]
     proc = subprocess.Popen(cmd, env=cfg.env(), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -572,26 +659,32 @@ def cmd_import(args) -> None:
     shutil.copy2(backup, common)                        # the account settings exactly as before
     env.disable_mcp(cfg)
     env.assert_trade_safety(cfg)
+    journal = ""
     for f in cfg.mt5_dir.glob("logs/*.log"):
         if f.stat().st_mtime >= t0 - 5:
             shutil.copy2(f, keep / f.name)
-    journal = "".join(env.read_text(f, errors="replace") for f in keep.glob("*.log"))
-    connected = [l for l in journal.splitlines() if any(w in l.lower() for w in ("authorized on", "connected to"))]
+            journal += run_part(f.read_bytes(), log_sizes.get(f.name, 0))
+    (keep / "journal_this_run.txt").write_text(journal, encoding="utf-8")
+    connected = connection_lines(journal)
     log_text = log_file.read_text(encoding="latin-1") if log_file.exists() else ""
     if log_file.exists():
         shutil.copy2(log_file, keep / log_file.name)
-    out = {"status": status, "seconds": round(time.time() - t0, 1), "common_ini_changed_by_terminal": restored,
+    out = {"scope": f"sample hour {SAMPLE_HOUR.isoformat()}" if args.sample else "months " + ", ".join(MONTHS),
+           "status": status, "seconds": round(time.time() - t0, 1),
+           "script_result": "ok" if "result: ok" in log_text else ("not_started" if not log_text else "mismatch"),
+           "common_ini_changed_by_terminal": restored,
            "common_ini_restored": True, "account_connection_lines": connected, "script_log": log_text.splitlines(),
            "journal_kept_in": keep.as_posix()}
-    evaluate.save(out, RESULTS / "import_run.json")
+    evaluate.save(out, RESULTS / ("import_run_sample.json" if args.sample else "import_run.json"))
     print(json.dumps(out, indent=1))
-    if connected or "result: ok" not in log_text:
+    loaded = all(f"{bin_name(m)}: readback" in log_text for m in keys)
+    if connected or "result: ok" not in log_text or not loaded:
         raise SystemExit("import not clean - see import_run.json")
 
 
 def cmd_verify_import(args) -> None:
     cfg = env.load_config()
-    src, _ = load_month(args.month)
+    src = source_ticks(args.month)
     frm, to, back = read_ticks_bin(mt5_files(cfg) / ("readback_" + bin_name(args.month)))
     out = compare_ticks(src, back, "terminal readback")
     evaluate.save(out, RESULTS / f"import_check_{args.month}.json")
@@ -625,7 +718,8 @@ def dump_run_id(symbol: str, month: str) -> str:
 
 
 def cmd_tester_dump(args) -> None:
-    check_month(args.month)
+    if args.month == SAMPLE and args.symbol != CUSTOM:
+        raise SystemExit(f"the sample is {CUSTOM} only")
     if args.symbol not in (CUSTOM, BYBIT):
         raise SystemExit(f"symbol must be {CUSTOM} or {BYBIT}")
     if args.symbol == BYBIT and args.month != "2026-03":
@@ -635,7 +729,7 @@ def cmd_tester_dump(args) -> None:
     comp = compmod.compile_ea(cfg, DUMP_EA)
     if comp["errors"] != 0 or not comp["ex5_exists"]:
         raise SystemExit(f"compile failed: {comp['log'][-1500:]}")
-    hs = dk.month_hours(*check_month(args.month))
+    hs = [SAMPLE_HOUR] if args.month == SAMPLE else dk.month_hours(*check_month(args.month))
     rid = dump_run_id(args.symbol, args.month)
     text = ini.render(expert=pathlib.Path(DUMP_EA).stem + ".ex5", symbol=args.symbol, period="M1",
                       from_date=hs[0].strftime("%Y.%m.%d"), to_date_inclusive=hs[-1].strftime("%Y.%m.%d"),
@@ -649,7 +743,7 @@ def tester_ticks(rid: str) -> pd.DataFrame:
 
 
 def cmd_verify_tester(args) -> None:
-    src, _ = load_month(args.month)
+    src = source_ticks(args.month)
     rid = dump_run_id(CUSTOM, args.month)
     got = tester_ticks(rid)
     out = compare_ticks(src, got, f"Tester delivery ({rid})")
@@ -716,7 +810,9 @@ def _breaks(time_msc: pd.Series) -> list:
 
 COMMANDS = {"download": cmd_download, "manifest": cmd_manifest, "quality": cmd_quality, "export": cmd_export,
             "import": cmd_import, "verify-import": cmd_verify_import, "tester-dump": cmd_tester_dump,
-            "verify-tester": cmd_verify_tester, "compare": cmd_compare}
+            "verify-tester": cmd_verify_tester, "compare": cmd_compare,
+            "manual-check": cmd_manual_check, "export-sample": cmd_export_sample}
+SAMPLE_OK = ("verify-import", "tester-dump", "verify-tester")
 
 
 def main() -> None:
@@ -726,7 +822,9 @@ def main() -> None:
         sp = sub.add_parser(name)
         if name == "tester-dump":
             sp.add_argument("symbol")
-        if name != "import":
+        if name in SAMPLE_OK:
+            sp.add_argument("month", choices=sorted(MONTHS) + [SAMPLE])
+        elif name not in ("import", "manual-check", "export-sample"):
             sp.add_argument("month", choices=sorted(MONTHS))
         if name == "download":
             sp.add_argument("--pause", type=float, default=5.0, help="seconds between requests")
@@ -737,6 +835,7 @@ def main() -> None:
             sp.add_argument("--partial", action="store_true", help="a labelled check of an incomplete month")
         if name == "import":
             sp.add_argument("--timeout", type=int, default=1800)
+            sp.add_argument("--sample", action="store_true", help="import only the one-hour sample file")
     args = ap.parse_args()
     COMMANDS[args.cmd](args)
 
