@@ -1,0 +1,42 @@
+{
+ "purpose": "import path and data fidelity check of one hour; not a month's coverage",
+ "source": {
+  "kind": "Dukascopy free historical feed file (LZMA .bi5), downloaded earlier",
+  "file": "XAUUSD/2024/00/02/10h_ticks.bi5",
+  "bytes": 21048,
+  "sha256": "97d5a9c2d06cf0835a23af2845b12b9bc463418c9eed4363d242dce16f55c80e"
+ },
+ "file": {
+  "name": "XAUUSD.duka_20240102_1000_UTC_ticks.csv",
+  "location": "outside git: NWQ_DUKA_DIR/mt5_manual (default D:/data/dukascopy)",
+  "bytes": 253462,
+  "sha256": "6b96423eac2dc2072934e58cc240d6756d7f691dcde548a54fff1c56fd20aee4",
+  "format": "ASCII, CRLF, tab-separated, header <DATE> <TIME> <BID> <ASK> <LAST> <VOLUME>; date YYYY.MM.DD, time HH:MM:SS.mmm; prices with 3 decimals; LAST 0.000 and VOLUME 0 (no trade prices or trade volumes in the source); no flags column",
+  "time_zone": "UTC as in the feed (the terminal stores times without a zone)"
+ },
+ "ticks": 4969,
+ "first_tick_utc": "2024-01-02T10:00:00.128+00:00",
+ "last_tick_utc": "2024-01-02T10:59:59.210+00:00",
+ "period": {
+  "from_utc": "2024-01-02T10:00:00+00:00",
+  "to_utc": "2024-01-02T11:00:00+00:00 (exclusive)"
+ },
+ "order": "feed order, unchanged",
+ "same_ms_as_previous": 0,
+ "out_of_order": 0,
+ "nothing_removed_or_added": "every feed record is one line; duplicates kept; no time invented",
+ "written_file_read_back_vs_feed": {
+  "compared": "file written vs feed ticks",
+  "ticks_source": 4969,
+  "ticks_target": 4969,
+  "identical_in_order": true,
+  "extra_in_target": 0,
+  "missing_in_target": 0,
+  "first_extra": [],
+  "first_missing": []
+ },
+ "manual_web_export_sha256_unchanged": {
+  "ASK": "4aa2ff4d04d83377ec41239612dc7a59bd8b8fbd2e97c67d28fb2144eb587fbe",
+  "BID": "d96e8aeea4ba42f36c842124b0bb1d46e41084aa5efc25b16654730a0412c66c"
+ }
+}
