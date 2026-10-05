@@ -913,7 +913,9 @@ def cmd_gui_finish(args) -> None:
            "journal_lines_custom_or_import": relevant[:200], "journal_lines_total": len(journal.splitlines()),
            "custom_base_files": [{"path": p, "bytes": b} for p, b in files],
            "journal_kept_in": keep.as_posix()}
-    evaluate.save(out, RESULTS / "gui_session.json")
+    out["terminal_started_in_session"] = any("launched with" in l for l in journal.splitlines())
+    res = RESULTS / "gui_session.json"                  # the first session's record is committed evidence
+    evaluate.save(out, res if not res.exists() else RESULTS2 / f"gui_session_{state['stamp']}.json")
     st_p.rename(keep / "session_state.json")
     print(json.dumps(out, indent=1))
     if out["account_connection_lines"]:
