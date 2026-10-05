@@ -1,0 +1,10 @@
+{
+ "scope": "sample hour 2024-01-02T10:00:00+00:00",
+ "status": "ok",
+ "seconds": 305.5,
+ "common_ini_changed_by_terminal": false,
+ "common_ini_restored": true,
+ "account_connection_lines": [],
+ "script_log": [],
+ "journal_kept_in": "D:/data/dukascopy/mt5_import/20261005_195728"
+}

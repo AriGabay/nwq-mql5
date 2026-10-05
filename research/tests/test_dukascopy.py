@@ -88,3 +88,71 @@ def test_the_clock_offset_is_found_from_the_data_not_assumed():
     res = dk.best_offset(duka, other)
     assert res["best_hours"] == 2 and res["scores"][2]["median_abs_close_diff"] == pytest.approx(0.05)
     assert res["scores"][0]["minutes"] > 0 and res["scores"][0]["median_abs_close_diff"] > 1
+
+
+# ------------------------------------------------------------------ manual web export (one file per side)
+def export_csv(path, rows):
+    """rows: (iso second, price, volume) -> a tick-export CSV as the widget writes it."""
+    lines = ["Etc/UTC,Open,High,Low,Close,Volume"] + [f"{t},{p},{p},{p},{p},{v}" for t, p, v in rows]
+    path.write_text("\n".join(lines), encoding="ascii")
+    return path
+
+
+T = "2024-01-02T10:00:00+00:00"
+T1 = "2024-01-02T10:00:01+00:00"
+
+
+def test_the_export_reader_refuses_layouts_it_was_not_checked_on(tmp_path):
+    ok = dk.read_export_csv(export_csv(tmp_path / "ok.csv", [(T, "2077.255", 120), (T, "2077.225", 120)]))
+    assert ok["raw"].tolist() == [2077255, 2077225] and ok["time_s"].tolist() == [int(H0.timestamp())] * 2
+    bar = tmp_path / "bar.csv"
+    bar.write_text(f"Etc/UTC,Open,High,Low,Close,Volume\n{T},1.0,2.0,0.5,1.5,10", encoding="ascii")
+    with pytest.raises(ValueError, match="not all equal"):
+        dk.read_export_csv(bar)
+    other_tz = tmp_path / "tz.csv"
+    other_tz.write_text("Etc/UTC,Open,High,Low,Close,Volume\n2024-01-02T12:00:00+02:00,1,1,1,1,1", encoding="ascii")
+    with pytest.raises(ValueError, match="UTC"):
+        dk.read_export_csv(other_tz)
+    head = tmp_path / "head.csv"
+    head.write_text("Time,Bid,Ask\n2024-01-02 10:00:00.123,1,2", encoding="ascii")
+    with pytest.raises(ValueError, match="header"):
+        dk.read_export_csv(head)
+
+
+def test_sides_are_paired_by_row_never_joined_by_a_shared_second(tmp_path):
+    ask = dk.read_export_csv(export_csv(tmp_path / "a.csv", [(T, "2000.30", 1), (T, "2000.50", 1), (T1, "2000.40", 1)]))
+    bid = dk.read_export_csv(export_csv(tmp_path / "b.csv", [(T, "2000.00", 2), (T, "2000.20", 2), (T1, "2000.10", 2)]))
+    p = dk.pair_export_sides(ask, bid)
+    assert list(zip(p["raw_ask"], p["raw_bid"])) == [(2000300, 2000000), (2000500, 2000200), (2000400, 2000100)]
+    # a time join would match each of the two ticks at 10:00:00 with both bids (4 rows instead of 2)
+    assert len(ask.merge(bid, on="time_s")) == 5
+
+
+def test_pairing_is_refused_when_rows_cannot_be_the_same_quote(tmp_path):
+    ask = dk.read_export_csv(export_csv(tmp_path / "a.csv", [(T, "2000.30", 1), (T1, "2000.40", 1)]))
+    short = dk.read_export_csv(export_csv(tmp_path / "s.csv", [(T, "2000.00", 1)]))
+    with pytest.raises(ValueError, match="cannot be paired"):
+        dk.pair_export_sides(ask, short)
+    shifted = dk.read_export_csv(export_csv(tmp_path / "t.csv", [(T, "2000.00", 1), (T, "2000.10", 1)]))
+    with pytest.raises(ValueError, match="different time"):
+        dk.pair_export_sides(ask, shifted)
+    crossed = dk.read_export_csv(export_csv(tmp_path / "c.csv", [(T, "2000.00", 1), (T1, "2000.50", 1)]))
+    with pytest.raises(ValueError, match="ask below bid"):
+        dk.pair_export_sides(ask, crossed)
+
+
+def test_the_feed_comparison_is_row_by_row_and_reports_the_lost_milliseconds(tmp_path):
+    feed = ticks([(5, 2000.30, 2000.00), (700, 2000.50, 2000.20), (999, 2000.40, 2000.10)])
+    rows = [(T, "2000.30", "2000.00"), (T, "2000.50", "2000.20"), (T1, "2000.40", "2000.10")]
+    ask = dk.read_export_csv(export_csv(tmp_path / "a.csv", [(t, a, 1e6) for t, a, _ in rows]))
+    bid = dk.read_export_csv(export_csv(tmp_path / "b.csv", [(t, b, 1e6) for t, _, b in rows]))
+    r = dk.compare_export_to_feed(dk.pair_export_sides(ask, bid), feed)
+    assert r["identical_prices_in_order"] and r["volume_mismatch"] == 0
+    assert r["time_equal_to_feed_second"] == 2 and r["time_one_second_later"] == 1
+    assert r["time_one_second_later_feed_ms"] == [999] and r["feed_ticks_sharing_a_second"] == 3
+    # the same ticks in another order within the second: same count, prices no longer identical in order
+    swapped = [rows[1], rows[0], rows[2]]
+    ask2 = dk.read_export_csv(export_csv(tmp_path / "a2.csv", [(t, a, 1e6) for t, a, _ in swapped]))
+    bid2 = dk.read_export_csv(export_csv(tmp_path / "b2.csv", [(t, b, 1e6) for t, _, b in swapped]))
+    r2 = dk.compare_export_to_feed(dk.pair_export_sides(ask2, bid2), feed)
+    assert r2["same_count"] and not r2["identical_prices_in_order"] and r2["ask_mismatch"] == 2

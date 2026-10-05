@@ -15,8 +15,8 @@ def test_only_the_two_approved_months():
 
 
 def test_the_import_start_is_offline_with_trading_off_and_shuts_down():
-    ini = dc.startup_ini()
-    assert "Server=nwq-offline-no-server" in ini and "Login=0" in ini
+    ini = dc.startup_ini("Some-Server")
+    assert "Server=Some-Server" in ini and "Login=0" in ini
     assert "ProxyEnable=1" in ini and "ProxyAddress=127.0.0.1:9" in ini
     assert "AllowLiveTrading=0" in ini and "Enabled=0" in ini and "AllowDllImport=0" in ini
     assert "Script=duka_import" in ini and "ShutdownTerminal=1" in ini
@@ -265,3 +265,38 @@ def test_the_existing_budget_is_kept_and_marked_as_possibly_undercounted(monkeyp
     assert b["requests"] == 41 and b["wait_seconds"] == 900 and b["counting"]["count_before"] == 41
     assert "lower than the requests actually sent" in b["counting"]["note"]
     assert dc.load_budget()["counting"] == b["counting"]
+
+
+def test_the_sample_import_passes_only_its_file_and_still_starts_offline():
+    ini = dc.startup_ini("Some-Server", "duka_import_sample.set")
+    assert "ScriptParameters=duka_import_sample.set" in ini
+    assert ini.index("ScriptParameters") < ini.index("ShutdownTerminal=1")
+    assert "Login=0" in ini and "ProxyAddress=127.0.0.1:9" in ini and "AllowLiveTrading=0" in ini
+    assert "ScriptParameters" not in dc.startup_ini("Some-Server")
+
+
+def test_the_sample_is_one_hour_inside_the_approved_january_and_only_for_the_import_checks():
+    assert dc.SAMPLE_HOUR.strftime("%Y-%m") in dc.MONTHS and dc.SAMPLE_HOUR.tzinfo is not None
+    assert set(dc.SAMPLE_OK) == {"verify-import", "tester-dump", "verify-tester"}
+    assert dc.bin_name(dc.SAMPLE) not in {dc.bin_name(m) for m in dc.MONTHS}
+    import argparse
+    with pytest.raises(SystemExit, match="only"):
+        dc.cmd_tester_dump(argparse.Namespace(symbol=dc.BYBIT, month=dc.SAMPLE))
+
+
+def test_raw_data_folders_are_ignored_by_git():
+    ignore = (dc.REPO / ".gitignore").read_text(encoding="utf-8").splitlines()
+    assert "/data/" in ignore and "runs/" in ignore
+
+
+def test_only_this_runs_journal_lines_are_checked_and_account_numbers_are_masked():
+    tab, eol = chr(9), chr(13) + chr(10)
+    old = tab.join(["", "0", "00:31:34", "Network", "'1234567': authorized on X-Live through Y"]) + eol
+    new = tab.join(["", "0", "19:46:18", "Terminal", "launched"]) + eol
+    data = b"\xff\xfe" + old.encode("utf-16-le")
+    start = len(data)
+    data += new.encode("utf-16-le")
+    assert dc.run_part(data, start) == new
+    assert dc.connection_lines(dc.run_part(data, start)) == []
+    hits = dc.connection_lines(dc.run_part(data, 0))
+    assert len(hits) == 1 and "1234567" not in hits[0] and "<number>" in hits[0]

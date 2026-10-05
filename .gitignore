@@ -9,3 +9,5 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .DS_Store
+# manual Dukascopy exports and other raw market data (large; never committed; see docs/PROJECT_STATUS.md)
+/data/

@@ -146,3 +146,77 @@ def best_offset(duka_m1: pd.DataFrame, other_m1: pd.DataFrame, candidates_h=rang
     ok = {h: s for h, s in scores.items() if s["minutes"]}
     best = min(ok, key=lambda h: ok[h]["median_abs_close_diff"]) if ok else None
     return {"best_hours": best, "scores": scores}
+
+
+# ------------------------------------------------------------------ manual web export (checked 2026-10-05)
+# The Dukascopy "Historical Data Export" widget, period "1 Tick", writes one CSV per offer side (ASK or BID):
+# header "Etc/UTC,Open,High,Low,Close,Volume", one row per tick with Open = High = Low = Close = the price, an ISO
+# time to the second ("2024-01-02T10:00:00+00:00", no milliseconds) and the volume in units of the feed volume
+# x 1e6. Verified against the feed file of the same hour (4,969 ticks): same rows in the same order and the same
+# prices; the time is the feed time without its milliseconds (5 ticks at .999 show the next second).
+EXPORT_HEADER = ["Etc/UTC", "Open", "High", "Low", "Close", "Volume"]
+
+
+def read_export_csv(path) -> pd.DataFrame:
+    """One side of a manual tick export, in file order: time_s (epoch seconds, UTC), price, volume, raw (price x
+    1000). Refuses (never repairs) a file whose header, time zone or rows do not have the checked layout."""
+    df = pd.read_csv(path, dtype=str, keep_default_na=False)
+    if list(df.columns) != EXPORT_HEADER:
+        raise ValueError(f"{path}: header {list(df.columns)} is not the checked tick-export layout")
+    if not df["Etc/UTC"].str.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+00:00").all():
+        raise ValueError(f"{path}: a time is not 'YYYY-MM-DDTHH:MM:SS+00:00' (UTC, whole seconds)")
+    ohlc = df[["Open", "High", "Low", "Close"]]
+    if not ohlc.eq(ohlc["Close"], axis=0).all().all():
+        raise ValueError(f"{path}: a row has Open/High/Low/Close not all equal - not one tick per row")
+    price = df["Close"].astype(float)
+    if (price <= 0).any():
+        raise ValueError(f"{path}: a price is not positive")
+    t = pd.to_datetime(df["Etc/UTC"], utc=True)
+    return pd.DataFrame({"time_s": (t - pd.Timestamp(0, tz="UTC")) // pd.Timedelta(seconds=1),
+                         "price": price.to_numpy(), "volume": df["Volume"].astype(float).to_numpy(),
+                         "raw": np.round(price.to_numpy() * 1000).astype(np.int64)})
+
+
+def pair_export_sides(ask: pd.DataFrame, bid: pd.DataFrame) -> pd.DataFrame:
+    """Quotes from the two side files, paired by row position - never by time, because many ticks share a second.
+    Row pairing is accepted only when both files have the same number of rows and the same time on every row and no
+    pair is crossed; otherwise it refuses. This is a necessary condition, not proof: that row i of both files is the
+    same tick must be shown against a source carrying both sides (the feed file of the same hour)."""
+    if len(ask) != len(bid):
+        raise ValueError(f"ASK has {len(ask)} rows and BID {len(bid)}: rows cannot be paired")
+    if not (ask["time_s"].to_numpy() == bid["time_s"].to_numpy()).all():
+        n = int((ask["time_s"].to_numpy() != bid["time_s"].to_numpy()).sum())
+        raise ValueError(f"{n} rows have a different time in ASK and BID: rows cannot be paired")
+    if (ask["raw"].to_numpy() < bid["raw"].to_numpy()).any():
+        raise ValueError("a row pair has ask below bid: rows are not the same quote")
+    return pd.DataFrame({"time_s": ask["time_s"].to_numpy(), "ask": ask["price"].to_numpy(),
+                         "bid": bid["price"].to_numpy(), "ask_vol": ask["volume"].to_numpy(),
+                         "bid_vol": bid["volume"].to_numpy(), "raw_ask": ask["raw"].to_numpy(),
+                         "raw_bid": bid["raw"].to_numpy()})
+
+
+def compare_export_to_feed(pairs: pd.DataFrame, feed: pd.DataFrame) -> dict:
+    """Row by row against the decoded feed file of the same period: prices (exact, in 0.001), volume (x 1e6) and
+    time (the export's second against the feed's millisecond time). A count match alone is never reported as a
+    match."""
+    out = {"rows_export": int(len(pairs)), "ticks_feed": int(len(feed)), "same_count": len(pairs) == len(feed)}
+    if not out["same_count"]:
+        return out | {"identical_prices_in_order": False}
+    fs = feed["time_msc"].to_numpy() // 1000
+    dsec = pairs["time_s"].to_numpy() - fs
+    ms = feed["time_msc"].to_numpy() % 1000
+    out["ask_mismatch"] = int((pairs["raw_ask"].to_numpy() != feed["raw_ask"].to_numpy()).sum())
+    out["bid_mismatch"] = int((pairs["raw_bid"].to_numpy() != feed["raw_bid"].to_numpy()).sum())
+    out["volume_mismatch"] = int(((np.round(pairs["ask_vol"].to_numpy()) != np.round(feed["ask_vol"].to_numpy() * 1e6))
+                                  | (np.round(pairs["bid_vol"].to_numpy()) != np.round(feed["bid_vol"].to_numpy() * 1e6))).sum())
+    out["identical_prices_in_order"] = out["ask_mismatch"] == 0 and out["bid_mismatch"] == 0
+    out["time_equal_to_feed_second"] = int((dsec == 0).sum())
+    out["time_one_second_later"] = int((dsec == 1).sum())
+    out["time_one_second_later_feed_ms"] = sorted({int(x) for x in ms[dsec == 1]})
+    out["time_other"] = int(((dsec != 0) & (dsec != 1)).sum())
+    out["feed_ticks_with_nonzero_ms"] = int((ms != 0).sum())
+    sec = pd.Series(fs).value_counts()
+    out["feed_seconds_with_several_ticks"] = int((sec > 1).sum())
+    out["feed_ticks_sharing_a_second"] = int(sec[sec > 1].sum())
+    out["feed_max_ticks_in_one_second"] = int(sec.max()) if len(sec) else 0
+    return out
