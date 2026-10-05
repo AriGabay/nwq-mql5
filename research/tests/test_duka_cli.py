@@ -361,3 +361,33 @@ def test_the_dump_ea_reads_back_without_trading_and_reports_the_definition():
     src = (dc.SRC_DIR / dc.DUMP_EA).read_text(encoding="utf-8")
     assert not any(c in src for c in dc.TRADE_CALLS)
     assert "SYMBOL_FORMULA" in src and "CopyRates" in src and 'Readback("readback_end")' in src
+
+
+def test_the_single_hour_fetch_is_one_request_without_retry_or_wait(monkeypatch, tmp_path):
+    import argparse
+    seen = []
+
+    def answers(u, n):
+        seen.append(u)
+        raise dc.RateLimited(u, None)
+    slept, _ = _fake_feed(monkeypatch, tmp_path, answers)
+    with pytest.raises(SystemExit, match="429"):
+        dc.cmd_fetch_one(argparse.Namespace(hour="2024-01-03T00:00:00"))
+    assert len(seen) == 1 and seen[0].endswith("/XAUUSD/2024/00/03/00h_ticks.bi5") and slept == []
+    st = dc.load_status("2024-01")
+    assert st["hours"]["2024-01-03T00:00:00+00:00"]["status"] == "unresolved"
+    assert st["rate_limits"][-1]["kind"] == "http_429" and st["rate_limits"][-1]["waited_s"] == 0
+    assert dc.load_budget()["requests"] == 1
+    assert not dc.raw_path(dt.datetime(2024, 1, 3, tzinfo=dt.timezone.utc)).exists()
+
+
+def test_the_single_hour_fetch_accepts_only_the_approved_hour_and_never_refetches(monkeypatch, tmp_path):
+    import argparse
+    slept, _ = _fake_feed(monkeypatch, tmp_path, lambda u, n: (200, tick_blob()))
+    with pytest.raises(SystemExit, match="not an approved"):
+        dc.cmd_fetch_one(argparse.Namespace(hour="2024-01-03T01:00:00"))
+    dc.cmd_fetch_one(argparse.Namespace(hour="2024-01-03T00:00:00"))
+    assert dc.raw_path(dt.datetime(2024, 1, 3, tzinfo=dt.timezone.utc)).exists()
+    with pytest.raises(SystemExit, match="exists"):
+        dc.cmd_fetch_one(argparse.Namespace(hour="2024-01-03T00:00:00"))
+    assert dc.load_budget()["requests"] == 1 and slept == []
