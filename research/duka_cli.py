@@ -156,13 +156,24 @@ def cmd_download(args) -> None:
                 status, body = fetch(dk.url(SYMBOL, h))
             except RateLimited as e:
                 wait = e.retry_after if e.retry_after is not None else args.wait
-                st["rate_limits"].append({"at": now_iso(), "hour": key, "retry_after": e.retry_after, "waited_s": wait})
+                st["rate_limits"].append({"at": now_iso(), "hour": key, "kind": "http_429", "retry_after": e.retry_after,
+                                         "waited_s": wait})
                 save_status(args.month, st)
                 time.sleep(wait)
                 continue
             except NetworkError as e:
-                st["hours"][key] = {"status": "unresolved", "error": str(e)[-200:], "at": now_iso()}
-                break
+                # dropped connections are treated like a rate limit: a long pause, then the same hour again; after
+                # args.max_failures in a row the hour stays unresolved and the run stops (resumable)
+                fails = st["hours"].get(key, {}).get("failures", 0) + 1
+                st["hours"][key] = {"status": "unresolved", "failures": fails, "error": str(e)[-200:], "at": now_iso()}
+                st["rate_limits"].append({"at": now_iso(), "hour": key, "kind": "network", "waited_s": args.wait})
+                save_status(args.month, st)
+                if fails >= args.max_failures:
+                    st["runs"].append({"at": now_iso(), "downloaded": got, "stopped": f"network failures at {key}"})
+                    save_status(args.month, st)
+                    raise SystemExit(f"{args.month}: {fails} network failures at {key}; resume later")
+                time.sleep(args.wait)
+                continue
             if status == 404:
                 st["hours"][key] = {"status": "http_404", "at": now_iso()}
             else:
@@ -564,6 +575,7 @@ def main() -> None:
             sp.add_argument("--pause", type=float, default=5.0, help="seconds between requests")
             sp.add_argument("--wait", type=int, default=900, help="seconds after a 429 without Retry-After")
             sp.add_argument("--max-hours", type=float, default=12.0, help="stop (resumable) after this long")
+            sp.add_argument("--max-failures", type=int, default=4, help="network failures in a row before stopping")
         if name == "quality":
             sp.add_argument("--partial", action="store_true", help="a labelled check of an incomplete month")
         if name == "import":

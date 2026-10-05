@@ -66,7 +66,7 @@ def _fake_feed(monkeypatch, tmp_path, answers):
         calls["n"] += 1
         return answers(u, calls["n"])
     monkeypatch.setattr(dc, "fetch", fetch)
-    return slept, types.SimpleNamespace(month="2024-01", pause=0.0, wait=900, max_hours=1.0)
+    return slept, types.SimpleNamespace(month="2024-01", pause=0.0, wait=900, max_hours=1.0, max_failures=2)
 
 
 def test_a_429_waits_retry_after_and_retries_the_same_hour(monkeypatch, tmp_path):
@@ -91,21 +91,37 @@ def test_without_retry_after_the_default_wait_is_used(monkeypatch, tmp_path):
     assert 900 in slept and dc.load_status("2024-01")["rate_limits"][0]["waited_s"] == 900
 
 
-def test_a_network_failure_leaves_the_hour_unresolved_and_the_month_partial(monkeypatch, tmp_path):
+def test_a_dropped_connection_pauses_like_a_rate_limit_then_retries_the_same_hour(monkeypatch, tmp_path):
+    seen = []
+
+    def answers(u, n):
+        if "/02/10h_" in u and u not in seen:          # the first attempt at this hour is dropped
+            seen.append(u)
+            raise dc.NetworkError(u)
+        return 200, b""
+    slept, args = _fake_feed(monkeypatch, tmp_path, answers)
+    dc.cmd_download(args)
+    st = dc.load_status("2024-01")
+    assert st["hours"]["2024-01-02T10:00:00+00:00"]["status"] == "empty_response"
+    assert st["rate_limits"][0]["kind"] == "network" and 900 in slept
+
+
+def test_repeated_network_failures_stop_the_run_and_leave_the_month_partial(monkeypatch, tmp_path):
     def answers(u, n):
         if "/02/10h_" in u:
             raise dc.NetworkError(u)
-        if "/03/10h_" in u:
+        if "/01/10h_" in u:
             return 404, b""
         return 200, b""
     _, args = _fake_feed(monkeypatch, tmp_path, answers)
-    dc.cmd_download(args)
+    with pytest.raises(SystemExit, match="network failures"):
+        dc.cmd_download(args)
     st = dc.load_status("2024-01")["hours"]
     assert st["2024-01-02T10:00:00+00:00"]["status"] == "unresolved"
-    assert st["2024-01-03T10:00:00+00:00"]["status"] == "http_404"
+    assert st["2024-01-01T10:00:00+00:00"]["status"] == "http_404"
     dc.cmd_manifest(args)
     man = __import__("json").loads((dc.RESULTS / "manifest_2024-01.json").read_text())
-    assert man["complete"] is False and man["hours_pending"] == 1
+    assert man["complete"] is False and man["hours_pending"] > 1          # this hour and every hour after it
     with pytest.raises(SystemExit, match="partial"):
         dc.require_complete("2024-01", False)
     dc.require_complete("2024-01", True)
