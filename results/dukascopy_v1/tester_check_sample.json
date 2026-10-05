@@ -1,0 +1,86 @@
+{
+ "compared": "Tester delivery (duka_dump_duka_sample)",
+ "ticks_source": 4969,
+ "ticks_target": 0,
+ "identical_in_order": false,
+ "extra_in_target": 0,
+ "missing_in_target": 4969,
+ "first_extra": [],
+ "first_missing": [
+  {
+   "time": "2024-01-02T10:00:00.128+00:00",
+   "bid": 2076.965,
+   "ask": 2077.255
+  },
+  {
+   "time": "2024-01-02T10:00:00.279+00:00",
+   "bid": 2076.935,
+   "ask": 2077.225
+  },
+  {
+   "time": "2024-01-02T10:00:00.582+00:00",
+   "bid": 2076.915,
+   "ask": 2077.215
+  },
+  {
+   "time": "2024-01-02T10:00:00.633+00:00",
+   "bid": 2076.905,
+   "ask": 2077.195
+  },
+  {
+   "time": "2024-01-02T10:00:01.187+00:00",
+   "bid": 2076.955,
+   "ask": 2077.245
+  },
+  {
+   "time": "2024-01-02T10:00:01.289+00:00",
+   "bid": 2076.975,
+   "ask": 2077.265
+  },
+  {
+   "time": "2024-01-02T10:00:03.200+00:00",
+   "bid": 2076.985,
+   "ask": 2077.285
+  },
+  {
+   "time": "2024-01-02T10:00:03.252+00:00",
+   "bid": 2077.015,
+   "ask": 2077.305
+  },
+  {
+   "time": "2024-01-02T10:00:03.956+00:00",
+   "bid": 2077.035,
+   "ask": 2077.325
+  },
+  {
+   "time": "2024-01-02T10:00:04.763+00:00",
+   "bid": 2077.105,
+   "ask": 2077.395
+  }
+ ],
+ "spec_in_tester": {
+  "symbol": "XAUUSD.duka",
+  "digits": "3",
+  "point": "0.00100000",
+  "tick_size": "0.00100000",
+  "tick_value": "1.00000000",
+  "contract_size": "100000.00",
+  "currency_base": "XAU",
+  "currency_profit": "USD",
+  "currency_margin": "USD",
+  "calc_mode": "0",
+  "stops_level": "5",
+  "freeze_level": "0",
+  "spread_float": "1",
+  "quote_session_1_0": "00:00-00:00",
+  "trade_session_1_0": "00:00-00:00",
+  "quote_session_2_0": "00:00-00:00",
+  "trade_session_2_0": "00:00-00:00",
+  "quote_session_3_0": "00:00-00:00",
+  "trade_session_3_0": "00:00-00:00",
+  "quote_session_4_0": "00:00-00:00",
+  "trade_session_4_0": "00:00-00:00",
+  "quote_session_5_0": "00:00-00:00",
+  "trade_session_5_0": "00:00-00:00"
+ }
+}

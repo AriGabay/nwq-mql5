@@ -7,6 +7,8 @@
 #property strict
 
 input string ResearchRunTag = "";
+input long   ReadbackFromMsc = 0;   // > 0: also write the stored ticks of [from, to] (CopyTicksRange) at init
+input long   ReadbackToMsc   = 0;
 
 int hTicks = INVALID_HANDLE;
 
@@ -43,10 +45,40 @@ void Spec()
    FileClose(h);
   }
 
+// the ticks the Tester holds for the symbol in a range, as stored (independent of the ticks it delivers)
+void Readback()
+  {
+   MqlTick t[];
+   int n = -1, err = 0;
+   for(int k = 0; k < 10 && n <= 0; k++)
+     {
+      ResetLastError();
+      n = CopyTicksRange(_Symbol, t, COPY_TICKS_ALL, (ulong)ReadbackFromMsc, (ulong)ReadbackToMsc);
+      err = GetLastError();
+      if(n <= 0) Sleep(500);
+     }
+   int h = FileOpen(Out("readback"), FILE_WRITE | FILE_CSV | FILE_ANSI, ',');
+   if(h == INVALID_HANDLE) return;
+   FileWrite(h, "time_msc", "bid", "ask", "flags");
+   for(int i = 0; i < n; i++)
+      FileWrite(h, IntegerToString(t[i].time_msc), DoubleToString(t[i].bid, _Digits), DoubleToString(t[i].ask, _Digits),
+                IntegerToString(t[i].flags));
+   FileClose(h);
+   int m = FileOpen(Out("readback_meta"), FILE_WRITE | FILE_CSV | FILE_ANSI, ',');
+   if(m == INVALID_HANDLE) return;
+   FileWrite(m, "key", "value");
+   FileWrite(m, "from_msc", IntegerToString(ReadbackFromMsc));
+   FileWrite(m, "to_msc", IntegerToString(ReadbackToMsc));
+   FileWrite(m, "copied", IntegerToString(n));
+   FileWrite(m, "last_error", IntegerToString(err));
+   FileClose(m);
+  }
+
 int OnInit()
   {
    if(!MQLInfoInteger(MQL_TESTER)) { Print("duka_tick_dump: tester only"); return INIT_FAILED; }
    Spec();
+   if(ReadbackToMsc > 0) Readback();
    hTicks = FileOpen(Out("ticks"), FILE_WRITE | FILE_CSV | FILE_ANSI, ',');
    if(hTicks == INVALID_HANDLE) return INIT_FAILED;
    FileWrite(hTicks, "time_msc", "bid", "ask", "flags");

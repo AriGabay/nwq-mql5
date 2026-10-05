@@ -1,0 +1,45 @@
+{
+ "compared": "stored ticks read back in the Tester (duka_dump_duka_sample_rb)",
+ "ticks_source": 4969,
+ "ticks_target": 4969,
+ "identical_in_order": true,
+ "extra_in_target": 0,
+ "missing_in_target": 0,
+ "first_extra": [],
+ "first_missing": [],
+ "readback_meta": {
+  "from_msc": "1704189600000",
+  "to_msc": "1704193199999",
+  "copied": "4969",
+  "last_error": "0"
+ },
+ "flags": {
+  "6": 4969
+ },
+ "max_abs_time_diff_ms": 0,
+ "spec_in_tester": {
+  "symbol": "XAUUSD.duka",
+  "digits": "3",
+  "point": "0.00100000",
+  "tick_size": "0.00100000",
+  "tick_value": "1.00000000",
+  "contract_size": "100000.00",
+  "currency_base": "XAU",
+  "currency_profit": "USD",
+  "currency_margin": "USD",
+  "calc_mode": "0",
+  "stops_level": "5",
+  "freeze_level": "0",
+  "spread_float": "1",
+  "quote_session_1_0": "00:00-00:00",
+  "trade_session_1_0": "00:00-00:00",
+  "quote_session_2_0": "00:00-00:00",
+  "trade_session_2_0": "00:00-00:00",
+  "quote_session_3_0": "00:00-00:00",
+  "trade_session_3_0": "00:00-00:00",
+  "quote_session_4_0": "00:00-00:00",
+  "trade_session_4_0": "00:00-00:00",
+  "quote_session_5_0": "00:00-00:00",
+  "trade_session_5_0": "00:00-00:00"
+ }
+}
