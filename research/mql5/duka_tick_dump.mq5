@@ -28,6 +28,8 @@ void Spec()
    FileWrite(h, "currency_margin", SymbolInfoString(_Symbol, SYMBOL_CURRENCY_MARGIN));
    FileWrite(h, "calc_mode", (long)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_CALC_MODE));
    FileWrite(h, "stops_level", (long)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL));
+   FileWrite(h, "freeze_level", (long)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_FREEZE_LEVEL));
+   FileWrite(h, "spread_float", (long)SymbolInfoInteger(_Symbol, SYMBOL_SPREAD_FLOAT));
    for(int d = 0; d < 7; d++)
      {
       datetime a, b;
