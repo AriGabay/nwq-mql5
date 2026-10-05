@@ -63,3 +63,12 @@ The user's untracked file `mql5/Experts/ob_fvg_retest copy.mq5` is theirs: never
   or demo).
 - Never start, stop, reconfigure or attach to the live terminal. Research runs only while it is closed; if it is
   open, ask the user to close it. Never close it yourself.
+- **One limited exception (user approval, 2026-10-05):** for the Dukascopy data check only, the isolated copy
+  (`C:\mt5r`, `/portable`) may be started outside the Tester to run one import script that creates a custom symbol and
+  loads the January 2024 and March 2026 Dukascopy ticks. Conditions:
+  - account connection blocked, AutoTrading off;
+  - the script contains no trading functions;
+  - `ShutdownTerminal=1`;
+  - the live terminal closed and untouched.
+
+  This permits no trading and no other action outside the Tester; all checks after the import run in the Tester.
