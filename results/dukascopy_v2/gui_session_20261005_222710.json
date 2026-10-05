@@ -1,0 +1,34 @@
+{
+ "session": "20261005_222710",
+ "prepared_at": "2026-10-05T19:27:10+00:00",
+ "finished_at": "2026-10-05T19:44:33+00:00",
+ "common_ini_changed_by_terminal": false,
+ "common_ini_restored": true,
+ "account_connection_lines": [],
+ "journal_lines_custom_or_import": [],
+ "journal_lines_total": 0,
+ "custom_base_files": [
+  {
+   "path": "history/XAUUSD.duka/2024.hcc",
+   "bytes": 18933
+  },
+  {
+   "path": "history/XAUUSD.duka/2026.hcc",
+   "bytes": 15333
+  },
+  {
+   "path": "ticks/XAUUSD.duka/202401.tkc",
+   "bytes": 40388
+  },
+  {
+   "path": "ticks/XAUUSD.duka/202610.tkc",
+   "bytes": 1784
+  },
+  {
+   "path": "ticks/XAUUSD.duka/ticks.dat",
+   "bytes": 123312
+  }
+ ],
+ "journal_kept_in": "D:/data/dukascopy/mt5_gui/20261005_222710",
+ "terminal_started_in_session": false
+}
