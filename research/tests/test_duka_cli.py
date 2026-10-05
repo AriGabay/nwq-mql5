@@ -391,3 +391,50 @@ def test_the_single_hour_fetch_accepts_only_the_approved_hour_and_never_refetche
     with pytest.raises(SystemExit, match="exists"):
         dc.cmd_fetch_one(argparse.Namespace(hour="2024-01-03T00:00:00"))
     assert dc.load_budget()["requests"] == 1 and slept == []
+
+
+def test_a_manual_hour_is_checked_copied_byte_for_byte_and_never_overwrites(monkeypatch, tmp_path):
+    import argparse
+    monkeypatch.setattr(dc, "RAW", tmp_path / "raw")
+    monkeypatch.setattr(dc, "RESULTS2", tmp_path / "results2")
+    monkeypatch.setattr(dc, "MANUAL", tmp_path / "manual")
+    (tmp_path / "manual").mkdir()
+    h = "2024-01-03T00:00:00"
+    (tmp_path / "manual" / "page.bi5").write_bytes(b"<html><body>Too Many Requests</body></html>")
+    with pytest.raises(SystemExit, match="not an LZMA"):
+        dc.cmd_register_manual_hour(argparse.Namespace(hour=h, file="page.bi5"))
+    (tmp_path / "manual" / "ok.bi5").write_bytes(tick_blob())
+    with pytest.raises(SystemExit, match="not an approved"):
+        dc.cmd_register_manual_hour(argparse.Namespace(hour="2024-01-03T01:00:00", file="ok.bi5"))
+    dc.cmd_register_manual_hour(argparse.Namespace(hour=h, file="ok.bi5"))
+    dst = dc.raw_path(dt.datetime(2024, 1, 3, tzinfo=dt.timezone.utc))
+    assert dst.read_bytes() == tick_blob() == (tmp_path / "manual" / "ok.bi5").read_bytes()
+    assert dc.load_status("2024-01")["hours"]["2024-01-03T00:00:00+00:00"]["source"].startswith("manual")
+    import lzma
+    import struct
+    (tmp_path / "manual" / "other.bi5").write_bytes(
+        lzma.compress(struct.pack(">IIIff", 5, 2050500, 2050200, 1.0, 1.0), format=lzma.FORMAT_ALONE))
+    with pytest.raises(SystemExit, match="never overwritten"):
+        dc.cmd_register_manual_hour(argparse.Namespace(hour=h, file="other.bi5"))
+
+
+def test_the_ontick_span_gives_a_full_warm_up_day_before_the_window():
+    hours = dc.span_hours("span0103")
+    assert len(hours) == 26 and hours[-1] == dt.datetime(2024, 1, 3, tzinfo=dt.timezone.utc)
+    assert dc.span_hours("span0102") == hours[:-1]
+
+
+def test_an_unreadable_process_list_fails_closed(monkeypatch):
+    import types
+    from mt5r import runner
+    monkeypatch.setattr(runner.subprocess, "run", lambda *a, **k: types.SimpleNamespace(returncode=0, stdout=None))
+    with pytest.raises(RuntimeError, match="refusing"):
+        runner.live_terminal_running()
+    seen = {}
+
+    def run(cmd, **k):
+        seen.update(k)
+        return types.SimpleNamespace(returncode=0, stdout="12 C:/mt5r/terminal64.exe x" + chr(10))
+    monkeypatch.setattr(runner.subprocess, "run", run)
+    runner._ps_lines()
+    assert seen.get("encoding") == "utf-8" and seen.get("errors") == "replace"

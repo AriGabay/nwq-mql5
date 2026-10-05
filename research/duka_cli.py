@@ -366,6 +366,46 @@ def cmd_fetch_one(args) -> None:
                       "budget_requests": budget.b["requests"]}, indent=1, default=str))
 
 
+def cmd_register_manual_hour(args) -> None:
+    """A feed hour file the user obtained manually (in MANUAL) checked and copied byte for byte into the raw tree,
+    with its manual source in the download status. Only an approved hour; the original stays untouched; an
+    existing raw file is never overwritten. No network."""
+    h = dt.datetime.fromisoformat(args.hour).replace(tzinfo=dt.timezone.utc)
+    if h not in ONE_HOUR_APPROVED:
+        raise SystemExit(f"{h.isoformat()} is not an approved single hour")
+    src = MANUAL / args.file
+    data = src.read_bytes()
+    if data[:1] != b"\x5d" or b"<html" in data[:512].lower():
+        raise SystemExit(f"{src}: not an LZMA .bi5 file (an error page saved under this name?)")
+    df = dk.decode(data, h, dk.PRICE_DIVISOR[SYMBOL])         # whole 20-byte records or an error
+    t0 = int(h.timestamp() * 1000)
+    q = dk.quality(df)
+    problems = [k for k in ("nonpositive", "crossed", "out_of_order") if q[k]]
+    if not len(df) or not ((df["time_msc"] >= t0) & (df["time_msc"] < t0 + 3_600_000)).all() or problems:
+        raise SystemExit(f"{src}: rejected ({problems or 'times outside the hour or no ticks'})")
+    dst = raw_path(h)
+    if dst.exists():
+        if dst.read_bytes() != data:
+            raise SystemExit(f"{dst} exists with other content; never overwritten")
+    else:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_bytes(data)
+    month = h.strftime("%Y-%m")
+    st = load_status(month)
+    st["hours"][h.isoformat()] = {"status": "file", "bytes": len(data), "at": now_iso(),
+                                  "source": f"manual (user), {args.file} in the gitignored data folder",
+                                  "sha256": sha256(data)}
+    save_status(month, st)
+    out = {"hour": h.isoformat(), "source": "obtained manually by the user (2026-10-05); no request by the tools",
+           "original": f"data/{args.file} (gitignored, unchanged)", "raw_copy": dst.relative_to(RAW).as_posix(),
+           "bytes": len(data), "sha256": sha256(data), "copy_identical": sha256(dst.read_bytes()) == sha256(data),
+           "format": "LZMA alone header; whole 20-byte records (>IIIff); price = integer / 1000",
+           "ticks": int(len(df)), "first_tick_utc": _iso(int(df["time_msc"].min())),
+           "last_tick_utc": _iso(int(df["time_msc"].max())), "quality": q}
+    evaluate.save(out, RESULTS2 / f"manual_hour_{h:%Y%m%d_%H}.json")
+    print(json.dumps(out, indent=1, default=str))
+
+
 def load_month(key: str):
     """Decoded ticks of a month in hour order, plus one row per hour with its download status, read from the
     current files (never from an earlier manifest)."""
@@ -778,7 +818,10 @@ def read_mt5_tick_lines(text: str) -> pd.DataFrame:
 SPANS = {"sample": (SAMPLE_HOUR, SAMPLE_HOUR + dt.timedelta(hours=1)),
          # every downloaded hour with ticks, contiguous: the market reopens 2024-01-01 23:00 UTC (the hours before
          # are empty answers), 2024-01-02 22:00 is the daily break (empty answer)
-         "span0102": (dt.datetime(2024, 1, 1, 23, tzinfo=dt.timezone.utc), dt.datetime(2024, 1, 3, tzinfo=dt.timezone.utc))}
+         "span0102": (dt.datetime(2024, 1, 1, 23, tzinfo=dt.timezone.utc), dt.datetime(2024, 1, 3, tzinfo=dt.timezone.utc)),
+         # span0102 plus 2024-01-03 00:00 (obtained manually): 2024-01-02 is the warm-up of a Tester window on 01-03
+         "span0103": (dt.datetime(2024, 1, 1, 23, tzinfo=dt.timezone.utc),
+                      dt.datetime(2024, 1, 3, 1, tzinfo=dt.timezone.utc))}
 
 
 CRLF = chr(13) + chr(10)
@@ -1192,7 +1235,7 @@ def _breaks(time_msc: pd.Series) -> list:
 COMMANDS = {"download": cmd_download, "manifest": cmd_manifest, "quality": cmd_quality, "export": cmd_export,
             "import": cmd_import, "verify-import": cmd_verify_import, "tester-dump": cmd_tester_dump,
             "verify-tester": cmd_verify_tester, "compare": cmd_compare, "verify-readback": cmd_verify_readback,
-            "custom-backup": cmd_custom_backup, "fetch-one": cmd_fetch_one, "tester-probe": cmd_tester_probe, "probe-report": cmd_probe_report,
+            "custom-backup": cmd_custom_backup, "fetch-one": cmd_fetch_one, "register-manual-hour": cmd_register_manual_hour, "tester-probe": cmd_tester_probe, "probe-report": cmd_probe_report,
             "manual-check": cmd_manual_check, "export-sample": cmd_export_sample,
             "manual-import-file": cmd_manual_import_file, "gui-prepare": cmd_gui_prepare, "gui-finish": cmd_gui_finish}
 SAMPLE_OK = ("verify-import", "tester-dump", "verify-tester", "verify-readback")
@@ -1208,7 +1251,7 @@ def main() -> None:
         if name in SAMPLE_OK:
             sp.add_argument("month", choices=sorted(MONTHS) + [SAMPLE])
         elif name not in ("import", "manual-check", "export-sample", "manual-import-file", "gui-prepare",
-                          "gui-finish", "custom-backup", "tester-probe", "probe-report", "fetch-one"):
+                          "gui-finish", "custom-backup", "tester-probe", "probe-report", "fetch-one", "register-manual-hour"):
             sp.add_argument("month", choices=sorted(MONTHS))
         if name == "download":
             sp.add_argument("--pause", type=float, default=5.0, help="seconds between requests")
@@ -1228,10 +1271,13 @@ def main() -> None:
             sp.add_argument("--span", choices=sorted(SPANS), help="the imported span: source of the comparisons")
             sp.add_argument("--window", nargs=2, help="Tester window [from, to) ISO UTC: every OnTick tick against the span")
             sp.add_argument("--list", action="store_true", help="include the first 50 stored ticks and bars")
+        if name == "register-manual-hour":
+            sp.add_argument("hour", help="ISO UTC hour; only the approved one is accepted")
+            sp.add_argument("file", help="file name in the manual data folder")
         if name == "fetch-one":
             sp.add_argument("hour", help="ISO UTC hour; only the approved one is accepted")
         if name == "manual-import-file":
-            sp.add_argument("--span", choices=["sample", "span0102"], default="sample")
+            sp.add_argument("--span", choices=sorted(SPANS), default="sample")
         if name == "quality":
             sp.add_argument("--partial", action="store_true", help="a labelled check of an incomplete month")
         if name == "import":

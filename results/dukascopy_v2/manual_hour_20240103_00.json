@@ -1,0 +1,34 @@
+{
+ "hour": "2024-01-03T00:00:00+00:00",
+ "source": "obtained manually by the user (2026-10-05); no request by the tools",
+ "original": "data/00h_ticks.bi5 (gitignored, unchanged)",
+ "raw_copy": "XAUUSD/2024/00/03/00h_ticks.bi5",
+ "bytes": 13855,
+ "sha256": "f7ba9a8ec9908a700e6d932d13784aea769b022fb40d2fc9afcb1b391509b3e9",
+ "copy_identical": true,
+ "format": "LZMA alone header; whole 20-byte records (>IIIff); price = integer / 1000",
+ "ticks": 3182,
+ "first_tick_utc": "2024-01-03T00:00:00.096+00:00",
+ "last_tick_utc": "2024-01-03T00:59:57.743+00:00",
+ "quality": {
+  "ticks": 3182,
+  "nonpositive": 0,
+  "crossed": 0,
+  "zero_spread": 0,
+  "out_of_order": 0,
+  "same_ms_as_previous": 0,
+  "exact_duplicates": 0,
+  "spread": {
+   "min": 0.2,
+   "p01": 0.26,
+   "median": 0.337,
+   "p99": 0.41,
+   "max": 0.45
+  },
+  "raw_last_digit_bid": {
+   "4": 275,
+   "5": 2429,
+   "8": 478
+  }
+ }
+}

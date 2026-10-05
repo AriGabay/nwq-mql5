@@ -1,0 +1,198 @@
+{
+ "purpose": "import path and data fidelity check; not a month's coverage",
+ "span": "span0103",
+ "source": {
+  "kind": "Dukascopy free historical feed files (LZMA .bi5), downloaded earlier",
+  "files": [
+   {
+    "file": "XAUUSD/2024/00/01/23h_ticks.bi5",
+    "bytes": 10473,
+    "sha256": "d930ff64c8d0eb6c75908cbf500a9b258acd5591f0350bff94b83eb4f2de8c44",
+    "ticks": 2220
+   },
+   {
+    "file": "XAUUSD/2024/00/02/00h_ticks.bi5",
+    "bytes": 13099,
+    "sha256": "c7eefab4bc9681471a92ad6b4a8d9ab94375cd0708d8b24c2b786813dfe4902b",
+    "ticks": 2948
+   },
+   {
+    "file": "XAUUSD/2024/00/02/01h_ticks.bi5",
+    "bytes": 27780,
+    "sha256": "75923ea8e9a5e6ffb29c425c416a53a8a3d6dbebe67a375c1004727348a24fe3",
+    "ticks": 6579
+   },
+   {
+    "file": "XAUUSD/2024/00/02/02h_ticks.bi5",
+    "bytes": 18617,
+    "sha256": "2de783311b27787231690d9095f19a9d0952b0b5a2d6ed19c89d67eb0d726839",
+    "ticks": 4427
+   },
+   {
+    "file": "XAUUSD/2024/00/02/03h_ticks.bi5",
+    "bytes": 11411,
+    "sha256": "0d92bc145986643956e7ad17023b671603ebf07af24edd326c6e530a61d61313",
+    "ticks": 2763
+   },
+   {
+    "file": "XAUUSD/2024/00/02/04h_ticks.bi5",
+    "bytes": 10929,
+    "sha256": "7b70440aff1cd17940b76c41e284de0bbbbfc5331704bb6d05b0afbfbc73564c",
+    "ticks": 2486
+   },
+   {
+    "file": "XAUUSD/2024/00/02/05h_ticks.bi5",
+    "bytes": 15343,
+    "sha256": "ab2f265473bea0ac2136c552ec7daba30e6a9fc60e3987ceecab73d7d4d774ae",
+    "ticks": 3592
+   },
+   {
+    "file": "XAUUSD/2024/00/02/06h_ticks.bi5",
+    "bytes": 16411,
+    "sha256": "3faf2b7d4340c240e1393f8cab258f35a7f32f63308072eea2291411449546ec",
+    "ticks": 3757
+   },
+   {
+    "file": "XAUUSD/2024/00/02/07h_ticks.bi5",
+    "bytes": 25623,
+    "sha256": "206dabbe3364a08bc3ead8fba9b38289e521c4bb0edfa33e7acd1be3ab64f73b",
+    "ticks": 6136
+   },
+   {
+    "file": "XAUUSD/2024/00/02/08h_ticks.bi5",
+    "bytes": 29184,
+    "sha256": "f282c92c9d28b58ece86b8ebabdd418674e3b2010675372b977cd4a7943ee8df",
+    "ticks": 6782
+   },
+   {
+    "file": "XAUUSD/2024/00/02/09h_ticks.bi5",
+    "bytes": 23397,
+    "sha256": "ee6f1625fc4ef4164223355612b7d334ef84a578f7f6c663374c60191fbb3836",
+    "ticks": 5611
+   },
+   {
+    "file": "XAUUSD/2024/00/02/10h_ticks.bi5",
+    "bytes": 21048,
+    "sha256": "97d5a9c2d06cf0835a23af2845b12b9bc463418c9eed4363d242dce16f55c80e",
+    "ticks": 4969
+   },
+   {
+    "file": "XAUUSD/2024/00/02/11h_ticks.bi5",
+    "bytes": 29510,
+    "sha256": "c84c5a4eb16903fad3f2278a58edbba0dbf5f29e1d36fe937f2827026a5f27dd",
+    "ticks": 7006
+   },
+   {
+    "file": "XAUUSD/2024/00/02/12h_ticks.bi5",
+    "bytes": 29392,
+    "sha256": "3674a02f6e51f17e8d031198193c984d59be64d51e8eb84e9c553f640db8fbd8",
+    "ticks": 6795
+   },
+   {
+    "file": "XAUUSD/2024/00/02/13h_ticks.bi5",
+    "bytes": 47502,
+    "sha256": "f9011f1f28cdf3bbfef56964ebc3d5a225dccf6bbac20f996b87ed106b2b10dc",
+    "ticks": 11503
+   },
+   {
+    "file": "XAUUSD/2024/00/02/14h_ticks.bi5",
+    "bytes": 63027,
+    "sha256": "b02974f5936c187ed5230574d99a7a1a5e92bae5627fcc4e09d9cc79de7008ed",
+    "ticks": 15463
+   },
+   {
+    "file": "XAUUSD/2024/00/02/15h_ticks.bi5",
+    "bytes": 65989,
+    "sha256": "a2b3f21daff8cd12b0d7e33f5705ccb050c5f8e5f31406e5dc792cb1e8454bc1",
+    "ticks": 16017
+   },
+   {
+    "file": "XAUUSD/2024/00/02/16h_ticks.bi5",
+    "bytes": 37288,
+    "sha256": "1dd04d2563514f92f8dcf02666341343d36e20874b02d5aa1dcf7ed877643d2a",
+    "ticks": 8965
+   },
+   {
+    "file": "XAUUSD/2024/00/02/17h_ticks.bi5",
+    "bytes": 21892,
+    "sha256": "1c2b7027394716f673c1cb08fdaed07fccc4e7d6fb44e1934aae6d0d5d3b9900",
+    "ticks": 5175
+   },
+   {
+    "file": "XAUUSD/2024/00/02/18h_ticks.bi5",
+    "bytes": 18485,
+    "sha256": "2a8daa3d8a7968763c20bc66b6dcfa95d25d92e59396fd3a2c2bd5ef806ef180",
+    "ticks": 4384
+   },
+   {
+    "file": "XAUUSD/2024/00/02/19h_ticks.bi5",
+    "bytes": 13718,
+    "sha256": "d8a7c748d6a14dafcdf4984a0320489692692c0ed42bab6f6cc1d58e63a7b4ae",
+    "ticks": 3264
+   },
+   {
+    "file": "XAUUSD/2024/00/02/20h_ticks.bi5",
+    "bytes": 17527,
+    "sha256": "e1a1850add39eb9d9d88bd44089b983c7a86ffd858514a3d2e97d6fdf100acee",
+    "ticks": 4191
+   },
+   {
+    "file": "XAUUSD/2024/00/02/21h_ticks.bi5",
+    "bytes": 11010,
+    "sha256": "3f476443e2629b1eedd1db498aaf84bff1fc67bbf3b33cbcbbda6800b4b5c463",
+    "ticks": 2675
+   },
+   {
+    "file": "XAUUSD/2024/00/02/22h_ticks.bi5",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "ticks": 0
+   },
+   {
+    "file": "XAUUSD/2024/00/02/23h_ticks.bi5",
+    "bytes": 7392,
+    "sha256": "9fd61065ea959049b4a4840e31b82f88bdaf8f3e125c0a86201ca47fde03b277",
+    "ticks": 1620
+   },
+   {
+    "file": "XAUUSD/2024/00/03/00h_ticks.bi5",
+    "bytes": 13855,
+    "sha256": "f7ba9a8ec9908a700e6d932d13784aea769b022fb40d2fc9afcb1b391509b3e9",
+    "ticks": 3182
+   }
+  ]
+ },
+ "file": {
+  "name": "XAUUSD.duka_20240101_2300_to_20240103_0100_UTC_ticks.csv",
+  "location": "outside git: NWQ_DUKA_DIR/mt5_manual (default D:/data/dukascopy)",
+  "bytes": 7268053,
+  "sha256": "0a4d0ab3ac4dfa14be1881d87c8ecce9f5b43d626668fc2ffa4429f5d4063728",
+  "format": "ASCII, CRLF, tab-separated, header <DATE> <TIME> <BID> <ASK> <LAST> <VOLUME>; date YYYY.MM.DD, time HH:MM:SS.mmm; prices with 3 decimals; LAST 0.000 and VOLUME 0 (no trade prices or trade volumes in the source); no flags column",
+  "time_zone": "UTC as in the feed (the terminal stores times without a zone)"
+ },
+ "ticks": 142510,
+ "first_tick_utc": "2024-01-01T23:00:00.312+00:00",
+ "last_tick_utc": "2024-01-03T00:59:57.743+00:00",
+ "period": {
+  "from_utc": "2024-01-01T23:00:00+00:00",
+  "to_utc": "2024-01-03T01:00:00+00:00 (exclusive)"
+ },
+ "order": "feed order, unchanged",
+ "same_ms_as_previous": 0,
+ "out_of_order": 0,
+ "nothing_removed_or_added": "every feed record is one line; duplicates kept; no time invented",
+ "written_file_read_back_vs_feed": {
+  "compared": "file written vs feed ticks",
+  "ticks_source": 142510,
+  "ticks_target": 142510,
+  "identical_in_order": true,
+  "extra_in_target": 0,
+  "missing_in_target": 0,
+  "first_extra": [],
+  "first_missing": []
+ },
+ "manual_web_export_sha256_unchanged": {
+  "ASK": "4aa2ff4d04d83377ec41239612dc7a59bd8b8fbd2e97c67d28fb2144eb587fbe",
+  "BID": "d96e8aeea4ba42f36c842124b0bb1d46e41084aa5efc25b16654730a0412c66c"
+ }
+}

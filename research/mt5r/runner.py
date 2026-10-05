@@ -37,7 +37,8 @@ class RunResult:
 # An MT5 process whose path Windows hides from us (it runs elevated): it may be the live or the isolated
 # terminal, so it counts as both and blocks every run (fail closed), but is never killed.
 UNREADABLE = "UNREADABLE:"
-PS_WINDOWS = ("Get-CimInstance Win32_Process | ForEach-Object { if ($_.ExecutablePath) "
+PS_WINDOWS = ("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+              "Get-CimInstance Win32_Process | ForEach-Object { if ($_.ExecutablePath) "
               "{ \"$($_.ProcessId) $($_.ExecutablePath) $($_.CommandLine)\" } "
               "elseif ($_.Name -match '^(terminal64|metatester64|metaeditor64)\\.exe$') "
               "{ \"$($_.ProcessId) " + UNREADABLE + "$($_.Name)\" } }")
@@ -49,8 +50,10 @@ def _ps_lines() -> list:
         cmd = ["powershell", "-NoProfile", "-NonInteractive", "-Command", PS_WINDOWS]
     else:
         cmd = ["ps", "-axo", "pid=,command="]
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    if r.returncode != 0:   # fail closed: an unreadable process list must never read as "MT5 closed"
+    # UTF-8 with replacement: a process name outside the console code page once made the reader thread fail and
+    # left stdout None (2026-10-05); the markers searched for are ASCII paths, so a replaced character is harmless
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode != 0 or r.stdout is None:   # fail closed: an unreadable list must never read as "MT5 closed"
         raise RuntimeError(f"process list unavailable (exit {r.returncode}); refusing to treat MT5 as closed")
     return r.stdout.splitlines()
 
