@@ -564,17 +564,26 @@ def cmd_export(args) -> None:
     print(f"{dst}: {len(ticks)} ticks, {dst.stat().st_size} bytes, sha256 {sha256(dst.read_bytes())}")
 
 
+def offline_lines(server: str) -> list:
+    """No account (Login=0) and every connection through a proxy on a closed local port, so nothing can connect;
+    algorithmic trading off. The server name only selects the local symbol base."""
+    return ["[Common]", f"Server={server}", "Login=0", "ProxyEnable=1", "ProxyType=0",
+            "ProxyAddress=127.0.0.1:9", "NewsEnable=0",
+            "[Experts]", "AllowLiveTrading=0", "AllowDllImport=0", "Enabled=0"]
+
+
 def startup_ini(server: str, script_parameters: str = "") -> str:
-    """Offline start: no account (Login=0) and every connection through a proxy on a closed local port, so nothing
-    can connect; trading off; the import script at startup (with a preset from MQL5/Presets when given); the
-    terminal shuts down after it. The server name only selects the local symbol base the startup chart needs: with
-    an unknown server (first attempt, 2026-10-05) the chart symbol did not exist and the script never started."""
-    return "\r\n".join([
-        "[Common]", f"Server={server}", "Login=0", "ProxyEnable=1", "ProxyType=0",
-        "ProxyAddress=127.0.0.1:9", "NewsEnable=0",
-        "[Experts]", "AllowLiveTrading=0", "AllowDllImport=0", "Enabled=0",
-        "[StartUp]", f"Script={pathlib.Path(IMPORT_SCRIPT).stem}"]
-        + ([f"ScriptParameters={script_parameters}"] if script_parameters else []) + ["ShutdownTerminal=1", ""])
+    """Offline start (offline_lines) with the import script at startup (with a preset from MQL5/Presets when
+    given); the terminal shuts down after it. With an unknown server (first attempt, 2026-10-05) the chart symbol
+    did not exist; with the local base (second attempt) the script still timed out (300 s) before OnStart."""
+    return "\r\n".join(offline_lines(server) + ["[StartUp]", f"Script={pathlib.Path(IMPORT_SCRIPT).stem}"]
+                       + ([f"ScriptParameters={script_parameters}"] if script_parameters else [])
+                       + ["ShutdownTerminal=1", ""])
+
+
+def gui_ini(server: str) -> str:
+    """The user's manual session in the terminal's interface: offline_lines only, no startup program."""
+    return "\r\n".join(offline_lines(server) + [""])
 
 
 TRADE_CALLS = ("OrderSend", "OrderSendAsync", "PositionOpen", "PositionClose", "PositionModify", "CTrade",
@@ -680,6 +689,148 @@ def cmd_import(args) -> None:
     loaded = all(f"{bin_name(m)}: readback" in log_text for m in keys)
     if connected or "result: ok" not in log_text or not loaded:
         raise SystemExit("import not clean - see import_run.json")
+
+
+# ------------------------------------------------------------------ manual import in the interface (user, 2026-10-05)
+MANUAL_IMPORT = RAW / "mt5_manual"
+MT5_TICK_HEADER = ["<DATE>", "<TIME>", "<BID>", "<ASK>", "<LAST>", "<VOLUME>"]
+GUI_INI = pathlib.Path("runs_ini") / "duka_gui.ini"
+GUI_DIR = RAW / "mt5_gui"
+
+
+def _price(raw: int) -> str:
+    return f"{raw // 1000}.{raw % 1000:03d}"
+
+
+def mt5_tick_lines(ticks: pd.DataFrame) -> list:
+    """The terminal's tick import format (Symbols > Ticks > Import Ticks): tab-separated Date (YYYY.MM.DD), Time
+    (HH:MM:SS.mmm), Bid, Ask, Last, Volume; one line per feed tick, in feed order. Times are the feed's UTC
+    milliseconds unchanged; prices are the feed's integers written with exactly 3 decimals (no float rounding).
+    Last and Volume are 0: the feed has quote volumes, not trades, and the terminal skips values <= 0. No flags:
+    the terminal computes them."""
+    out = ["\t".join(MT5_TICK_HEADER)]
+    for t, b, a in zip(ticks["time_msc"].astype("int64"), ticks["raw_bid"].astype("int64"),
+                       ticks["raw_ask"].astype("int64")):
+        d = dt.datetime.fromtimestamp(int(t) // 1000, dt.timezone.utc)
+        out.append(f"{d:%Y.%m.%d}\t{d:%H:%M:%S}.{int(t) % 1000:03d}\t{_price(int(b))}\t{_price(int(a))}\t0.000\t0")
+    return out
+
+
+def read_mt5_tick_lines(text: str) -> pd.DataFrame:
+    """Back from the import format: time_msc (UTC as written), bid, ask, in file order."""
+    rows = [l.split("\t") for l in text.splitlines() if l.strip()]
+    if rows[0] != MT5_TICK_HEADER:
+        raise ValueError(f"header {rows[0]} is not the import layout")
+    t = [int(dt.datetime.strptime(f"{r[0]} {r[1]}", "%Y.%m.%d %H:%M:%S.%f").replace(tzinfo=dt.timezone.utc)
+             .timestamp() * 1000 + 0.5) for r in rows[1:]]
+    return pd.DataFrame({"time_msc": t, "bid": [float(r[2]) for r in rows[1:]], "ask": [float(r[3]) for r in rows[1:]]})
+
+
+def manual_import_path() -> pathlib.Path:
+    return MANUAL_IMPORT / f"{CUSTOM}_{SAMPLE_HOUR:%Y%m%d_%H}00_UTC_ticks.csv"
+
+
+def cmd_manual_import_file(args) -> None:
+    """The sample hour's feed ticks as a file for the user's manual import, outside git, never overwritten with
+    different content; a manifest next to it and in RESULTS."""
+    ticks = sample_ticks()
+    src = raw_path(SAMPLE_HOUR)
+    data = ("\r\n".join(mt5_tick_lines(ticks)) + "\r\n").encode("ascii")
+    dst = manual_import_path()
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if dst.exists() and dst.read_bytes() != data:
+        raise SystemExit(f"{dst} exists with other content; never overwritten")
+    if not dst.exists():
+        dst.write_bytes(data)
+    back = read_mt5_tick_lines(dst.read_text(encoding="ascii"))
+    d = np.diff(ticks["time_msc"].to_numpy())
+    manual = {s: sha256((MANUAL / n).read_bytes()) for s, n in MANUAL_FILES.items() if (MANUAL / n).exists()}
+    man = {"purpose": "import path and data fidelity check of one hour; not a month's coverage",
+           "source": {"kind": "Dukascopy free historical feed file (LZMA .bi5), downloaded earlier",
+                      "file": src.relative_to(RAW).as_posix(), "bytes": src.stat().st_size,
+                      "sha256": sha256(src.read_bytes())},
+           "file": {"name": dst.name, "location": "outside git: NWQ_DUKA_DIR/mt5_manual (default D:/data/dukascopy)",
+                    "bytes": len(data), "sha256": sha256(data),
+                    "format": "ASCII, CRLF, tab-separated, header <DATE> <TIME> <BID> <ASK> <LAST> <VOLUME>; "
+                              "date YYYY.MM.DD, time HH:MM:SS.mmm; prices with 3 decimals; LAST 0.000 and VOLUME 0 "
+                              "(no trade prices or trade volumes in the source); no flags column",
+                    "time_zone": "UTC as in the feed (the terminal stores times without a zone)"},
+           "ticks": int(len(ticks)), "first_tick_utc": _iso(int(ticks["time_msc"].min())),
+           "last_tick_utc": _iso(int(ticks["time_msc"].max())),
+           "period": {"from_utc": SAMPLE_HOUR.isoformat(),
+                      "to_utc": (SAMPLE_HOUR + dt.timedelta(hours=1)).isoformat() + " (exclusive)"},
+           "order": "feed order, unchanged", "same_ms_as_previous": int((d == 0).sum()),
+           "out_of_order": int((d < 0).sum()),
+           "nothing_removed_or_added": "every feed record is one line; duplicates kept; no time invented",
+           "written_file_read_back_vs_feed": compare_ticks(ticks, back, "file written vs feed ticks"),
+           "manual_web_export_sha256_unchanged": manual}
+    evaluate.save(man, RESULTS / "manual_import_file_manifest.json")
+    (dst.parent / (dst.stem + "_manifest.json")).write_text(json.dumps(man, indent=1), encoding="utf-8")
+    print(json.dumps(man, indent=1))
+
+
+def cmd_gui_prepare(args) -> None:
+    """Before the user's manual session: safety checks, a backup of common.ini, the offline start config and the
+    journal positions. The terminal is started by the user, never by this tool."""
+    if runner.live_terminal_running():
+        raise SystemExit("live MT5 terminal is running; please close it first (it is never closed by this tool)")
+    cfg = env.load_config()
+    env.assert_isolated(cfg)
+    if runner.isolated_processes(cfg):
+        raise SystemExit("isolated terminal already running")
+    env.disable_mcp(cfg)
+    env.assert_trade_safety(cfg)
+    if (GUI_DIR / "open_session.json").exists():
+        raise SystemExit("a manual session is already prepared; run gui-finish first")
+    stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    keep = GUI_DIR / stamp
+    keep.mkdir(parents=True)
+    shutil.copy2(cfg.mt5_dir / "config" / "common.ini", keep / "common.ini.before")
+    env.write_utf16(cfg.mt5_dir / GUI_INI, gui_ini(cfg.server))
+    state = {"stamp": stamp, "prepared_at": now_iso(), "t0": time.time(),
+             "log_sizes": {f.name: f.stat().st_size for f in cfg.mt5_dir.glob("logs/*.log")}}
+    (GUI_DIR / "open_session.json").write_text(json.dumps(state), encoding="utf-8")
+    print("start the isolated terminal yourself with:")
+    print(f'"{cfg.win_path("terminal64.exe")}" /portable /config:{cfg.win_path(GUI_INI.as_posix())}')
+
+
+def cmd_gui_finish(args) -> None:
+    """After the user closed the terminal: restore common.ini, check this session's journal (connections masked),
+    and record which custom-symbol files exist. Import success is judged later from readback and Tester ticks."""
+    st_p = GUI_DIR / "open_session.json"
+    if not st_p.exists():
+        raise SystemExit("no prepared manual session")
+    cfg = env.load_config()
+    if runner.isolated_processes(cfg):
+        raise SystemExit("the isolated terminal is still running; close it first")
+    state = json.loads(st_p.read_text(encoding="utf-8"))
+    keep = GUI_DIR / state["stamp"]
+    common = cfg.mt5_dir / "config" / "common.ini"
+    changed = common.read_bytes() != (keep / "common.ini.before").read_bytes()
+    shutil.copy2(keep / "common.ini.before", common)
+    env.disable_mcp(cfg)
+    env.assert_trade_safety(cfg)
+    journal = ""
+    for f in cfg.mt5_dir.glob("logs/*.log"):
+        if f.stat().st_mtime >= state["t0"] - 5:
+            shutil.copy2(f, keep / f.name)
+            journal += run_part(f.read_bytes(), state["log_sizes"].get(f.name, 0))
+    (keep / "journal_this_session.txt").write_text(journal, encoding="utf-8")
+    words = ("custom", CUSTOM.lower(), "import", "tick")
+    relevant = [re.sub(r"\d{5,}", "<number>", l) for l in journal.splitlines() if any(w in l.lower() for w in words)]
+    base = cfg.mt5_dir / "bases" / "Custom"
+    files = sorted((p.relative_to(base).as_posix(), p.stat().st_size) for p in base.rglob("*") if p.is_file())
+    out = {"session": state["stamp"], "prepared_at": state["prepared_at"], "finished_at": now_iso(),
+           "common_ini_changed_by_terminal": changed, "common_ini_restored": True,
+           "account_connection_lines": connection_lines(journal),
+           "journal_lines_custom_or_import": relevant[:200], "journal_lines_total": len(journal.splitlines()),
+           "custom_base_files": [{"path": p, "bytes": b} for p, b in files],
+           "journal_kept_in": keep.as_posix()}
+    evaluate.save(out, RESULTS / "gui_session.json")
+    st_p.rename(keep / "session_state.json")
+    print(json.dumps(out, indent=1))
+    if out["account_connection_lines"]:
+        raise SystemExit("the session connected to a server - see gui_session.json")
 
 
 def cmd_verify_import(args) -> None:
@@ -811,7 +962,8 @@ def _breaks(time_msc: pd.Series) -> list:
 COMMANDS = {"download": cmd_download, "manifest": cmd_manifest, "quality": cmd_quality, "export": cmd_export,
             "import": cmd_import, "verify-import": cmd_verify_import, "tester-dump": cmd_tester_dump,
             "verify-tester": cmd_verify_tester, "compare": cmd_compare,
-            "manual-check": cmd_manual_check, "export-sample": cmd_export_sample}
+            "manual-check": cmd_manual_check, "export-sample": cmd_export_sample,
+            "manual-import-file": cmd_manual_import_file, "gui-prepare": cmd_gui_prepare, "gui-finish": cmd_gui_finish}
 SAMPLE_OK = ("verify-import", "tester-dump", "verify-tester")
 
 
@@ -824,7 +976,8 @@ def main() -> None:
             sp.add_argument("symbol")
         if name in SAMPLE_OK:
             sp.add_argument("month", choices=sorted(MONTHS) + [SAMPLE])
-        elif name not in ("import", "manual-check", "export-sample"):
+        elif name not in ("import", "manual-check", "export-sample", "manual-import-file", "gui-prepare",
+                          "gui-finish"):
             sp.add_argument("month", choices=sorted(MONTHS))
         if name == "download":
             sp.add_argument("--pause", type=float, default=5.0, help="seconds between requests")

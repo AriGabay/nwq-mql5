@@ -300,3 +300,25 @@ def test_only_this_runs_journal_lines_are_checked_and_account_numbers_are_masked
     assert dc.connection_lines(dc.run_part(data, start)) == []
     hits = dc.connection_lines(dc.run_part(data, 0))
     assert len(hits) == 1 and "1234567" not in hits[0] and "<number>" in hits[0]
+
+
+def test_the_manual_import_file_keeps_feed_milliseconds_pairs_order_and_exact_prices():
+    t0 = int(dc.SAMPLE_HOUR.timestamp() * 1000)
+    ticks = pd.DataFrame({"time_msc": [t0 + 128, t0 + 128, t0 + 999, t0 + 3_599_210],
+                          "raw_bid": [2076965, 2076965, 2076000, 2075925], "raw_ask": [2077255, 2077255, 2076005, 2076265]})
+    lines = dc.mt5_tick_lines(ticks)
+    assert lines[0] == "\t".join(["<DATE>", "<TIME>", "<BID>", "<ASK>", "<LAST>", "<VOLUME>"])
+    assert lines[1].split("\t") == ["2024.01.02", "10:00:00.128", "2076.965", "2077.255", "0.000", "0"]
+    assert lines[3].split("\t")[1:4] == ["10:00:00.999", "2076.000", "2076.005"]      # .999 stays in its second
+    assert len(lines) == 5                                                           # the identical pair is kept
+    back = dc.read_mt5_tick_lines("\r\n".join(lines))
+    assert back["time_msc"].tolist() == ticks["time_msc"].tolist()
+    src = ticks.assign(bid=ticks["raw_bid"] / 1000, ask=ticks["raw_ask"] / 1000)
+    assert dc.compare_ticks(src, back, "x")["identical_in_order"]
+
+
+def test_the_manual_session_config_is_offline_with_trading_off_and_starts_nothing():
+    ini = dc.gui_ini("Some-Server")
+    assert "Login=0" in ini and "ProxyEnable=1" in ini and "ProxyAddress=127.0.0.1:9" in ini
+    assert "AllowLiveTrading=0" in ini and "Enabled=0" in ini
+    assert "[StartUp]" not in ini and "Script=" not in ini and "Password" not in ini
