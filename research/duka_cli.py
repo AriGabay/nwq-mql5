@@ -33,6 +33,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
@@ -119,68 +120,149 @@ def load_status(month: str) -> dict:
     return st
 
 
-def save_status(month: str, st: dict) -> None:
-    p = status_path(month)
+def _write_json(p: pathlib.Path, obj) -> None:
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(".tmp")
-    tmp.write_text(json.dumps(st, indent=1))
+    tmp.write_text(json.dumps(obj, indent=1))
     tmp.replace(p)
+
+
+def save_status(month: str, st: dict) -> None:
+    _write_json(status_path(month), st)
 
 
 def now_iso() -> str:
     return dt.datetime.now(dk.UTC).isoformat(timespec="seconds")
 
 
+# one budget for both months, kept between runs: requests sent and seconds waited after 429s or dropped connections
+BUDGET_DEFAULT = {"max_requests": 2500, "max_wait_seconds": 12 * 3600}
+
+
+def budget_path() -> pathlib.Path:
+    return RAW / SYMBOL / "download_budget.json"
+
+
+def load_budget() -> dict:
+    p = budget_path()
+    b = json.loads(p.read_text()) if p.exists() else {**BUDGET_DEFAULT, "requests": 0, "wait_seconds": 0}
+    return b
+
+
+def budget_left(b: dict) -> str:
+    """Empty while the budget lasts; otherwise why it is spent."""
+    if b["requests"] >= b["max_requests"]:
+        return f"request budget spent ({b['requests']}/{b['max_requests']})"
+    if b["wait_seconds"] >= b["max_wait_seconds"]:
+        return f"wait budget spent ({b['wait_seconds']}/{b['max_wait_seconds']} s)"
+    return ""
+
+
+def _pid_alive(pid: int) -> bool:
+    if os.name == "nt":
+        out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True).stdout
+        return str(pid) in out
+    try:
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+class DownloadLock:
+    """At most one download at a time (no parallel requests to the feed)."""
+
+    def __init__(self):
+        self.path = RAW / SYMBOL / "download.lock"
+
+    def __enter__(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        if self.path.exists():
+            pid = int(json.loads(self.path.read_text()).get("pid", 0))
+            if pid and _pid_alive(pid):
+                raise SystemExit(f"another download is running (pid {pid}); refusing a parallel one")
+            self.path.unlink()                              # a stale lock from a stopped run
+        with open(self.path, "x") as f:
+            json.dump({"pid": os.getpid(), "at": now_iso()}, f)
+        return self
+
+    def __exit__(self, *exc):
+        self.path.unlink(missing_ok=True)
+        return False
+
+
 def cmd_download(args) -> None:
-    """Every hour of the month once: a stored file (possibly an empty 200 answer), a 404, or - after a network
-    failure - unresolved for a later run. A 429 waits Retry-After (or args.wait seconds) and retries the same hour;
-    each 429 is logged with its time, so the limit is documented from what was observed."""
+    """Every hour of the month once: a stored file (possibly an empty 200 answer), a 404, or - after network
+    failures - unresolved. A 429 waits Retry-After (or args.wait seconds) and retries the same hour; dropped
+    connections wait the same way. Every wait is logged, and the shared budget (requests and seconds waited,
+    kept between runs) stops the run with a partial summary when it is spent."""
     y, m = check_month(args.month)
-    st = load_status(args.month)
-    t_end = time.time() + args.max_hours * 3600
-    got = 0
-    for h in dk.month_hours(y, m):
-        key = h.isoformat()
-        p = raw_path(h)
-        if p.exists():                                      # never overwritten
-            st["hours"].setdefault(key, {"status": "file" if p.stat().st_size else "empty_response"})
-            continue
-        if st["hours"].get(key, {}).get("status") == "http_404":
-            continue
-        while True:
-            if time.time() > t_end:
-                st["runs"].append({"at": now_iso(), "downloaded": got, "stopped": "max_hours"})
-                save_status(args.month, st)
-                raise SystemExit(f"{args.month}: stopped after --max-hours; resume later")
-            try:
-                status, body = fetch(dk.url(SYMBOL, h))
-            except RateLimited as e:
-                wait = e.retry_after if e.retry_after is not None else args.wait
-                st["rate_limits"].append({"at": now_iso(), "hour": key, "retry_after": e.retry_after, "waited_s": wait})
-                save_status(args.month, st)
-                time.sleep(wait)
+    with DownloadLock():
+        st, b = load_status(args.month), load_budget()
+        t_end = time.time() + args.max_hours * 3600
+        got, stop = 0, None
+        for h in dk.month_hours(y, m):
+            key = h.isoformat()
+            p = raw_path(h)
+            if p.exists():                                  # never overwritten
+                st["hours"].setdefault(key, {"status": "file" if p.stat().st_size else "empty_response"})
                 continue
-            except NetworkError as e:
-                st["hours"][key] = {"status": "unresolved", "error": str(e)[-200:], "at": now_iso()}
+            if st["hours"].get(key, {}).get("status") == "http_404":
+                continue
+            while stop is None:
+                stop = budget_left(b) or ("max_hours" if time.time() > t_end else None)
+                if stop:
+                    break
+                b["requests"] += 1
+                _write_json(budget_path(), b)
+                try:
+                    status, body = fetch(dk.url(SYMBOL, h))
+                except (RateLimited, NetworkError) as e:
+                    limited = isinstance(e, RateLimited)
+                    wait = e.retry_after if limited and e.retry_after is not None else args.wait
+                    if not limited:
+                        fails = st["hours"].get(key, {}).get("failures", 0) + 1
+                        st["hours"][key] = {"status": "unresolved", "failures": fails, "error": str(e)[-200:],
+                                            "at": now_iso()}
+                        if fails >= args.max_failures:
+                            stop = f"{fails} network failures in a row at {key}"
+                    st["rate_limits"].append({"at": now_iso(), "hour": key, "kind": "http_429" if limited else "network",
+                                              "retry_after": e.retry_after if limited else None, "waited_s": wait})
+                    save_status(args.month, st)
+                    if stop:
+                        break
+                    b["wait_seconds"] += wait
+                    _write_json(budget_path(), b)
+                    time.sleep(wait)
+                    continue
+                if status == 404:
+                    st["hours"][key] = {"status": "http_404", "at": now_iso()}
+                else:
+                    p.parent.mkdir(parents=True, exist_ok=True)
+                    p.write_bytes(body)
+                    st["hours"][key] = {"status": "file" if body else "empty_response", "bytes": len(body),
+                                        "at": now_iso()}
+                    got += 1
+                save_status(args.month, st)
+                time.sleep(args.pause)
                 break
-            if status == 404:
-                st["hours"][key] = {"status": "http_404", "at": now_iso()}
-            else:
-                p.parent.mkdir(parents=True, exist_ok=True)
-                p.write_bytes(body)
-                st["hours"][key] = {"status": "file" if body else "empty_response", "bytes": len(body), "at": now_iso()}
-                got += 1
-            break
+            if stop:
+                break
+        missing = sum(1 for h in dk.month_hours(y, m) if not raw_path(h).exists()
+                      and st["hours"].get(h.isoformat(), {}).get("status") != "http_404")
+        st["runs"].append({"at": now_iso(), "downloaded": got, "stopped": stop, "hours_missing": missing,
+                           "budget": {k: b[k] for k in ("requests", "max_requests", "wait_seconds", "max_wait_seconds")}})
         save_status(args.month, st)
-        time.sleep(args.pause)
-    st["runs"].append({"at": now_iso(), "downloaded": got, "stopped": None})
-    save_status(args.month, st)
-    left = sum(1 for v in st["hours"].values() if v["status"] == "unresolved")
-    print(f"{args.month}: downloaded {got} this run; unresolved hours {left}; 429 events so far {len(st['rate_limits'])}")
+    print(f"{args.month}: downloaded {got} this run; hours still missing {missing}; "
+          f"budget {b['requests']}/{b['max_requests']} requests, {b['wait_seconds']}/{b['max_wait_seconds']} s waited"
+          + (f"; stopped: {stop}" if stop else ""))
+    if stop and stop != "max_hours":
+        raise SystemExit(f"{args.month}: partial - {missing} hours missing ({stop})")
 
 
 def load_month(key: str):
-    """Decoded ticks of a month in hour order, plus one manifest row per hour with its download status."""
+    """Decoded ticks of a month in hour order, plus one row per hour with its download status, read from the
+    current files (never from an earlier manifest)."""
     y, m = check_month(key)
     st = load_status(key)["hours"]
     frames, files = [], []
@@ -200,58 +282,97 @@ def load_month(key: str):
     return ticks, files
 
 
-def closed_hours(files: list, ticks: pd.DataFrame) -> set:
-    """Hours without ticks that lie wholly inside an observed market pause between real ticks (a weekend, holiday
-    or daily-break gap from dk.gaps). Only those count as a verified close; an hour never downloaded never does."""
-    out = set()
-    for g in dk.gaps(ticks, min_seconds=3600, holidays=HOLIDAYS):
-        if g["kind"] == "unexplained":
-            continue
-        a, b = dt.datetime.fromisoformat(g["start"]), dt.datetime.fromisoformat(g["end"])
-        for f in files:
-            h = dt.datetime.fromisoformat(f["hour"])
-            if a <= h and h + dt.timedelta(hours=1) <= b:
-                out.add(f["hour"])
+NEW_YORK = ZoneInfo("America/New_York")
+SCHEDULE_BASIS = ("spot gold (XAU/USD) schedule in New York time: weekly close Friday 17:00 to Sunday 18:00, "
+                  "daily break 17:00-18:00 Monday-Thursday; holidays are not in it")
+
+
+def schedule_closed(hour: dt.datetime) -> bool:
+    """The whole UTC hour [hour, hour+1h) lies in the spot-gold closed schedule (New York time, so daylight saving
+    moves it in UTC). Holidays are not part of the schedule: they are never assumed closed."""
+    for minute in range(0, 60, 5):
+        t = (hour + dt.timedelta(minutes=minute)).astimezone(NEW_YORK)
+        wd, hm = t.weekday(), t.hour * 60 + t.minute
+        weekend = (wd == 4 and hm >= 17 * 60) or wd == 5 or (wd == 6 and hm < 18 * 60)
+        daily = wd in (0, 1, 2, 3) and 17 * 60 <= hm < 18 * 60
+        if not (weekend or daily):
+            return False
+    return True
+
+
+def classify_hours(files: list) -> list:
+    """Each hour's coverage: 'ticks' (a file with ticks), 'closed_verified' (no ticks, a resolved answer - empty
+    file or 404 - and the whole hour inside the closed schedule), 'pending' (not downloaded or unresolved), or
+    'unverified' (a resolved answer without ticks outside that schedule, e.g. a holiday or a missing trading
+    hour). A tick gap alone never makes an hour 'closed'."""
+    out = []
+    for f in files:
+        s = f["status"]
+        if s == "file_with_ticks":
+            c = "ticks"
+        elif s in ("not_downloaded", "unresolved"):
+            c = "pending"
+        elif s in ("empty_response", "http_404"):
+            c = "closed_verified" if schedule_closed(dt.datetime.fromisoformat(f["hour"])) else "unverified"
+        else:
+            c = "unverified"
+        out.append({**f, "coverage": c})
     return out
 
 
-def cmd_manifest(args) -> None:
-    ticks, files = load_month(args.month)
-    closed = closed_hours(files, ticks)
-    for f in files:
-        if f["status"] in ("empty_response", "http_404"):
-            f["verified_market_closed"] = f["hour"] in closed
+def coverage(month: str) -> dict:
+    """Recomputed from the current files: download_resolved (every hour answered: a file, an empty answer or a
+    404) and coverage_confirmed (every hour has ticks or is a verified closed hour)."""
+    ticks, files = load_month(month)
+    rows = classify_hours(files)
+    counts = pd.Series([r["coverage"] for r in rows]).value_counts().to_dict()
     present = [f for f in files if f["file"]]
-    counts = pd.Series([f["status"] for f in files]).value_counts().to_dict()
-    pending = counts.get("not_downloaded", 0) + counts.get("unresolved", 0)
+    return {"ticks": ticks, "rows": rows, "counts": counts,
+            "download_resolved": counts.get("pending", 0) == 0,
+            "coverage_confirmed": counts.get("pending", 0) == 0 and counts.get("unverified", 0) == 0,
+            "sha256_of_file_list": sha256("".join(f"{f['file']}:{f['sha256']}\n" for f in present).encode())}
+
+
+def cmd_manifest(args) -> None:
+    cov = coverage(args.month)
+    ticks, rows = cov["ticks"], cov["rows"]
+    present = [f for f in rows if f["file"]]
     st = load_status(args.month)
     man = {"source": "Dukascopy historical data feed (free), " + dk.BASE + "/XAUUSD/<YYYY>/<MM-1>/<DD>/<HH>h_ticks.bi5",
            "format": "LZMA; 20-byte big-endian records: uint32 ms since the UTC hour, uint32 ask, uint32 bid, "
                      "float32 ask volume, float32 bid volume; price = integer / 1000",
            "symbol": SYMBOL, "month": args.month, "time_zone": "UTC (hour in the path, ms offset in the record)",
            "raw_location": "outside git (NWQ_DUKA_DIR, default D:/data/dukascopy)",
-           "complete": pending == 0, "hours_in_month": len(files), "hours_by_status": counts, "hours_pending": pending,
-           "empty_hours_in_verified_closed_window": sum(1 for f in files if f.get("verified_market_closed")),
-           "empty_hours_outside_closed_window": sum(1 for f in files if f["status"] in ("empty_response", "http_404")
-                                                    and not f.get("verified_market_closed")),
+           "download_resolved": cov["download_resolved"], "coverage_confirmed": cov["coverage_confirmed"],
+           "closed_schedule_basis": SCHEDULE_BASIS,
+           "hours_in_month": len(rows), "hours_by_download_status": pd.Series([r["status"] for r in rows]).value_counts().to_dict(),
+           "hours_by_coverage": cov["counts"],
+           "unverified_hours": [r["hour"] for r in rows if r["coverage"] == "unverified"],
+           "pending_hours": [r["hour"] for r in rows if r["coverage"] == "pending"],
            "files": len(present), "bytes": sum(f["bytes"] for f in present), "ticks": int(len(ticks)),
            "first_tick_utc": _iso(ticks["time_msc"].min()) if len(ticks) else None,
            "last_tick_utc": _iso(ticks["time_msc"].max()) if len(ticks) else None,
            "rate_limit_events": len(st["rate_limits"]), "rate_limits_observed": st["rate_limits"],
-           "sha256_of_file_list": sha256("".join(f"{f['file']}:{f['sha256']}\n" for f in present).encode()),
-           "per_hour": files}
+           "download_budget": load_budget(),
+           "sha256_of_file_list": cov["sha256_of_file_list"], "per_hour": rows}
     evaluate.save(man, RESULTS / f"manifest_{args.month}.json")
-    print(json.dumps({k: v for k, v in man.items() if k not in ("per_hour", "rate_limits_observed")}, indent=1))
+    print(json.dumps({k: v for k, v in man.items() if k not in ("per_hour", "rate_limits_observed",
+                                                              "unverified_hours", "pending_hours")}, indent=1))
 
 
-def require_complete(month: str, allow_partial: bool) -> None:
-    man = RESULTS / f"manifest_{month}.json"
-    if not man.exists():
+def require_resolved(month: str, allow_partial: bool) -> dict:
+    """The coverage of the current files, checked against the saved manifest (it must describe these very files).
+    A month with pending hours is refused unless a labelled partial check is asked for."""
+    man_p = RESULTS / f"manifest_{month}.json"
+    if not man_p.exists():
         raise SystemExit(f"run manifest {month} first")
-    m = json.loads(man.read_text())
-    if not m["complete"] and not allow_partial:
-        raise SystemExit(f"{month}: {m['hours_pending']} hours not downloaded - the month is partial "
+    cov = coverage(month)
+    if json.loads(man_p.read_text())["sha256_of_file_list"] != cov["sha256_of_file_list"]:
+        raise SystemExit(f"{month}: the manifest does not describe the current files; run manifest {month} again")
+    if not cov["download_resolved"] and not allow_partial:
+        raise SystemExit(f"{month}: {cov['counts'].get('pending', 0)} hours not downloaded - the month is partial "
                          "(--partial only for a labelled partial check)")
+    return cov
 
 
 # ------------------------------------------------------------------ quality
@@ -262,8 +383,8 @@ def derived(name: str) -> pathlib.Path:
 
 
 def cmd_quality(args) -> None:
-    require_complete(args.month, args.partial)
-    ticks, files = load_month(args.month)
+    cov = require_resolved(args.month, args.partial)
+    ticks, files = cov["ticks"], cov["rows"]
     q = dk.quality(ticks)
     g = dk.gaps(ticks, min_seconds=300, holidays=HOLIDAYS)
     kinds = pd.Series([x["kind"] for x in g]).value_counts().to_dict() if g else {}
@@ -276,7 +397,8 @@ def cmd_quality(args) -> None:
         ticks=("spread", "size"), spread_median=("spread", "median"), spread_p99=("spread", lambda s: s.quantile(0.99)))
     sec = ticks["time_msc"].to_numpy() // 1000
     per_sec = pd.Series(sec).value_counts()
-    out = {"month": args.month, "partial_sample": bool(args.partial), "quality": q,
+    out = {"month": args.month, "partial_sample": not cov["download_resolved"],
+           "coverage_confirmed": cov["coverage_confirmed"], "hours_by_coverage": cov["counts"], "quality": q,
            "gaps_over_5min": {"count": len(g), "by_kind": kinds, "list": g},
            "bars": {"m1": int(len(m1)), "m5": int(len(m5)),
                     "m1_ticks_median": float(m1["ticks"].median()), "m1_ticks_p01": float(m1["ticks"].quantile(0.01)),
@@ -323,8 +445,7 @@ def month_range_msc(month: str) -> tuple:
 
 
 def cmd_export(args) -> None:
-    require_complete(args.month, False)
-    ticks, _ = load_month(args.month)
+    ticks = require_resolved(args.month, False)["ticks"]
     q = dk.quality(ticks)
     if q["out_of_order"]:
         raise SystemExit(f"{args.month}: {q['out_of_order']} ticks out of time order - not exported; decide first")
@@ -564,6 +685,7 @@ def main() -> None:
             sp.add_argument("--pause", type=float, default=5.0, help="seconds between requests")
             sp.add_argument("--wait", type=int, default=900, help="seconds after a 429 without Retry-After")
             sp.add_argument("--max-hours", type=float, default=12.0, help="stop (resumable) after this long")
+            sp.add_argument("--max-failures", type=int, default=4, help="network failures in a row before stopping")
         if name == "quality":
             sp.add_argument("--partial", action="store_true", help="a labelled check of an incomplete month")
         if name == "import":
