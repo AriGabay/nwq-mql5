@@ -277,7 +277,7 @@ def test_the_sample_import_passes_only_its_file_and_still_starts_offline():
 
 def test_the_sample_is_one_hour_inside_the_approved_january_and_only_for_the_import_checks():
     assert dc.SAMPLE_HOUR.strftime("%Y-%m") in dc.MONTHS and dc.SAMPLE_HOUR.tzinfo is not None
-    assert set(dc.SAMPLE_OK) == {"verify-import", "tester-dump", "verify-tester"}
+    assert set(dc.SAMPLE_OK) == {"verify-import", "tester-dump", "verify-tester", "verify-readback"}
     assert dc.bin_name(dc.SAMPLE) not in {dc.bin_name(m) for m in dc.MONTHS}
     import argparse
     with pytest.raises(SystemExit, match="only"):

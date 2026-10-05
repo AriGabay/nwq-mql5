@@ -881,16 +881,37 @@ def cmd_tester_dump(args) -> None:
     if comp["errors"] != 0 or not comp["ex5_exists"]:
         raise SystemExit(f"compile failed: {comp['log'][-1500:]}")
     hs = [SAMPLE_HOUR] if args.month == SAMPLE else dk.month_hours(*check_month(args.month))
-    rid = dump_run_id(args.symbol, args.month)
+    rid = dump_run_id(args.symbol, args.month) + ("_rb" if args.readback else "")
+    lines = [f"ResearchRunTag={rid}"]
+    if args.readback:               # the stored ticks of the period, read at init (the Tester may deliver none)
+        frm = int(hs[0].timestamp() * 1000)
+        lines += [f"ReadbackFromMsc={frm}", f"ReadbackToMsc={int(hs[-1].timestamp() * 1000) + 3_600_000 - 1}"]
     text = ini.render(expert=pathlib.Path(DUMP_EA).stem + ".ex5", symbol=args.symbol, period="M1",
                       from_date=hs[0].strftime("%Y.%m.%d"), to_date_inclusive=hs[-1].strftime("%Y.%m.%d"),
-                      deposit=10000, report=f"reports\\{rid}", set_lines=[f"ResearchRunTag={rid}"])
+                      deposit=10000, report=f"reports\\{rid}", set_lines=lines)
     res = runner.run(cfg, rid, text, pathlib.Path(DUMP_EA).stem + ".ex5", meta={"role": "duka_data_check"})
     print(rid, res.status, res.seconds)
 
 
 def tester_ticks(rid: str) -> pd.DataFrame:
     return pd.read_csv(runner.RUNS / rid / f"rl_ticks_{rid}.csv")
+
+
+def cmd_verify_readback(args) -> None:
+    """The stored ticks the Tester read back (CopyTicksRange at init) against the source, tick by tick."""
+    src = source_ticks(args.month)
+    rid = dump_run_id(CUSTOM, args.month) + "_rb"
+    got = pd.read_csv(runner.RUNS / rid / f"rl_readback_{rid}.csv")
+    meta = pd.read_csv(runner.RUNS / rid / f"rl_readback_meta_{rid}.csv")
+    out = compare_ticks(src, got, f"stored ticks read back in the Tester ({rid})")
+    out["readback_meta"] = dict(zip(meta["key"], meta["value"].astype(str)))
+    out["flags"] = {str(k): int(v) for k, v in got["flags"].value_counts().items()}
+    if len(got) == len(src):
+        out["max_abs_time_diff_ms"] = int((got["time_msc"].to_numpy() - src["time_msc"].to_numpy()).__abs__().max())
+    spec = pd.read_csv(runner.RUNS / rid / f"rl_spec_{rid}.csv")
+    out["spec_in_tester"] = dict(zip(spec["key"], spec["value"].astype(str)))
+    evaluate.save(out, RESULTS / f"readback_check_{args.month}.json")
+    print(json.dumps({k: v for k, v in out.items() if k != "spec_in_tester"}, indent=1))
 
 
 def cmd_verify_tester(args) -> None:
@@ -961,10 +982,10 @@ def _breaks(time_msc: pd.Series) -> list:
 
 COMMANDS = {"download": cmd_download, "manifest": cmd_manifest, "quality": cmd_quality, "export": cmd_export,
             "import": cmd_import, "verify-import": cmd_verify_import, "tester-dump": cmd_tester_dump,
-            "verify-tester": cmd_verify_tester, "compare": cmd_compare,
+            "verify-tester": cmd_verify_tester, "compare": cmd_compare, "verify-readback": cmd_verify_readback,
             "manual-check": cmd_manual_check, "export-sample": cmd_export_sample,
             "manual-import-file": cmd_manual_import_file, "gui-prepare": cmd_gui_prepare, "gui-finish": cmd_gui_finish}
-SAMPLE_OK = ("verify-import", "tester-dump", "verify-tester")
+SAMPLE_OK = ("verify-import", "tester-dump", "verify-tester", "verify-readback")
 
 
 def main() -> None:
@@ -984,6 +1005,8 @@ def main() -> None:
             sp.add_argument("--wait", type=int, default=900, help="seconds after a 429 without Retry-After")
             sp.add_argument("--max-hours", type=float, default=12.0, help="stop (resumable) after this long")
             sp.add_argument("--max-failures", type=int, default=4, help="network failures in a row before stopping")
+        if name == "tester-dump":
+            sp.add_argument("--readback", action="store_true", help="also write the stored ticks of the period")
         if name == "quality":
             sp.add_argument("--partial", action="store_true", help="a labelled check of an incomplete month")
         if name == "import":
