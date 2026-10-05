@@ -317,6 +317,55 @@ def cmd_download(args) -> None:
         raise SystemExit(f"{args.month}: partial - {missing} hours missing ({stop})")
 
 
+ONE_HOUR_APPROVED = {dt.datetime(2024, 1, 3, 0, tzinfo=dt.timezone.utc)}   # user approval 2026-10-05: this file only
+
+
+def cmd_fetch_one(args) -> None:
+    """One HTTP request for one approved hour: no retry, no wait, no loop. A 429, a network failure, a 404 or an
+    empty or undecodable answer stops with a report; an existing file is never fetched again or overwritten."""
+    h = dt.datetime.fromisoformat(args.hour).replace(tzinfo=dt.timezone.utc)
+    if h not in ONE_HOUR_APPROVED:
+        raise SystemExit(f"{h.isoformat()} is not an approved single hour")
+    p = raw_path(h)
+    if p.exists():
+        raise SystemExit(f"{p} exists ({p.stat().st_size} bytes); not fetched again")
+    month = h.strftime("%Y-%m")
+    with DownloadLock():
+        st, budget = load_status(month), Budget()
+        key, u = h.isoformat(), dk.url(SYMBOL, h)
+        try:
+            status, body = fetch(u, budget, tries=1)
+        except RateLimited as e:
+            st["rate_limits"].append({"at": now_iso(), "hour": key, "kind": "http_429", "retry_after": e.retry_after,
+                                      "waited_s": 0, "single_request": True})
+            st["hours"][key] = {"status": "unresolved", "error": "http_429", "at": now_iso()}
+            save_status(month, st)
+            raise SystemExit(f"{key}: 429 Too Many Requests (Retry-After {e.retry_after}); stopped, no retry")
+        except (NetworkError, BudgetSpent) as e:
+            st["rate_limits"].append({"at": now_iso(), "hour": key, "kind": "network", "waited_s": 0,
+                                      "single_request": True, "error": str(e)[-200:]})
+            st["hours"][key] = {"status": "unresolved", "error": str(e)[-200:], "at": now_iso()}
+            save_status(month, st)
+            raise SystemExit(f"{key}: {e}; stopped, no retry")
+        if status == 404 or not body:
+            st["hours"][key] = {"status": "http_404" if status == 404 else "empty_response", "at": now_iso()}
+            save_status(month, st)
+            raise SystemExit(f"{key}: {'404' if status == 404 else 'empty answer'}; nothing stored")
+        df = dk.decode(body, h, dk.PRICE_DIVISOR[SYMBOL])          # raises on a payload that is not whole records
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(body)
+        st["hours"][key] = {"status": "file", "bytes": len(body), "at": now_iso(), "single_request": True}
+        st["runs"].append({"at": now_iso(), "single_hour": key, "downloaded": 1,
+                           "budget": {k: budget.b[k] for k in ("requests", "max_requests", "wait_seconds",
+                                                               "max_wait_seconds")}})
+        save_status(month, st)
+    q = dk.quality(df)
+    print(json.dumps({"hour": key, "url": u, "http_status": status, "bytes": len(body), "sha256": sha256(body),
+                      "ticks": int(len(df)), "first": _iso(int(df["time_msc"].min())),
+                      "last": _iso(int(df["time_msc"].max())), "quality": q,
+                      "budget_requests": budget.b["requests"]}, indent=1, default=str))
+
+
 def load_month(key: str):
     """Decoded ticks of a month in hour order, plus one row per hour with its download status, read from the
     current files (never from an earlier manifest)."""
@@ -1141,7 +1190,7 @@ def _breaks(time_msc: pd.Series) -> list:
 COMMANDS = {"download": cmd_download, "manifest": cmd_manifest, "quality": cmd_quality, "export": cmd_export,
             "import": cmd_import, "verify-import": cmd_verify_import, "tester-dump": cmd_tester_dump,
             "verify-tester": cmd_verify_tester, "compare": cmd_compare, "verify-readback": cmd_verify_readback,
-            "custom-backup": cmd_custom_backup, "tester-probe": cmd_tester_probe, "probe-report": cmd_probe_report,
+            "custom-backup": cmd_custom_backup, "fetch-one": cmd_fetch_one, "tester-probe": cmd_tester_probe, "probe-report": cmd_probe_report,
             "manual-check": cmd_manual_check, "export-sample": cmd_export_sample,
             "manual-import-file": cmd_manual_import_file, "gui-prepare": cmd_gui_prepare, "gui-finish": cmd_gui_finish}
 SAMPLE_OK = ("verify-import", "tester-dump", "verify-tester", "verify-readback")
@@ -1157,7 +1206,7 @@ def main() -> None:
         if name in SAMPLE_OK:
             sp.add_argument("month", choices=sorted(MONTHS) + [SAMPLE])
         elif name not in ("import", "manual-check", "export-sample", "manual-import-file", "gui-prepare",
-                          "gui-finish", "custom-backup", "tester-probe", "probe-report"):
+                          "gui-finish", "custom-backup", "tester-probe", "probe-report", "fetch-one"):
             sp.add_argument("month", choices=sorted(MONTHS))
         if name == "download":
             sp.add_argument("--pause", type=float, default=5.0, help="seconds between requests")
@@ -1177,6 +1226,8 @@ def main() -> None:
             sp.add_argument("--span", choices=sorted(SPANS), help="the imported span: source of the comparisons")
             sp.add_argument("--window", nargs=2, help="Tester window [from, to) ISO UTC: every OnTick tick against the span")
             sp.add_argument("--list", action="store_true", help="include the first 50 stored ticks and bars")
+        if name == "fetch-one":
+            sp.add_argument("hour", help="ISO UTC hour; only the approved one is accepted")
         if name == "manual-import-file":
             sp.add_argument("--span", choices=["sample", "span0102"], default="sample")
         if name == "quality":
