@@ -1,0 +1,43 @@
+{
+ "backup": "20261005_221845",
+ "location": "outside git: NWQ_DUKA_DIR/mt5_backup/<stamp>",
+ "files": [
+  {
+   "path": "bases/symbols.custom.dat",
+   "bytes": 4096,
+   "sha256": "529c69eaa9ab51a542f97a8a160834039928a9aae7321c3c1b156c9daff20834",
+   "modified": "2026-10-05T22:02:29"
+  },
+  {
+   "path": "bases/Custom/history/XAUUSD.duka/2024.hcc",
+   "bytes": 18933,
+   "sha256": "3a45b47f7c9f6e74fa936aae44f6a6c7137127a974e039b89380a67da7612797",
+   "modified": "2026-10-05T22:01:50"
+  },
+  {
+   "path": "bases/Custom/history/XAUUSD.duka/2026.hcc",
+   "bytes": 15333,
+   "sha256": "2da2713864aa7bbbe197cf0f7589bbb67e3bfc46a2fdd73091e0c3c0bf106353",
+   "modified": "2026-10-05T22:06:18"
+  },
+  {
+   "path": "bases/Custom/ticks/XAUUSD.duka/202401.tkc",
+   "bytes": 40388,
+   "sha256": "ba3a3045779ef164f6b604d6864f6f9669cd8523b74b00e004ca3111715ac108",
+   "modified": "2026-10-05T22:01:49"
+  },
+  {
+   "path": "bases/Custom/ticks/XAUUSD.duka/202610.tkc",
+   "bytes": 1784,
+   "sha256": "084fc3085db231b220eae7a9d4c61471b1c6b37f4fb58303303f1743227f067c",
+   "modified": "2026-10-05T22:06:15"
+  },
+  {
+   "path": "bases/Custom/ticks/XAUUSD.duka/ticks.dat",
+   "bytes": 123312,
+   "sha256": "e6bb8414dc13bf8769bf981c1ce3ad544d63f81bb7510f34f8f00d647d79d90a",
+   "modified": "2026-10-05T22:06:18"
+  }
+ ],
+ "restore": "with every terminal closed, copy the saved bases/ files back over C:/mt5r/bases"
+}

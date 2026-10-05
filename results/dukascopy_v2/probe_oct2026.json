@@ -1,0 +1,18 @@
+{
+ "run": "duka_probe_oct2026",
+ "tester_lines": [],
+ "spec": null,
+ "readback": {
+  "meta": null,
+  "ticks": 0,
+  "bars_m1": 0
+ },
+ "readback_end": {
+  "meta": null,
+  "ticks": 0,
+  "bars_m1": 0
+ },
+ "ontick": {
+  "ticks": 0
+ }
+}

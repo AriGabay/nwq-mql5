@@ -726,17 +726,49 @@ def read_mt5_tick_lines(text: str) -> pd.DataFrame:
     return pd.DataFrame({"time_msc": t, "bid": [float(r[2]) for r in rows[1:]], "ask": [float(r[3]) for r in rows[1:]]})
 
 
-def manual_import_path() -> pathlib.Path:
-    return MANUAL_IMPORT / f"{CUSTOM}_{SAMPLE_HOUR:%Y%m%d_%H}00_UTC_ticks.csv"
+SPANS = {"sample": (SAMPLE_HOUR, SAMPLE_HOUR + dt.timedelta(hours=1)),
+         # every downloaded hour with ticks, contiguous: the market reopens 2024-01-01 23:00 UTC (the hours before
+         # are empty answers), 2024-01-02 22:00 is the daily break (empty answer)
+         "span0102": (dt.datetime(2024, 1, 1, 23, tzinfo=dt.timezone.utc), dt.datetime(2024, 1, 3, tzinfo=dt.timezone.utc))}
+
+
+CRLF = chr(13) + chr(10)
+
+
+def span_hours(name: str) -> list:
+    a, b = SPANS[name]
+    return [h for h in dk.month_hours(a.year, a.month) if a <= h < b]
+
+
+def span_ticks(name: str) -> tuple:
+    """The feed ticks of a span, hour by hour in order, and the source files (a missing file is refused)."""
+    frames, files = [], []
+    for h in span_hours(name):
+        p = raw_path(h)
+        if not p.exists():
+            raise SystemExit(f"{p} missing: the span is not covered by downloaded files")
+        data = p.read_bytes()
+        df = dk.decode(data, h, dk.PRICE_DIVISOR[SYMBOL])
+        frames.append(df)
+        files.append({"file": p.relative_to(RAW).as_posix(), "bytes": len(data), "sha256": sha256(data),
+                      "ticks": int(len(df))})
+    return pd.concat(frames, ignore_index=True), files
+
+
+def manual_import_path(name: str = "sample") -> pathlib.Path:
+    if name == "sample":
+        return MANUAL_IMPORT / f"{CUSTOM}_{SAMPLE_HOUR:%Y%m%d_%H}00_UTC_ticks.csv"
+    a, b = SPANS[name]
+    return MANUAL_IMPORT / f"{CUSTOM}_{a:%Y%m%d_%H%M}_to_{b:%Y%m%d_%H%M}_UTC_ticks.csv"
 
 
 def cmd_manual_import_file(args) -> None:
-    """The sample hour's feed ticks as a file for the user's manual import, outside git, never overwritten with
-    different content; a manifest next to it and in RESULTS."""
-    ticks = sample_ticks()
-    src = raw_path(SAMPLE_HOUR)
-    data = ("\r\n".join(mt5_tick_lines(ticks)) + "\r\n").encode("ascii")
-    dst = manual_import_path()
+    """A span's feed ticks as a file for the user's manual import, outside git, never overwritten with different
+    content; a manifest next to it and in the results folder."""
+    ticks, files = span_ticks(args.span)
+    a, b = SPANS[args.span]
+    data = (CRLF.join(mt5_tick_lines(ticks)) + CRLF).encode("ascii")
+    dst = manual_import_path(args.span)
     dst.parent.mkdir(parents=True, exist_ok=True)
     if dst.exists() and dst.read_bytes() != data:
         raise SystemExit(f"{dst} exists with other content; never overwritten")
@@ -745,10 +777,10 @@ def cmd_manual_import_file(args) -> None:
     back = read_mt5_tick_lines(dst.read_text(encoding="ascii"))
     d = np.diff(ticks["time_msc"].to_numpy())
     manual = {s: sha256((MANUAL / n).read_bytes()) for s, n in MANUAL_FILES.items() if (MANUAL / n).exists()}
-    man = {"purpose": "import path and data fidelity check of one hour; not a month's coverage",
-           "source": {"kind": "Dukascopy free historical feed file (LZMA .bi5), downloaded earlier",
-                      "file": src.relative_to(RAW).as_posix(), "bytes": src.stat().st_size,
-                      "sha256": sha256(src.read_bytes())},
+    man = {"purpose": "import path and data fidelity check; not a month's coverage", "span": args.span,
+           "source": {"kind": "Dukascopy free historical feed files (LZMA .bi5), downloaded earlier",
+                      "files": files} if args.span != "sample" else
+                     {"kind": "Dukascopy free historical feed file (LZMA .bi5), downloaded earlier", **files[0]},
            "file": {"name": dst.name, "location": "outside git: NWQ_DUKA_DIR/mt5_manual (default D:/data/dukascopy)",
                     "bytes": len(data), "sha256": sha256(data),
                     "format": "ASCII, CRLF, tab-separated, header <DATE> <TIME> <BID> <ASK> <LAST> <VOLUME>; "
@@ -757,16 +789,20 @@ def cmd_manual_import_file(args) -> None:
                     "time_zone": "UTC as in the feed (the terminal stores times without a zone)"},
            "ticks": int(len(ticks)), "first_tick_utc": _iso(int(ticks["time_msc"].min())),
            "last_tick_utc": _iso(int(ticks["time_msc"].max())),
-           "period": {"from_utc": SAMPLE_HOUR.isoformat(),
-                      "to_utc": (SAMPLE_HOUR + dt.timedelta(hours=1)).isoformat() + " (exclusive)"},
+           "period": {"from_utc": a.isoformat(), "to_utc": b.isoformat() + " (exclusive)"},
            "order": "feed order, unchanged", "same_ms_as_previous": int((d == 0).sum()),
            "out_of_order": int((d < 0).sum()),
            "nothing_removed_or_added": "every feed record is one line; duplicates kept; no time invented",
            "written_file_read_back_vs_feed": compare_ticks(ticks, back, "file written vs feed ticks"),
            "manual_web_export_sha256_unchanged": manual}
-    evaluate.save(man, RESULTS / "manual_import_file_manifest.json")
+    res = (RESULTS / "manual_import_file_manifest.json" if args.span == "sample"
+           else RESULTS2 / f"manual_import_file_manifest_{args.span}.json")
+    if res.exists():                                    # committed evidence is never overwritten
+        print(f"{res} exists; kept unchanged")
+    else:
+        evaluate.save(man, res)
     (dst.parent / (dst.stem + "_manifest.json")).write_text(json.dumps(man, indent=1), encoding="utf-8")
-    print(json.dumps(man, indent=1))
+    print(json.dumps({k: v for k, v in man.items() if k != "source"}, indent=1))
 
 
 def cmd_gui_prepare(args) -> None:
@@ -782,6 +818,8 @@ def cmd_gui_prepare(args) -> None:
     env.assert_trade_safety(cfg)
     if (GUI_DIR / "open_session.json").exists():
         raise SystemExit("a manual session is already prepared; run gui-finish first")
+    if (cfg.mt5_dir / "bases" / "symbols.custom.dat").exists():
+        cmd_custom_backup(args)                         # the custom symbol as it is, before the user changes it
     stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
     keep = GUI_DIR / stamp
     keep.mkdir(parents=True)
@@ -897,6 +935,126 @@ def tester_ticks(rid: str) -> pd.DataFrame:
     return pd.read_csv(runner.RUNS / rid / f"rl_ticks_{rid}.csv")
 
 
+# ------------------------------------------------------------------ v2: backup, diagnostics, OnTick check (2026-10-05)
+RESULTS2 = REPO / "results" / "dukascopy_v2"
+
+
+def cmd_custom_backup(args) -> None:
+    """A copy of the isolated copy's custom-symbol definition and data (bases/symbols.custom.dat, bases/Custom)
+    outside git, with sha256 per file, before any change to the symbol. Reads only; refuses while a terminal runs."""
+    cfg = env.load_config()
+    if runner.isolated_processes(cfg):
+        raise SystemExit("the isolated terminal is running; close it first")
+    base = cfg.mt5_dir / "bases"
+    srcs = [base / "symbols.custom.dat"] + sorted(p for p in (base / "Custom").rglob("*") if p.is_file())
+    stamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    keep = RAW / "mt5_backup" / stamp
+    files = []
+    for p in srcs:
+        rel = p.relative_to(base)
+        dst = keep / "bases" / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(p, dst)
+        h, h2 = sha256(p.read_bytes()), sha256(dst.read_bytes())
+        if h != h2:
+            raise SystemExit(f"{rel}: copy differs from the source")
+        files.append({"path": "bases/" + rel.as_posix(), "bytes": p.stat().st_size, "sha256": h,
+                      "modified": dt.datetime.fromtimestamp(p.stat().st_mtime).isoformat(timespec="seconds")})
+    out = {"backup": stamp, "location": "outside git: NWQ_DUKA_DIR/mt5_backup/<stamp>", "files": files,
+           "restore": "with every terminal closed, copy the saved bases/ files back over C:/mt5r/bases"}
+    (keep / "backup_manifest.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
+    evaluate.save(out, RESULTS2 / f"backup_{stamp}.json")
+    print(json.dumps(out, indent=1))
+
+
+def probe_run_id(tag: str) -> str:
+    return f"duka_probe_{tag}"
+
+
+def cmd_tester_probe(args) -> None:
+    """The diagnostic EA (never trades, real ticks) on XAUUSD.duka for a Tester window, with the stored ticks and
+    M1 bars of a readback range written at init and at deinit. New run ID per tag; an existing run is never reused."""
+    rid = probe_run_id(args.tag)
+    if (runner.RUNS / rid).exists():
+        raise SystemExit(f"{rid} exists; earlier runs are kept - use a new tag")
+    cfg = env.load_config()
+    shutil.copy2(SRC_DIR / DUMP_EA, cfg.mt5_dir / "MQL5" / "Experts" / DUMP_EA)
+    comp = compmod.compile_ea(cfg, DUMP_EA)
+    if comp["errors"] != 0 or not comp["ex5_exists"]:
+        raise SystemExit(f"compile failed: {comp['log'][-1500:]}")
+    ms = lambda s: int(dt.datetime.fromisoformat(s).replace(tzinfo=dt.timezone.utc).timestamp() * 1000)
+    lines = [f"ResearchRunTag={rid}", f"ReadbackFromMsc={ms(args.rb_from)}", f"ReadbackToMsc={ms(args.rb_to) - 1}"]
+    text = ini.render(expert=pathlib.Path(DUMP_EA).stem + ".ex5", symbol=CUSTOM, period="M1",
+                      from_date=args.date_from, to_date_inclusive=args.date_to, deposit=10000,
+                      report=f"reports\\{rid}", set_lines=lines)
+    res = runner.run(cfg, rid, text, pathlib.Path(DUMP_EA).stem + ".ex5", meta={"role": "duka_data_check_v2"})
+    print(rid, res.status, res.seconds)
+
+
+def agent_lines(rid: str) -> list:
+    """The Tester agent's lines of this run only (the day's log holds earlier runs): from the agent start before
+    the line naming the run to the agent stop after it; kept are the start shift, synchronization and tick lines."""
+    out = []
+    keys = ("start time changed", "ticks, ", "history synchronized", "ticks synchronized", "testing of",
+            "history begins", "contains")
+    for f in (runner.RUNS / rid / "logs").glob("Tester__Agent*"):
+        lines = env.read_text(f, errors="replace").splitlines()
+        tagged = [i for i, l in enumerate(lines) if f"ResearchRunTag={rid}" in l]
+        if not tagged:
+            continue
+        i = tagged[-1]
+        a = max([k for k in range(i) if "MetaTester 5 started" in lines[k]], default=0)
+        b = min([k for k in range(i, len(lines)) if "MetaTester 5 stopped" in lines[k]], default=len(lines) - 1)
+        out += [l.split("\t")[-1] for l in lines[a:b + 1] if any(w in l for w in keys)]
+    return out
+
+
+def cmd_probe_report(args) -> None:
+    """What a probe run saw: spec (incl. formula), stored ticks and M1 bars at init and at end, the delivered
+    OnTick sequence, and the Tester's own lines; compared with the source ticks of the window when given."""
+    rid = probe_run_id(args.tag)
+    d = runner.RUNS / rid
+    read = lambda n: pd.read_csv(d / f"rl_{n}_{rid}.csv") if (d / f"rl_{n}_{rid}.csv").exists() else None
+    spec = read("spec")
+    out = {"run": rid, "tester_lines": [l for l in agent_lines(rid) if "Agent" not in l][-12:],
+           "spec": dict(zip(spec["key"], spec["value"].astype(str))) if spec is not None else None}
+    for n in ("readback", "readback_end"):
+        t, r, m = read(n), read(n + "_rates"), read(n + "_meta")
+        out[n] = {"meta": dict(zip(m["key"], m["value"].astype(str))) if m is not None else None,
+                  "ticks": 0 if t is None else int(len(t)), "bars_m1": 0 if r is None else int(len(r))}
+        if t is not None and len(t):
+            out[n]["first_tick"] = _iso(int(t["time_msc"].min()))
+            out[n]["last_tick"] = _iso(int(t["time_msc"].max()))
+            out[n]["ticks_by_day"] = {str(k): int(v) for k, v in
+                                      pd.to_datetime(t["time_msc"], unit="ms").dt.date.value_counts().sort_index().items()}
+        if args.list and t is not None:
+            out[n]["tick_rows"] = t.head(50).to_dict("records")
+            out[n]["bar_rows"] = r.head(50).to_dict("records") if r is not None else []
+    ticks = read("ticks")
+    out["ontick"] = {"ticks": 0 if ticks is None else int(len(ticks))}
+    if ticks is not None and len(ticks):
+        out["ontick"].update(first=_iso(int(ticks["time_msc"].min())), last=_iso(int(ticks["time_msc"].max())))
+    if args.span:                   # the imported span's feed ticks are the source of every comparison
+        src_all, _ = span_ticks(args.span)
+        for n in ("readback", "readback_end"):
+            t, m = read(n), read(n + "_meta")
+            if t is None or m is None:
+                continue
+            mm = dict(zip(m["key"], m["value"]))
+            s = src_all[(src_all["time_msc"] >= int(mm["from_msc"])) & (src_all["time_msc"] <= int(mm["to_msc"]))]
+            out[n]["vs_source"] = compare_ticks(s, t, f"{n}: stored ticks against the feed in the readback range")
+        if args.window:
+            frm, to = (int(dt.datetime.fromisoformat(x).replace(tzinfo=dt.timezone.utc).timestamp() * 1000)
+                       for x in args.window)
+            s = src_all[(src_all["time_msc"] >= frm) & (src_all["time_msc"] < to)]
+            got = ticks if ticks is not None else s.iloc[:0]
+            out["ontick_vs_source"] = compare_ticks(s, got, f"every OnTick tick against the feed in "
+                                                            f"[{args.window[0]}, {args.window[1]})")
+            out["ontick_outside_window"] = int(((got["time_msc"] < frm) | (got["time_msc"] >= to)).sum())
+    evaluate.save(out, RESULTS2 / f"probe_{args.tag}.json")
+    print(json.dumps({k: v for k, v in out.items() if k != "spec"}, indent=1, default=str)[:6000])
+
+
 def cmd_verify_readback(args) -> None:
     """The stored ticks the Tester read back (CopyTicksRange at init) against the source, tick by tick."""
     src = source_ticks(args.month)
@@ -983,6 +1141,7 @@ def _breaks(time_msc: pd.Series) -> list:
 COMMANDS = {"download": cmd_download, "manifest": cmd_manifest, "quality": cmd_quality, "export": cmd_export,
             "import": cmd_import, "verify-import": cmd_verify_import, "tester-dump": cmd_tester_dump,
             "verify-tester": cmd_verify_tester, "compare": cmd_compare, "verify-readback": cmd_verify_readback,
+            "custom-backup": cmd_custom_backup, "tester-probe": cmd_tester_probe, "probe-report": cmd_probe_report,
             "manual-check": cmd_manual_check, "export-sample": cmd_export_sample,
             "manual-import-file": cmd_manual_import_file, "gui-prepare": cmd_gui_prepare, "gui-finish": cmd_gui_finish}
 SAMPLE_OK = ("verify-import", "tester-dump", "verify-tester", "verify-readback")
@@ -998,7 +1157,7 @@ def main() -> None:
         if name in SAMPLE_OK:
             sp.add_argument("month", choices=sorted(MONTHS) + [SAMPLE])
         elif name not in ("import", "manual-check", "export-sample", "manual-import-file", "gui-prepare",
-                          "gui-finish"):
+                          "gui-finish", "custom-backup", "tester-probe", "probe-report"):
             sp.add_argument("month", choices=sorted(MONTHS))
         if name == "download":
             sp.add_argument("--pause", type=float, default=5.0, help="seconds between requests")
@@ -1007,6 +1166,19 @@ def main() -> None:
             sp.add_argument("--max-failures", type=int, default=4, help="network failures in a row before stopping")
         if name == "tester-dump":
             sp.add_argument("--readback", action="store_true", help="also write the stored ticks of the period")
+        if name in ("tester-probe", "probe-report"):
+            sp.add_argument("tag")
+        if name == "tester-probe":
+            sp.add_argument("date_from", help="Tester FromDate YYYY.MM.DD")
+            sp.add_argument("date_to", help="Tester last day YYYY.MM.DD (inclusive)")
+            sp.add_argument("rb_from", help="readback start, ISO UTC")
+            sp.add_argument("rb_to", help="readback end (exclusive), ISO UTC")
+        if name == "probe-report":
+            sp.add_argument("--span", choices=sorted(SPANS), help="the imported span: source of the comparisons")
+            sp.add_argument("--window", nargs=2, help="Tester window [from, to) ISO UTC: every OnTick tick against the span")
+            sp.add_argument("--list", action="store_true", help="include the first 50 stored ticks and bars")
+        if name == "manual-import-file":
+            sp.add_argument("--span", choices=["sample", "span0102"], default="sample")
         if name == "quality":
             sp.add_argument("--partial", action="store_true", help="a labelled check of an incomplete month")
         if name == "import":

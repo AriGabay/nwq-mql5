@@ -322,3 +322,42 @@ def test_the_manual_session_config_is_offline_with_trading_off_and_starts_nothin
     assert "Login=0" in ini and "ProxyEnable=1" in ini and "ProxyAddress=127.0.0.1:9" in ini
     assert "AllowLiveTrading=0" in ini and "Enabled=0" in ini
     assert "[StartUp]" not in ini and "Script=" not in ini and "Password" not in ini
+
+
+def test_the_span_is_contiguous_real_hours_only_and_never_shifted():
+    a, b = dc.SPANS["span0102"]
+    hours = dc.span_hours("span0102")
+    assert hours[0] == a and hours[-1] == b - dt.timedelta(hours=1) and len(hours) == 25
+    assert all(h.strftime("%Y-%m") in dc.MONTHS for h in hours)
+    assert dc.span_hours("sample") == [dc.SAMPLE_HOUR]
+    assert dc.manual_import_path("span0102").name == "XAUUSD.duka_20240101_2300_to_20240103_0000_UTC_ticks.csv"
+
+
+def test_a_probe_run_is_never_reused(monkeypatch, tmp_path):
+    import argparse
+    monkeypatch.setattr(dc.runner, "RUNS", tmp_path)
+    (tmp_path / dc.probe_run_id("x")).mkdir()
+    with pytest.raises(SystemExit, match="exists"):
+        dc.cmd_tester_probe(argparse.Namespace(tag="x", date_from="2024.01.02", date_to="2024.01.02",
+                                               rb_from="2024-01-01T23:00:00", rb_to="2024-01-03T00:00:00"))
+
+
+def test_probe_log_lines_come_from_this_run_only(monkeypatch, tmp_path):
+    monkeypatch.setattr(dc.runner, "RUNS", tmp_path)
+    logs = tmp_path / "duka_probe_t" / "logs"
+    logs.mkdir(parents=True)
+    tab = chr(9)
+    rows = ["MetaTester 5 started", "XAUUSD.s,M1: 99 ticks, 1 bars generated", "MetaTester 5 stopped",
+            "MetaTester 5 started", "XAUUSD.duka: start time changed to 2024.01.03 00:00", "testing of x started",
+            "  ResearchRunTag=duka_probe_t", "XAUUSD.duka,M1: 0 ticks, 0 bars generated", "MetaTester 5 stopped"]
+    (logs / "Tester__Agent-1__logs__d.log").write_text(chr(10).join("CS" + tab + "0" + tab + "t" + tab + r
+                                                                    for r in rows), encoding="utf-8")
+    got = dc.agent_lines("duka_probe_t")
+    assert "XAUUSD.s,M1: 99 ticks, 1 bars generated" not in got
+    assert any("start time changed" in l for l in got) and any("0 ticks" in l for l in got)
+
+
+def test_the_dump_ea_reads_back_without_trading_and_reports_the_definition():
+    src = (dc.SRC_DIR / dc.DUMP_EA).read_text(encoding="utf-8")
+    assert not any(c in src for c in dc.TRADE_CALLS)
+    assert "SYMBOL_FORMULA" in src and "CopyRates" in src and 'Readback("readback_end")' in src
